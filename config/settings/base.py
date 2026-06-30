@@ -6,6 +6,8 @@ env = environ.Env()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
+environ.Env.read_env(BASE_DIR / ".env")
+
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 
 ALLOWED_HOSTS: list[str] = env.list("DJANGO_ALLOWED_HOSTS", default=[])
@@ -150,6 +152,15 @@ SPECTACULAR_SETTINGS = {
             "description": "Supplier order fulfilment: confirm, dispatch, deliver",
         },
         {"name": "Admin: Orders", "description": "Admin order management and dispute resolution"},
+        {
+            "name": "Payments (Buyer)",
+            "description": "Create Stripe PaymentIntents and view payment history",
+        },
+        {
+            "name": "Payments (Supplier)",
+            "description": "Supplier payout ledger: view pending, processing, and paid payouts",
+        },
+        {"name": "Admin: Payments", "description": "Admin payment and payout oversight"},
     ],
 }
 
@@ -208,6 +219,7 @@ CACHES = {
 STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")
 STRIPE_PUBLISHABLE_KEY = env("STRIPE_PUBLISHABLE_KEY", default="")
 STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
+PLATFORM_FEE_PERCENT = env("PLATFORM_FEE_PERCENT", default="10")
 
 # Frontend
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
