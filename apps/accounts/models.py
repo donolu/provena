@@ -2,6 +2,7 @@ import uuid
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+from django.utils import timezone
 
 
 class Role(models.TextChoices):
@@ -14,6 +15,7 @@ class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra):
         if not email:
             raise ValueError("Email is required")
+        email = email.lower()
         user = self.model(email=self.normalize_email(email), **extra)
         user.set_password(password)
         user.save(using=self._db)
@@ -49,3 +51,23 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+class PasswordResetToken(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="password_reset_tokens")
+    # SHA-256 hash of the raw token sent to the user; raw token never stored
+    token_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"PasswordResetToken({self.user.email})"
+
+    @property
+    def is_valid(self):
+        return self.used_at is None and self.expires_at > timezone.now()

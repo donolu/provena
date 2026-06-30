@@ -24,6 +24,7 @@ dependencies = [
     "stripe>=10.0",
     "Pillow>=10.0",
     "sentry-sdk[django]>=2.0",
+    "pyotp>=2.9",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +40,7 @@ dev = [
     "djangorestframework-stubs>=3.15",
     "bandit>=1.7",
     "safety>=3.0",
+    "pre-commit>=3.7",
 ]
 
 [tool.pytest.ini_options]
@@ -65,6 +67,10 @@ ignore_missing_imports = true
 
 [tool.django-stubs]
 django_settings_module = "config.settings.development"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["apps*", "config*"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "migrations"]
