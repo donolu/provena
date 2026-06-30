@@ -161,6 +161,16 @@ SPECTACULAR_SETTINGS = {
             "description": "Supplier payout ledger: view pending, processing, and paid payouts",
         },
         {"name": "Admin: Payments", "description": "Admin payment and payout oversight"},
+        {"name": "Marketplace: Cart", "description": "Buyer shopping cart management"},
+        {"name": "Marketplace: Wishlist", "description": "Buyer saved items"},
+        {
+            "name": "Marketplace: Reviews",
+            "description": "Product reviews: submit, list approved; verified-purchase badge auto-applied",
+        },
+        {
+            "name": "Admin: Marketplace",
+            "description": "Admin review moderation: approve or delete",
+        },
     ],
 }
 
