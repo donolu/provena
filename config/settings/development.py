@@ -1,0 +1,26 @@
+import environ
+
+from .base import *  # noqa: F401, F403
+
+env = environ.Env()
+
+DEBUG = True
+
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
+
+# Use console email backend in development
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# Use local filesystem for media in development
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"  # noqa: F405
+
+# Disable throttling in development
+REST_FRAMEWORK = {  # noqa: F405
+    **REST_FRAMEWORK,  # noqa: F405
+    "DEFAULT_THROTTLE_CLASSES": [],
+}
