@@ -133,6 +133,14 @@ SPECTACULAR_SETTINGS = {
         {"name": "Stripe Connect", "description": "Stripe Connect onboarding for supplier payouts"},
         {"name": "Admin: Suppliers", "description": "Admin-only supplier management"},
         {"name": "Admin: KYC Documents", "description": "Admin-only document review queue"},
+        {
+            "name": "Inventory (Supplier)",
+            "description": "Supplier stock management: receive lots, adjust quantities, view audit log",
+        },
+        {
+            "name": "Admin: Inventory",
+            "description": "Admin-only inventory overview and low-stock monitoring",
+        },
     ],
 }
 
