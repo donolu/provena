@@ -38,7 +38,7 @@ docker compose exec api python manage.py migrate
 docker compose exec api python manage.py createsuperuser
 ```
 
-API available at `http://localhost:8000/api/v1/`  
+API available at `http://localhost:8000/api/v1/`
 Admin panel at `http://localhost:8000/admin/`
 
 ## Development
@@ -46,6 +46,9 @@ Admin panel at `http://localhost:8000/admin/`
 ```bash
 # Install dependencies locally
 pip install -e ".[dev]"
+
+# Install git hooks (run once per clone)
+pre-commit install
 
 # Run tests
 pytest
@@ -61,6 +64,8 @@ mypy apps/
 bandit -r apps/
 safety check
 ```
+
+Pre-commit runs ruff, ruff-format, and bandit automatically on every `git commit`. CI runs the same checks via `pre-commit run --all-files`.
 
 ## Project structure
 
