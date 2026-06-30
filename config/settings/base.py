@@ -141,6 +141,15 @@ SPECTACULAR_SETTINGS = {
             "name": "Admin: Inventory",
             "description": "Admin-only inventory overview and low-stock monitoring",
         },
+        {
+            "name": "Orders (Buyer)",
+            "description": "Place orders, view order history, cancel, raise disputes",
+        },
+        {
+            "name": "Orders (Supplier)",
+            "description": "Supplier order fulfilment: confirm, dispatch, deliver",
+        },
+        {"name": "Admin: Orders", "description": "Admin order management and dispute resolution"},
     ],
 }
 
