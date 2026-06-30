@@ -171,8 +171,17 @@ SPECTACULAR_SETTINGS = {
             "name": "Admin: Marketplace",
             "description": "Admin review moderation: approve or delete",
         },
+        {
+            "name": "Notifications",
+            "description": "In-app notification feed: list, mark read, delete",
+        },
     ],
 }
+
+NOTIFICATION_BACKENDS = [
+    "apps.notifications.backends.InAppBackend",
+    "apps.notifications.backends.EmailBackend",
+]
 
 # DRF
 REST_FRAMEWORK = {
