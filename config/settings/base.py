@@ -175,6 +175,14 @@ SPECTACULAR_SETTINGS = {
             "name": "Notifications",
             "description": "In-app notification feed: list, mark read, delete",
         },
+        {
+            "name": "Admin: Analytics",
+            "description": "Admin-only reports: sales, revenue trends, top products, supplier performance, inventory health, reviews, payouts",
+        },
+        {
+            "name": "Analytics (Supplier)",
+            "description": "Supplier self-service analytics: own revenue summary and payout breakdown",
+        },
     ],
 }
 
