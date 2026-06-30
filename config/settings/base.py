@@ -27,6 +27,7 @@ THIRD_PARTY_APPS = [
     "django_celery_beat",
     "django_celery_results",
     "storages",
+    "drf_spectacular",
 ]
 
 LOCAL_APPS = [
@@ -83,7 +84,10 @@ AUTH_USER_MODEL = "accounts.User"
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 12}},
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 12},
+    },
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
@@ -99,8 +103,42 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# OpenAPI docs
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Provena API",
+    "DESCRIPTION": (
+        "REST API for the Provena supply chain and marketplace platform. "
+        "All endpoints are versioned under `/api/v1/`. "
+        "Authentication uses JWT Bearer tokens (15-minute access, 30-day rotating refresh)."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SORT_OPERATIONS": False,
+    "ENUM_NAME_OVERRIDES": {
+        "SupplierStatusEnum": "apps.suppliers.models.SupplierStatus",
+        "DocumentStatusEnum": "apps.suppliers.models.DocumentStatus",
+        "DocumentTypeEnum": "apps.suppliers.models.DocumentType",
+    },
+    "TAGS": [
+        {"name": "Authentication", "description": "Register, login, logout, token refresh"},
+        {"name": "User Profile", "description": "View and update the authenticated user's profile"},
+        {"name": "Password Reset", "description": "Self-service password reset via email"},
+        {"name": "Two-Factor Authentication", "description": "TOTP setup, enable, and disable"},
+        {"name": "Suppliers (Public)", "description": "Publicly readable supplier data"},
+        {
+            "name": "Suppliers (Supplier)",
+            "description": "Supplier self-service profile and documents",
+        },
+        {"name": "Stripe Connect", "description": "Stripe Connect onboarding for supplier payouts"},
+        {"name": "Admin: Suppliers", "description": "Admin-only supplier management"},
+        {"name": "Admin: KYC Documents", "description": "Admin-only document review queue"},
+    ],
+}
+
 # DRF
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],

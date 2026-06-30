@@ -1,3 +1,5 @@
+from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
+from rest_framework import serializers as drf_serializers
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
@@ -31,6 +33,17 @@ def _issue_token_pair(user):
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Authentication"],
+        summary="Register a new user",
+        description="Creates a buyer account and returns a JWT token pair. "
+        "Password must be at least 12 characters.",
+        request=RegisterSerializer,
+        responses={
+            201: OpenApiResponse(description="JWT access/refresh tokens and user profile"),
+            400: OpenApiResponse(description="Validation error (duplicate email, weak password)"),
+        },
+    )
     def post(self, request: Request) -> Response:
         s = RegisterSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -47,6 +60,23 @@ class RegisterView(APIView):
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Authentication"],
+        summary="Log in",
+        description="Authenticates with email and password. "
+        "If TOTP is enabled the response contains `totp_required: true` and a "
+        "`totp_session_token`; submit that token with the 6-digit code to "
+        "`POST /api/v1/auth/login/totp/` to complete login. "
+        "Accounts are locked for 30 minutes after 5 failed attempts.",
+        request=LoginSerializer,
+        responses={
+            200: OpenApiResponse(
+                description="JWT token pair, OR `{totp_required: true, totp_session_token}` "
+                "when TOTP is enabled"
+            ),
+            401: OpenApiResponse(description="Invalid credentials or account locked"),
+        },
+    )
     def post(self, request: Request) -> Response:
         s = LoginSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -69,6 +99,21 @@ class LoginView(APIView):
 class TOTPLoginView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Authentication"],
+        summary="Complete TOTP login",
+        description="Second step of the TOTP two-factor login flow. "
+        "Submit the `totp_session_token` from the initial login response alongside "
+        "the 6-digit TOTP code from the authenticator app. "
+        "The session token is single-use and expires after 5 minutes.",
+        request=TOTPLoginSerializer,
+        responses={
+            200: OpenApiResponse(description="JWT access/refresh tokens and user profile"),
+            401: OpenApiResponse(
+                description="Invalid or expired session token, or wrong TOTP code"
+            ),
+        },
+    )
     def post(self, request: Request) -> Response:
         s = TOTPLoginSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -85,11 +130,25 @@ class TOTPLoginView(APIView):
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Authentication"],
+        summary="Log out",
+        description="Blacklists the supplied refresh token so it cannot be used again. "
+        "The short-lived access token will expire naturally after 15 minutes. "
+        "Returns 204 regardless of whether the token was valid.",
+        request=inline_serializer(
+            "LogoutRequest",
+            fields={
+                "refresh": drf_serializers.CharField(help_text="The refresh token to blacklist")
+            },
+        ),
+        responses={204: OpenApiResponse(description="Logged out")},
+    )
     def post(self, request: Request) -> Response:
         try:
             token = RefreshToken(request.data.get("refresh", ""))
             token.blacklist()
-        except (TokenError, Exception):
+        except (TokenError, Exception):  # noqa: S110
             pass  # Blacklisting is best-effort; short-lived access tokens expire naturally
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -97,9 +156,25 @@ class LogoutView(APIView):
 class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["User Profile"],
+        summary="Get current user profile",
+        responses={200: UserProfileSerializer},
+    )
     def get(self, request: Request) -> Response:
         return Response(UserProfileSerializer(request.user).data)
 
+    @extend_schema(
+        tags=["User Profile"],
+        summary="Update current user profile",
+        description="Partial update: only include fields you want to change. "
+        "Email and role cannot be changed via this endpoint.",
+        request=UserProfileSerializer,
+        responses={
+            200: UserProfileSerializer,
+            400: OpenApiResponse(description="Validation error"),
+        },
+    )
     def patch(self, request: Request) -> Response:
         s = UserProfileSerializer(request.user, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
@@ -110,6 +185,17 @@ class UserProfileView(APIView):
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["User Profile"],
+        summary="Change password",
+        description="Requires the current password for verification. "
+        "New password must meet the same strength requirements as registration.",
+        request=ChangePasswordSerializer,
+        responses={
+            204: OpenApiResponse(description="Password changed"),
+            400: OpenApiResponse(description="Current password incorrect or new password too weak"),
+        },
+    )
     def post(self, request: Request) -> Response:
         s = ChangePasswordSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -127,16 +213,38 @@ class ChangePasswordView(APIView):
 class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Password Reset"],
+        summary="Request a password reset email",
+        description="Sends a password reset link to the supplied email address. "
+        "Always returns 200 — no indication is given whether the email exists "
+        "(prevents user enumeration).",
+        request=PasswordResetRequestSerializer,
+        responses={200: OpenApiResponse(description="Reset email sent (if account exists)")},
+    )
     def post(self, request: Request) -> Response:
         s = PasswordResetRequestSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         services.request_password_reset(s.validated_data["email"])
-        return Response({"message": "If an account exists with that email, a reset link has been sent."})
+        return Response(
+            {"message": "If an account exists with that email, a reset link has been sent."}
+        )
 
 
 class PasswordResetConfirmView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=["Password Reset"],
+        summary="Confirm password reset",
+        description="Consumes the single-use token from the reset email and sets a new password. "
+        "Tokens expire after 1 hour.",
+        request=PasswordResetConfirmSerializer,
+        responses={
+            204: OpenApiResponse(description="Password reset successful"),
+            400: OpenApiResponse(description="Token invalid, expired, or already used"),
+        },
+    )
     def post(self, request: Request) -> Response:
         s = PasswordResetConfirmSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -153,6 +261,16 @@ class PasswordResetConfirmView(APIView):
 class TOTPSetupView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Two-Factor Authentication"],
+        summary="Get TOTP setup URI",
+        description="Returns an `otpauth://` URI that can be rendered as a QR code for scanning "
+        "with an authenticator app (Google Authenticator, Authy, etc.). "
+        "After scanning, verify the setup by calling `POST /api/v1/auth/totp/enable/`.",
+        responses={
+            200: OpenApiResponse(description="`{otpauth_uri: 'otpauth://totp/...'}`"),
+        },
+    )
     def get(self, request: Request) -> Response:
         uri = services.setup_totp(request.user)
         return Response({"otpauth_uri": uri})
@@ -161,6 +279,17 @@ class TOTPSetupView(APIView):
 class TOTPEnableView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Two-Factor Authentication"],
+        summary="Enable TOTP",
+        description="Verifies a code from the authenticator app and marks TOTP as enabled. "
+        "Must be called after `GET /api/v1/auth/totp/setup/`.",
+        request=TOTPVerifySerializer,
+        responses={
+            200: OpenApiResponse(description="`{totp_enabled: true}`"),
+            400: OpenApiResponse(description="Invalid TOTP code"),
+        },
+    )
     def post(self, request: Request) -> Response:
         s = TOTPVerifySerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -175,6 +304,16 @@ class TOTPEnableView(APIView):
 class TOTPDisableView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=["Two-Factor Authentication"],
+        summary="Disable TOTP",
+        description="Requires a valid TOTP code as confirmation before disabling two-factor authentication.",
+        request=TOTPVerifySerializer,
+        responses={
+            200: OpenApiResponse(description="`{totp_enabled: false}`"),
+            400: OpenApiResponse(description="Invalid TOTP code"),
+        },
+    )
     def post(self, request: Request) -> Response:
         s = TOTPVerifySerializer(data=request.data)
         s.is_valid(raise_exception=True)
