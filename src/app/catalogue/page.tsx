@@ -5,7 +5,9 @@ import { ChevronDown } from 'lucide-react'
 import { Nav } from '@/components/nav'
 import { CategoryTabs } from '@/components/category-tabs'
 import { SupplierSection } from '@/components/supplier-section'
+import { CartDrawer } from '@/components/cart-drawer'
 import { categories, groupBySupplier, products } from '@/lib/mock-data'
+import { buildCartItems } from '@/lib/cart-utils'
 
 type SortKey = 'best-match' | 'price-asc' | 'price-desc' | 'rating'
 
@@ -35,6 +37,7 @@ export default function CataloguePage() {
   const [sort, setSort]         = useState<SortKey>('best-match')
   const [sortOpen, setSortOpen] = useState(false)
   const [cart, setCart]         = useState<Map<string, number>>(new Map())
+  const [cartOpen, setCartOpen] = useState(false)
   const [wishlist, setWishlist] = useState<Set<string>>(new Set())
 
   const filtered = useMemo(() => {
@@ -44,16 +47,39 @@ export default function CataloguePage() {
     return applySort(base, sort)
   }, [activeCategory, sort])
 
-  const grouped  = useMemo(() => groupBySupplier(filtered), [filtered])
+  const grouped = useMemo(() => groupBySupplier(filtered), [filtered])
+
+  const cartItems = useMemo(() => buildCartItems(cart, products), [cart])
+
   const cartCount = useMemo(
-    () => Array.from(cart.values()).reduce((s, n) => s + n, 0),
-    [cart],
+    () => cartItems.reduce((s, item) => s + item.quantity, 0),
+    [cartItems],
   )
 
   function handleAddToCart(variantId: string) {
     setCart((prev) => {
       const next = new Map(prev)
       next.set(variantId, (next.get(variantId) ?? 0) + 1)
+      return next
+    })
+  }
+
+  function handleUpdateQuantity(variantId: string, quantity: number) {
+    setCart((prev) => {
+      const next = new Map(prev)
+      if (quantity <= 0) {
+        next.delete(variantId)
+      } else {
+        next.set(variantId, quantity)
+      }
+      return next
+    })
+  }
+
+  function handleRemoveFromCart(variantId: string) {
+    setCart((prev) => {
+      const next = new Map(prev)
+      next.delete(variantId)
       return next
     })
   }
@@ -72,7 +98,7 @@ export default function CataloguePage() {
 
   return (
     <>
-      <Nav cartCount={cartCount} />
+      <Nav cartCount={cartCount} onCartClick={() => setCartOpen(true)} />
       <CategoryTabs categories={categories} active={activeCategory} onSelect={setActiveCategory} />
 
       <main className="max-w-6xl mx-auto px-6 py-10">
@@ -102,7 +128,6 @@ export default function CataloguePage() {
 
               {sortOpen && (
                 <>
-                  {/* Backdrop */}
                   <div
                     className="fixed inset-0 z-10"
                     aria-hidden="true"
@@ -164,6 +189,14 @@ export default function CataloguePage() {
           </div>
         )}
       </main>
+
+      <CartDrawer
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        items={cartItems}
+        onUpdateQuantity={handleUpdateQuantity}
+        onRemove={handleRemoveFromCart}
+      />
     </>
   )
 }

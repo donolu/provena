@@ -4,9 +4,10 @@ import { ShoppingBasket, User, ChevronDown } from 'lucide-react'
 
 interface NavProps {
   cartCount: number
+  onCartClick: () => void
 }
 
-export function Nav({ cartCount }: NavProps) {
+export function Nav({ cartCount, onCartClick }: NavProps) {
   return (
     <header className="sticky top-0 z-50 bg-mist/95 backdrop-blur-sm border-b border-hoarfrost">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -27,6 +28,7 @@ export function Nav({ cartCount }: NavProps) {
           </button>
 
           <button
+            onClick={onCartClick}
             className="relative flex items-center gap-2 text-sm font-medium text-forest hover:text-meadow transition-colors duration-150"
             aria-label={`Cart, ${cartCount} item${cartCount !== 1 ? 's' : ''}`}
           >
