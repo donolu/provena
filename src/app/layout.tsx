@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import { Fraunces, Plus_Jakarta_Sans, DM_Mono } from 'next/font/google'
+import { QueryProvider } from '@/providers/query-provider'
+import { AuthProvider } from '@/providers/auth-provider'
 import './globals.css'
 
 const fraunces = Fraunces({
@@ -36,7 +38,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           'bg-mist text-forest font-sans antialiased',
         ].join(' ')}
       >
-        {children}
+        <QueryProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   )

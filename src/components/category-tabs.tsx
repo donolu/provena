@@ -1,9 +1,13 @@
 'use client'
 
-import type { Category } from '@/types'
+interface CategoryTab {
+  id: string
+  name: string
+  slug: string
+}
 
 interface CategoryTabsProps {
-  categories: Category[]
+  categories: CategoryTab[]
   active: string
   onSelect: (slug: string) => void
 }

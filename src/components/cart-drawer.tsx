@@ -2,19 +2,18 @@
 
 import { useEffect } from 'react'
 import { X, Minus, Plus, ShoppingBasket, Trash2 } from 'lucide-react'
-import type { CartLineItem } from '@/lib/cart-utils'
-import { cartSubtotal } from '@/lib/cart-utils'
+import type { CartItem } from '@/lib/api/types'
 
 interface CartDrawerProps {
   open: boolean
   onClose: () => void
-  items: CartLineItem[]
-  onUpdateQuantity: (variantId: string, quantity: number) => void
-  onRemove: (variantId: string) => void
+  items: CartItem[]
+  total: string
+  onUpdateQuantity: (itemId: string, quantity: number) => void
+  onRemove: (itemId: string) => void
 }
 
-export function CartDrawer({ open, onClose, items, onUpdateQuantity, onRemove }: CartDrawerProps) {
-  // Close on Escape
+export function CartDrawer({ open, onClose, items, total, onUpdateQuantity, onRemove }: CartDrawerProps) {
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
@@ -24,13 +23,11 @@ export function CartDrawer({ open, onClose, items, onUpdateQuantity, onRemove }:
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  // Lock body scroll while open
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [open])
 
-  const subtotal = cartSubtotal(items)
   const totalCount = items.reduce((s, i) => s + i.quantity, 0)
 
   return (
@@ -44,7 +41,6 @@ export function CartDrawer({ open, onClose, items, onUpdateQuantity, onRemove }:
         }`}
       />
 
-      {/* Drawer panel */}
       <aside
         role="dialog"
         aria-modal="true"
@@ -88,31 +84,29 @@ export function CartDrawer({ open, onClose, items, onUpdateQuantity, onRemove }:
         ) : (
           <ul className="flex-1 divide-y divide-hoarfrost overflow-y-auto px-6">
             {items.map((item) => (
-              <li key={item.variantId} className="py-5">
-                {/* Product name + remove */}
+              <li key={item.id} className="py-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-display text-[15px] leading-snug text-forest">
-                      {item.product.name}
+                      {item.product_name}
                     </p>
                     <p className="mt-0.5 text-[11px] uppercase tracking-[0.1em] text-soil font-sans">
-                      {item.variant.name} · {item.product.supplier.business_name}
+                      {item.variant_name} · {item.variant_sku}
                     </p>
                   </div>
                   <button
-                    onClick={() => onRemove(item.variantId)}
-                    aria-label={`Remove ${item.product.name} from cart`}
+                    onClick={() => onRemove(item.id)}
+                    aria-label={`Remove ${item.product_name} from cart`}
                     className="mt-0.5 flex-shrink-0 text-hoarfrost hover:text-soil transition-colors duration-150"
                   >
                     <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                   </button>
                 </div>
 
-                {/* Quantity stepper + line total */}
                 <div className="mt-3 flex items-center justify-between">
                   <div className="flex items-center gap-0 border border-hoarfrost rounded overflow-hidden">
                     <button
-                      onClick={() => onUpdateQuantity(item.variantId, item.quantity - 1)}
+                      onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
                       aria-label="Decrease quantity"
                       className="flex h-7 w-7 items-center justify-center text-soil hover:bg-mist hover:text-forest transition-colors duration-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-meadow"
                     >
@@ -122,19 +116,18 @@ export function CartDrawer({ open, onClose, items, onUpdateQuantity, onRemove }:
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() => onUpdateQuantity(item.variantId, item.quantity + 1)}
+                      onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
                       aria-label="Increase quantity"
-                      disabled={item.quantity >= item.variant.stock_available}
-                      className="flex h-7 w-7 items-center justify-center text-soil hover:bg-mist hover:text-forest transition-colors duration-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-meadow disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="flex h-7 w-7 items-center justify-center text-soil hover:bg-mist hover:text-forest transition-colors duration-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-meadow"
                     >
                       <Plus className="h-3 w-3" strokeWidth={2} />
                     </button>
                   </div>
 
                   <div className="text-right">
-                    <span className="font-mono text-sm font-medium text-forest">£{item.lineTotal}</span>
+                    <span className="font-mono text-sm font-medium text-forest">£{item.subtotal}</span>
                     <p className="text-[10px] text-soil font-sans mt-0.5">
-                      £{item.variant.price} / {item.variant.unit}
+                      £{item.price} each
                     </p>
                   </div>
                 </div>
@@ -143,12 +136,11 @@ export function CartDrawer({ open, onClose, items, onUpdateQuantity, onRemove }:
           </ul>
         )}
 
-        {/* Footer — only shown when cart has items */}
         {items.length > 0 && (
           <div className="border-t border-hoarfrost px-6 py-5">
             <div className="flex items-baseline justify-between mb-4">
               <span className="text-sm font-sans text-soil">Subtotal</span>
-              <span className="font-mono text-base font-semibold text-forest">£{subtotal}</span>
+              <span className="font-mono text-base font-semibold text-forest">£{total}</span>
             </div>
             <p className="text-[11px] text-soil font-sans mb-4">
               Shipping and taxes calculated at checkout.

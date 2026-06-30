@@ -12,7 +12,7 @@ import {
   X,
   LogOut,
 } from 'lucide-react'
-import { CURRENT_SUPPLIER } from '@/lib/supplier-data'
+import { useAuthStore } from '@/store/auth'
 
 const NAV = [
   { href: '/supplier/dashboard', label: 'Overview',  icon: LayoutDashboard },
@@ -23,6 +23,7 @@ const NAV = [
 
 function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
   const pathname = usePathname()
+  const user = useAuthStore((s) => s.user)
 
   return (
     <div className="flex flex-col h-full">
@@ -67,15 +68,15 @@ function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-meadow/30 flex items-center justify-center flex-shrink-0">
             <span className="text-[11px] font-mono font-semibold text-meadow">
-              {CURRENT_SUPPLIER.initials}
+              {user?.first_name?.[0] ?? 'S'}
             </span>
           </div>
           <div className="min-w-0">
             <p className="text-xs font-sans font-medium text-white truncate">
-              {CURRENT_SUPPLIER.business_name}
+              {user?.first_name ?? 'Supplier'}
             </p>
             <p className="text-[10px] text-white/40 font-sans truncate">
-              {CURRENT_SUPPLIER.location}
+              {user?.email ?? ''}
             </p>
           </div>
           <button

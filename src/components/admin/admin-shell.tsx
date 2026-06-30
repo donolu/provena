@@ -15,19 +15,33 @@ import {
   LogOut,
   ShieldCheck,
 } from 'lucide-react'
-import { PLATFORM_STATS } from '@/lib/admin-data'
+import { useQuery } from '@tanstack/react-query'
+import { getAdminSuppliers } from '@/lib/api/suppliers'
+import { useAuthStore } from '@/store/auth'
 
-const NAV = [
-  { href: '/admin/dashboard',  label: 'Overview',   icon: LayoutDashboard, badge: null },
-  { href: '/admin/suppliers',  label: 'Suppliers',  icon: Store,           badge: PLATFORM_STATS.pending_suppliers },
-  { href: '/admin/users',      label: 'Users',      icon: Users,           badge: null },
-  { href: '/admin/orders',     label: 'Orders',     icon: ShoppingBag,     badge: null },
-  { href: '/admin/analytics',  label: 'Analytics',  icon: BarChart2,       badge: null },
-  { href: '/admin/payouts',    label: 'Payouts',    icon: Wallet,          badge: null },
+const BASE_NAV = [
+  { href: '/admin/dashboard',  label: 'Overview',  icon: LayoutDashboard },
+  { href: '/admin/suppliers',  label: 'Suppliers', icon: Store },
+  { href: '/admin/users',      label: 'Users',     icon: Users },
+  { href: '/admin/orders',     label: 'Orders',    icon: ShoppingBag },
+  { href: '/admin/analytics',  label: 'Analytics', icon: BarChart2 },
+  { href: '/admin/payouts',    label: 'Payouts',   icon: Wallet },
 ]
 
 function AdminNav({ onLinkClick }: { onLinkClick?: () => void }) {
   const pathname = usePathname()
+  const user = useAuthStore((s) => s.user)
+  const { data: suppliersData } = useQuery({
+    queryKey: ['admin', 'suppliers', 'all'],
+    queryFn: () => getAdminSuppliers(),
+  })
+  const pendingCount = suppliersData?.results.filter((s) => s.status === 'PENDING').length ?? 0
+
+  const NAV = BASE_NAV.map((item) =>
+    item.href === '/admin/suppliers'
+      ? { ...item, badge: pendingCount }
+      : { ...item, badge: null },
+  )
 
   return (
     <div className="flex flex-col h-full">
@@ -77,8 +91,10 @@ function AdminNav({ onLinkClick }: { onLinkClick?: () => void }) {
             <ShieldCheck className="w-4 h-4 text-marigold" strokeWidth={1.5} />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-sans font-medium text-white truncate">Platform Admin</p>
-            <p className="text-[10px] text-white/40 font-sans truncate">admin@provena.co.uk</p>
+            <p className="text-xs font-sans font-medium text-white truncate">
+              {user?.first_name ? `${user.first_name} ${user.last_name}`.trim() : 'Platform Admin'}
+            </p>
+            <p className="text-[10px] text-white/40 font-sans truncate">{user?.email ?? ''}</p>
           </div>
           <button aria-label="Sign out" className="ml-auto text-white/30 hover:text-white/70 transition-colors">
             <LogOut className="w-3.5 h-3.5" strokeWidth={1.5} />

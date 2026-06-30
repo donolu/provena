@@ -1,9 +1,9 @@
-import { Star } from 'lucide-react'
 import { ProductCard } from '@/components/product-card'
-import type { Product, Supplier } from '@/types'
+import type { Product } from '@/lib/api/types'
 
 interface SupplierSectionProps {
-  supplier: Supplier
+  supplierName: string
+  supplierSlug: string
   products: Product[]
   wishlist: Set<string>
   onAddToCart: (variantId: string) => void
@@ -11,30 +11,23 @@ interface SupplierSectionProps {
 }
 
 export function SupplierSection({
-  supplier,
+  supplierName,
+  supplierSlug,
   products,
   wishlist,
   onAddToCart,
   onToggleWishlist,
 }: SupplierSectionProps) {
   return (
-    <section aria-label={supplier.business_name}>
-      {/* Specimen-label strip: name ─── location  ★ rating */}
+    <section aria-label={supplierName}>
       <div className="flex items-center gap-4 mb-6">
         <span className="text-[11px] uppercase tracking-[0.14em] font-sans font-semibold text-forest whitespace-nowrap">
-          {supplier.business_name}
+          {supplierName}
         </span>
         <div aria-hidden="true" className="flex-1 h-px bg-hoarfrost" />
-        <span className="text-xs font-sans text-soil whitespace-nowrap">
-          {supplier.location}
-        </span>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <Star className="w-3 h-3 fill-marigold text-marigold" strokeWidth={0} />
-          <span className="font-mono text-xs text-forest">{supplier.rating.toFixed(1)}</span>
-        </div>
+        <span className="text-[10px] font-mono text-hoarfrost">{supplierSlug}</span>
       </div>
 
-      {/* Three-column product grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {products.map((product) => {
           const variantId = product.variants[0]?.id

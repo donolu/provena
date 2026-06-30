@@ -1,27 +1,37 @@
 'use client'
 
 import Link from 'next/link'
+import { useQuery } from '@tanstack/react-query'
 import { Users, ShoppingBag, BarChart2, Store, AlertCircle } from 'lucide-react'
 import { StatCard } from '@/components/supplier/stat-card'
 import { StatusBadge } from '@/components/supplier/status-badge'
-import {
-  PLATFORM_STATS,
-  ADMIN_SUPPLIERS,
-  PLATFORM_ORDERS,
-  trend,
-} from '@/lib/admin-data'
+import { getAdminSuppliers } from '@/lib/api/suppliers'
+import { getAdminOrders } from '@/lib/api/orders'
+import { getSalesSummary } from '@/lib/api/admin'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export default function AdminDashboardPage() {
-  const revTrend    = trend(parseFloat(PLATFORM_STATS.revenue_30d.replace(/\s/g, '')), parseFloat(PLATFORM_STATS.revenue_prev_30d.replace(/\s/g, '')))
-  const ordersTrend = trend(PLATFORM_STATS.orders_30d, PLATFORM_STATS.orders_prev_30d)
-  const usersTrend  = trend(PLATFORM_STATS.active_users, PLATFORM_STATS.active_users_prev)
+  const { data: salesData } = useQuery({
+    queryKey: ['admin', 'analytics', 'sales'],
+    queryFn: () => getSalesSummary({ days: 30 }),
+  })
 
-  const pendingSuppliers = ADMIN_SUPPLIERS.filter((s) => s.status === 'PENDING')
-  const recentOrders     = PLATFORM_ORDERS.slice(0, 6)
+  const { data: suppliersData } = useQuery({
+    queryKey: ['admin', 'suppliers', 'all'],
+    queryFn: () => getAdminSuppliers({ page_size: 100 } as Parameters<typeof getAdminSuppliers>[0]),
+  })
+
+  const { data: ordersData } = useQuery({
+    queryKey: ['admin', 'orders'],
+    queryFn: getAdminOrders,
+  })
+
+  const pendingSuppliers = (suppliersData?.results ?? []).filter((s) => s.status === 'PENDING')
+  const recentOrders = (ordersData?.results ?? []).slice(0, 6)
+  const totalSuppliers = suppliersData?.results.length ?? 0
 
   return (
     <div className="px-6 py-8 max-w-5xl mx-auto">
@@ -30,15 +40,31 @@ export default function AdminDashboardPage() {
         <p className="text-sm text-soil font-sans mt-0.5">Platform metrics · last 30 days</p>
       </div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Revenue"      prefix="£" value={PLATFORM_STATS.revenue_30d}          icon={BarChart2} trend={{ pct: revTrend,    label: 'vs prev 30d' }} />
-        <StatCard label="Orders"                  value={String(PLATFORM_STATS.orders_30d)}    icon={ShoppingBag} trend={{ pct: ordersTrend, label: 'vs prev 30d' }} />
-        <StatCard label="Active users"            value={String(PLATFORM_STATS.active_users)}  icon={Users} trend={{ pct: usersTrend, label: 'vs prev 30d' }} />
-        <StatCard label="Pending suppliers"       value={String(PLATFORM_STATS.pending_suppliers)} icon={Store} alert={PLATFORM_STATS.pending_suppliers > 0} />
+        <StatCard
+          label="Revenue"
+          prefix="£"
+          value={salesData?.total_revenue ?? '—'}
+          icon={BarChart2}
+        />
+        <StatCard
+          label="Orders"
+          value={salesData ? String(salesData.total_orders) : '—'}
+          icon={ShoppingBag}
+        />
+        <StatCard
+          label="Suppliers"
+          value={totalSuppliers ? String(totalSuppliers) : '—'}
+          icon={Users}
+        />
+        <StatCard
+          label="Pending suppliers"
+          value={String(pendingSuppliers.length)}
+          icon={Store}
+          alert={pendingSuppliers.length > 0}
+        />
       </div>
 
-      {/* Pending supplier applications */}
       {pendingSuppliers.length > 0 && (
         <div className="mb-8 bg-marigold/8 border border-marigold/30 rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
@@ -57,7 +83,7 @@ export default function AdminDashboardPage() {
               <div key={s.id} className="flex items-center justify-between bg-white/60 rounded px-3 py-2.5">
                 <div>
                   <p className="text-sm font-sans font-medium text-forest">{s.business_name}</p>
-                  <p className="text-[11px] font-sans text-soil">{s.location} · applied {formatDate(s.joined_at)}</p>
+                  <p className="text-[11px] font-sans text-soil">{s.user_email} · applied {formatDate(s.created_at)}</p>
                 </div>
                 <Link href="/admin/suppliers" className="text-xs font-sans text-meadow underline-offset-2 hover:underline flex-shrink-0">
                   Review
@@ -68,7 +94,6 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Recent orders */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-sans font-semibold text-forest">Recent orders</h2>
@@ -85,13 +110,19 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-hoarfrost">
-                {recentOrders.map((o) => (
+                {recentOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-sm font-sans text-soil">No orders yet.</td>
+                  </tr>
+                ) : recentOrders.map((o) => (
                   <tr key={o.id} className="hover:bg-mist/50 transition-colors duration-100">
                     <td className="px-4 py-3.5 font-mono text-xs text-forest">{o.reference}</td>
                     <td className="px-4 py-3.5 text-xs font-sans text-soil whitespace-nowrap">{formatDate(o.created_at)}</td>
-                    <td className="px-4 py-3.5 text-xs font-sans text-forest">{o.buyer_name}</td>
-                    <td className="px-4 py-3.5 text-xs font-sans text-soil">{o.supplier_names.join(', ')}</td>
-                    <td className="px-4 py-3.5 font-mono text-xs text-forest">£{o.total}</td>
+                    <td className="px-4 py-3.5 text-xs font-sans text-forest">{o.buyer_email}</td>
+                    <td className="px-4 py-3.5 text-xs font-sans text-soil">
+                      {o.sub_orders.map((s) => s.supplier_name).join(', ')}
+                    </td>
+                    <td className="px-4 py-3.5 font-mono text-xs text-forest">£{o.total_amount}</td>
                     <td className="px-4 py-3.5"><StatusBadge status={o.status} /></td>
                   </tr>
                 ))}

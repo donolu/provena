@@ -1,10 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { StatusBadge } from '@/components/supplier/status-badge'
-import { PLATFORM_ORDERS, type PlatformOrderStatus } from '@/lib/admin-data'
+import { getAdminOrders } from '@/lib/api/orders'
+import type { Order, OrderStatus } from '@/lib/api/types'
 
-type Tab = 'ALL' | PlatformOrderStatus
+type Tab = 'ALL' | OrderStatus
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'ALL',        label: 'All' },
@@ -22,13 +24,17 @@ function formatDate(iso: string) {
 export default function AdminOrdersPage() {
   const [filter, setFilter] = useState<Tab>('ALL')
 
-  const displayed = filter === 'ALL'
-    ? PLATFORM_ORDERS
-    : PLATFORM_ORDERS.filter((o) => o.status === filter)
+  const { data, isPending } = useQuery({
+    queryKey: ['admin', 'orders'],
+    queryFn: getAdminOrders,
+  })
+
+  const all: Order[] = data?.results ?? []
+  const displayed = filter === 'ALL' ? all : all.filter((o) => o.status === filter)
 
   const totalRevenue = displayed
     .filter((o) => o.status !== 'CANCELLED')
-    .reduce((s, o) => s + parseFloat(o.total), 0)
+    .reduce((s, o) => s + parseFloat(o.total_amount), 0)
     .toFixed(2)
 
   return (
@@ -45,11 +51,10 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
-      {/* Status tabs */}
       <div className="border-b border-hoarfrost mb-6 -mx-6 px-6 overflow-x-auto">
         <div className="flex no-scrollbar">
           {TABS.map(({ key, label }) => {
-            const count = key === 'ALL' ? PLATFORM_ORDERS.length : PLATFORM_ORDERS.filter((o) => o.status === key).length
+            const count = key === 'ALL' ? all.length : all.filter((o) => o.status === key).length
             const active = filter === key
             return (
               <button
@@ -72,34 +77,40 @@ export default function AdminOrdersPage() {
       </div>
 
       <div className="bg-white rounded-lg border border-hoarfrost overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-hoarfrost">
-                {['Reference', 'Date', 'Buyer', 'Suppliers', 'Total', 'Status'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium">{h}</th>
+        {isPending ? (
+          <div className="px-4 py-12 text-center text-sm font-sans text-soil">Loading orders…</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-hoarfrost">
+                  {['Reference', 'Date', 'Buyer', 'Suppliers', 'Total', 'Status'].map((h) => (
+                    <th key={h} className="text-left px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-hoarfrost">
+                {displayed.map((o) => (
+                  <tr key={o.id} className="hover:bg-mist/50 transition-colors duration-100">
+                    <td className="px-4 py-3.5 font-mono text-xs text-forest">{o.reference}</td>
+                    <td className="px-4 py-3.5 text-xs font-sans text-soil whitespace-nowrap">{formatDate(o.created_at)}</td>
+                    <td className="px-4 py-3.5 text-xs font-sans text-forest">{o.buyer_email}</td>
+                    <td className="px-4 py-3.5 text-xs font-sans text-soil">
+                      {o.sub_orders.map((s) => s.supplier_name).join(', ')}
+                    </td>
+                    <td className="px-4 py-3.5 font-mono text-xs text-forest">£{o.total_amount}</td>
+                    <td className="px-4 py-3.5"><StatusBadge status={o.status} /></td>
+                  </tr>
                 ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-hoarfrost">
-              {displayed.map((o) => (
-                <tr key={o.id} className="hover:bg-mist/50 transition-colors duration-100">
-                  <td className="px-4 py-3.5 font-mono text-xs text-forest">{o.reference}</td>
-                  <td className="px-4 py-3.5 text-xs font-sans text-soil whitespace-nowrap">{formatDate(o.created_at)}</td>
-                  <td className="px-4 py-3.5 text-xs font-sans text-forest">{o.buyer_name}</td>
-                  <td className="px-4 py-3.5 text-xs font-sans text-soil">{o.supplier_names.join(', ')}</td>
-                  <td className="px-4 py-3.5 font-mono text-xs text-forest">£{o.total}</td>
-                  <td className="px-4 py-3.5"><StatusBadge status={o.status} /></td>
-                </tr>
-              ))}
-              {displayed.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-sm font-sans text-soil">No orders in this category.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                {displayed.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-12 text-center text-sm font-sans text-soil">No orders in this category.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
