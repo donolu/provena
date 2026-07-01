@@ -23,7 +23,7 @@ export default function AdminPayoutsPage() {
     queryFn: () => getAdminPayouts(),
   })
 
-  const payouts = data?.results ?? []
+  const payouts = data ?? []
   const pending    = sumByStatus(payouts, 'PENDING')
   const proc       = sumByStatus(payouts, 'PROCESSING')
   const paid       = sumByStatus(payouts, 'PAID')

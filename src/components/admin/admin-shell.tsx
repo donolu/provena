@@ -35,7 +35,7 @@ function AdminNav({ onLinkClick }: { onLinkClick?: () => void }) {
     queryKey: ['admin', 'suppliers', 'all'],
     queryFn: () => getAdminSuppliers(),
   })
-  const pendingCount = suppliersData?.results.filter((s) => s.status === 'PENDING').length ?? 0
+  const pendingCount = suppliersData?.filter((s) => s.status === 'PENDING').length ?? 0
 
   const NAV = BASE_NAV.map((item) =>
     item.href === '/admin/suppliers'

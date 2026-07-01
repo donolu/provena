@@ -35,11 +35,12 @@ export default function LoginPage() {
       } else {
         const { access, refresh, user } = result as LoginResponse
         storeLogin(user, access, refresh)
-        router.push('/catalogue')
+        const dest = user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue'
+        router.push(dest)
       }
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })
-        .response?.data?.detail ?? 'Invalid email or password.'
+      const data = (err as { response?: { data?: { error?: { message?: string }; detail?: string } } }).response?.data
+      const msg = data?.error?.message ?? data?.detail ?? 'Invalid email or password.'
       setError(msg)
     } finally {
       setLoading(false)

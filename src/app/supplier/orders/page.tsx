@@ -47,7 +47,7 @@ export default function OrdersPage() {
     },
   })
 
-  const all = data?.results ?? []
+  const all = data ?? []
   const displayed = filter === 'ALL' ? all : all.filter((o) => o.status === filter)
 
   return (

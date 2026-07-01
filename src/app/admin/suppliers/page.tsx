@@ -40,7 +40,7 @@ export default function SuppliersPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin', 'suppliers'] }); setConfirming(null) },
   })
 
-  const all = data?.results ?? []
+  const all = data ?? []
   const displayed: AdminSupplier[] = tab === 'ALL' ? all : all.filter((s) => s.status === tab)
 
   return (

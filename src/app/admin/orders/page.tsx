@@ -29,7 +29,7 @@ export default function AdminOrdersPage() {
     queryFn: getAdminOrders,
   })
 
-  const all: Order[] = data?.results ?? []
+  const all: Order[] = data ?? []
   const displayed = filter === 'ALL' ? all : all.filter((o) => o.status === filter)
 
   const totalRevenue = displayed

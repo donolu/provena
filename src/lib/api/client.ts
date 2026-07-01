@@ -38,7 +38,8 @@ apiClient.interceptors.response.use(
   async (error) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
-    if (error.response?.status !== 401 || original._retry) {
+    const isAuthEndpoint = original.url?.startsWith('/auth/login') || original.url?.startsWith('/auth/totp')
+    if (error.response?.status !== 401 || original._retry || isAuthEndpoint) {
       return Promise.reject(error)
     }
 

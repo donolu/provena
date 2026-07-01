@@ -23,7 +23,7 @@ export default function PayoutsPage() {
     queryFn: getSupplierPayouts,
   })
 
-  const payouts = data?.results ?? []
+  const payouts = data ?? []
   const pending    = sumByStatus(payouts, 'PENDING')
   const processing = sumByStatus(payouts, 'PROCESSING')
   const paid       = sumByStatus(payouts, 'PAID')

@@ -15,7 +15,7 @@ export default function ProductsPage() {
     queryFn: getMyProducts,
   })
 
-  const products: Product[] = data?.results ?? []
+  const products: Product[] = data ?? []
 
   return (
     <div className="px-6 py-8 max-w-5xl mx-auto">

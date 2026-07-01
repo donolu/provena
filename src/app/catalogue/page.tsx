@@ -115,7 +115,7 @@ export default function CataloguePage() {
     [categoriesData],
   )
 
-  const allProducts = useMemo(() => productsData?.results ?? [], [productsData])
+  const allProducts = useMemo(() => productsData ?? [], [productsData])
 
   const filtered = useMemo(() => applySort(
     allProducts.filter((p) => p.status === 'ACTIVE'),
