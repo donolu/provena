@@ -56,7 +56,7 @@ export default function AnalyticsPage() {
                       style={{ height: `${Math.max(pct, 2)}%` }}
                     >
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-forest text-white text-[9px] font-mono px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
-                        £{parseFloat(d.revenue).toFixed(2)}
+                        £{d.revenue}
                       </div>
                     </div>
                   </div>
@@ -80,7 +80,7 @@ export default function AnalyticsPage() {
         <div className="flex gap-8 mt-5 pt-5 border-t border-hoarfrost">
           <div>
             <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans mb-1">Total revenue</p>
-            <p className="font-mono text-lg font-medium text-forest">£{summary ? parseFloat(summary.total_revenue).toFixed(2) : '—'}</p>
+            <p className="font-mono text-lg font-medium text-forest">£{summary?.total_revenue ?? '—'}</p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans mb-1">Total orders</p>
@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
           <div>
             <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans mb-1">Avg. order value</p>
             <p className="font-mono text-lg font-medium text-forest">
-              £{summary ? parseFloat(summary.avg_order_value).toFixed(2) : '—'}
+              £{summary?.avg_order_value ?? '—'}
             </p>
           </div>
         </div>
@@ -124,7 +124,7 @@ export default function AnalyticsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-soil text-right">{p.units_sold}</td>
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-forest text-right">£{parseFloat(p.revenue).toFixed(2)}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-medium text-forest text-right">£{p.revenue}</td>
                   </tr>
                 ))}
               </tbody>
@@ -152,9 +152,9 @@ export default function AnalyticsPage() {
                 {supplierPerf.map((s, i) => (
                   <tr key={i} className="hover:bg-mist/50 transition-colors duration-100">
                     <td className="px-4 py-3 text-xs font-sans font-medium text-forest">{s.supplier_name}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-forest text-right">£{parseFloat(s.total_revenue).toFixed(2)}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-forest text-right">£{s.total_revenue}</td>
                     <td className="px-4 py-3 font-mono text-xs text-soil text-right">{s.sub_order_count}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-marigold text-right">£{parseFloat(s.pending_payout).toFixed(2)}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-marigold text-right">£{s.pending_payout}</td>
                   </tr>
                 ))}
               </tbody>
