@@ -119,10 +119,10 @@ export default function AdminDashboardPage() {
                     <td className="px-4 py-3.5 font-mono text-xs text-forest">{o.reference}</td>
                     <td className="px-4 py-3.5 text-xs font-sans text-soil whitespace-nowrap">{formatDate(o.created_at)}</td>
                     <td className="px-4 py-3.5 text-xs font-sans text-forest">{o.buyer_email}</td>
-                    <td className="px-4 py-3.5 text-xs font-sans text-soil">
+                    <td className="px-4 py-3.5 text-xs font-sans text-soil max-w-[140px] truncate">
                       {o.sub_orders.map((s) => s.supplier_name).join(', ')}
                     </td>
-                    <td className="px-4 py-3.5 font-mono text-xs text-forest">£{o.total_amount}</td>
+                    <td className="px-4 py-3.5 font-mono text-xs text-forest whitespace-nowrap">£{parseFloat(o.total_amount).toFixed(2)}</td>
                     <td className="px-4 py-3.5"><StatusBadge status={o.status} /></td>
                   </tr>
                 ))}
