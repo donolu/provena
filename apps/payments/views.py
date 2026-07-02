@@ -171,6 +171,16 @@ class AdminPayoutListView(generics.ListAPIView):
         return qs
 
 
+class AdminProcessPayoutView(APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(tags=["Admin: Payments"], summary="Process a pending payout")
+    def post(self, request, payout_id):
+        payout = get_object_or_404(Payout, id=payout_id)
+        payout = services.process_payout(payout)
+        return Response(PayoutSerializer(payout).data)
+
+
 class AdminPaymentListView(generics.ListAPIView):
     serializer_class = PaymentSerializer
     permission_classes = [IsAdminUser]

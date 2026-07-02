@@ -112,3 +112,12 @@ def _create_payouts(payment: Payment) -> None:
                 fee,
                 net,
             )
+
+
+def process_payout(payout: Payout) -> Payout:
+    if payout.status != PayoutStatus.PENDING:
+        raise ValueError(f"Cannot process a payout with status {payout.status}.")
+    payout.status = PayoutStatus.PROCESSING
+    payout.save(update_fields=["status", "updated_at"])
+    logger.info("Payout %s marked as PROCESSING", payout.id)
+    return payout
