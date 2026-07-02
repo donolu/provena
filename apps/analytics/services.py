@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.db.models import Avg, Count, DecimalField, ExpressionWrapper, F, Q, Sum
 from django.db.models.functions import TruncDay, TruncMonth, TruncWeek
@@ -8,6 +8,13 @@ from apps.inventory.models import StockLevel
 from apps.marketplace.models import Review
 from apps.orders.models import Order, OrderItem, OrderStatus, SubOrder
 from apps.payments.models import Payment, PaymentStatus, Payout, PayoutStatus
+
+_TWO_DP = Decimal("0.01")
+
+
+def _fmt(value) -> str:
+    d = value if isinstance(value, Decimal) else Decimal(str(value or 0))
+    return str(d.quantize(_TWO_DP, rounding=ROUND_HALF_UP))
 
 
 def _default_range() -> tuple[date, date]:
@@ -49,12 +56,12 @@ def sales_summary(
     return {
         "from_date": str(from_date),
         "to_date": str(to_date),
-        "total_revenue": str(revenue),
+        "total_revenue": _fmt(revenue),
         "total_orders": order_count,
         "total_items_sold": items_sold,
-        "avg_order_value": str(avg_order),
+        "avg_order_value": _fmt(avg_order),
         "cancelled_orders": orders.filter(status=OrderStatus.CANCELLED).count(),
-        "refunded_amount": str(refunded),
+        "refunded_amount": _fmt(refunded),
     }
 
 
@@ -77,7 +84,7 @@ def revenue_over_time(
     return [
         {
             "period": row["period"].date().isoformat(),
-            "revenue": str(row["revenue"] or Decimal("0.00")),
+            "revenue": _fmt(row["revenue"] or Decimal("0.00")),
             "order_count": row["order_count"],
         }
         for row in rows
@@ -114,7 +121,7 @@ def top_products(
             "variant_sku": row["variant__sku"],
             "product_name": row["variant__product__name"],
             "units_sold": row["units_sold"],
-            "revenue": str(row["revenue"] or Decimal("0.00")),
+            "revenue": _fmt(row["revenue"] or Decimal("0.00")),
         }
         for row in rows
     ]
@@ -146,11 +153,9 @@ def supplier_performance(from_date: date | None = None, to_date: date | None = N
         {
             "supplier_id": str(row["supplier__id"]),
             "supplier_name": row["supplier__business_name"],
-            "total_revenue": str(row["total_revenue"] or Decimal("0.00")),
+            "total_revenue": _fmt(row["total_revenue"] or Decimal("0.00")),
             "sub_order_count": row["sub_order_count"],
-            "pending_payout": str(
-                pending_map.get(row["supplier__id"], Decimal("0.00")) or Decimal("0.00")
-            ),
+            "pending_payout": _fmt(pending_map.get(row["supplier__id"]) or Decimal("0.00")),
         }
         for row in rows
     ]
@@ -178,10 +183,10 @@ def supplier_own_summary(
     return {
         "from_date": str(from_date),
         "to_date": str(to_date),
-        "total_revenue": str(totals["total_revenue"] or Decimal("0.00")),
+        "total_revenue": _fmt(totals["total_revenue"] or Decimal("0.00")),
         "sub_order_count": totals["sub_order_count"] or 0,
-        "pending_payout": str(payout_totals["pending"] or Decimal("0.00")),
-        "paid_payout": str(payout_totals["paid"] or Decimal("0.00")),
+        "pending_payout": _fmt(payout_totals["pending"] or Decimal("0.00")),
+        "paid_payout": _fmt(payout_totals["paid"] or Decimal("0.00")),
     }
 
 
@@ -233,8 +238,8 @@ def payouts_summary(supplier=None) -> dict:
     )
 
     return {
-        "pending": str(totals["pending"] or Decimal("0.00")),
-        "processing": str(totals["processing"] or Decimal("0.00")),
-        "paid": str(totals["paid"] or Decimal("0.00")),
-        "failed": str(totals["failed"] or Decimal("0.00")),
+        "pending": _fmt(totals["pending"] or Decimal("0.00")),
+        "processing": _fmt(totals["processing"] or Decimal("0.00")),
+        "paid": _fmt(totals["paid"] or Decimal("0.00")),
+        "failed": _fmt(totals["failed"] or Decimal("0.00")),
     }
