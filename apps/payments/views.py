@@ -177,7 +177,10 @@ class AdminProcessPayoutView(APIView):
     @extend_schema(tags=["Admin: Payments"], summary="Process a pending payout")
     def post(self, request, payout_id):
         payout = get_object_or_404(Payout, id=payout_id)
-        payout = services.process_payout(payout)
+        try:
+            payout = services.process_payout(payout)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(PayoutSerializer(payout).data)
 
 
