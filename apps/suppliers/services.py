@@ -154,11 +154,25 @@ def get_stripe_connect_onboarding_url(supplier: Supplier, return_url: str, refre
 
 
 def get_performance_stats(supplier: Supplier) -> dict:
-    # TODO: populate from orders app once built
+    from decimal import ROUND_HALF_UP, Decimal
+
+    from django.db.models import Sum
+
+    from apps.catalogue.models import Product, ProductStatus
+    from apps.orders.models import SubOrder
+
+    _two_dp = Decimal("0.01")
+
+    sub_orders = SubOrder.objects.filter(supplier=supplier)
+    total_orders = sub_orders.count()
+    total_revenue = sub_orders.aggregate(s=Sum("subtotal"))["s"] or Decimal("0")
+
+    active_products = Product.objects.filter(supplier=supplier, status=ProductStatus.ACTIVE).count()
+
     return {
-        "total_orders": 0,
-        "total_revenue": "0.00",
+        "total_orders": total_orders,
+        "total_revenue": str(total_revenue.quantize(_two_dp, rounding=ROUND_HALF_UP)),
         "average_fulfilment_days": None,
         "return_rate": "0.00",
-        "active_products": 0,
+        "active_products": active_products,
     }
