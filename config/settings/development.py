@@ -13,9 +13,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3001",
 ]
 
-# Use console email backend in development
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-
 # Use local filesystem for media in development
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"  # noqa: F405
