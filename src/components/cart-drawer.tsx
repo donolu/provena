@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { X, Minus, Plus, ShoppingBasket, Trash2 } from 'lucide-react'
 import type { CartItem } from '@/lib/api/types'
 
@@ -14,6 +15,7 @@ interface CartDrawerProps {
 }
 
 export function CartDrawer({ open, onClose, items, total, onUpdateQuantity, onRemove }: CartDrawerProps) {
+  const router = useRouter()
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
@@ -145,7 +147,10 @@ export function CartDrawer({ open, onClose, items, total, onUpdateQuantity, onRe
             <p className="text-[11px] text-soil font-sans mb-4">
               Shipping and taxes calculated at checkout.
             </p>
-            <button className="w-full rounded bg-forest py-3 text-sm font-sans font-medium text-mist hover:bg-meadow transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow focus-visible:ring-offset-2">
+            <button
+              onClick={() => { onClose(); router.push('/checkout') }}
+              className="w-full rounded bg-forest py-3 text-sm font-sans font-medium text-mist hover:bg-meadow transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow focus-visible:ring-offset-2"
+            >
               Proceed to checkout
             </button>
           </div>
