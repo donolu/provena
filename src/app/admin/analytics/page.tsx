@@ -50,9 +50,9 @@ export default function AnalyticsPage() {
               {revenue.map((d) => {
                 const pct = (parseFloat(d.revenue) / maxRevenue) * 100
                 return (
-                  <div key={d.period} className="flex-1 flex flex-col items-center gap-1 group/bar" title={`${d.period}: £${parseFloat(d.revenue).toFixed(2)} · ${d.order_count} orders`}>
+                  <div key={d.period} className="flex-1 h-full flex flex-col justify-end group/bar" title={`${d.period}: £${parseFloat(d.revenue).toFixed(2)} · ${d.order_count} orders`}>
                     <div
-                      className="w-full bg-meadow/60 group-hover/bar:bg-meadow rounded-t-sm transition-colors duration-150 relative min-h-[3px]"
+                      className="w-full bg-meadow/60 group-hover/bar:bg-meadow rounded-t-sm transition-colors duration-150 relative"
                       style={{ height: `${Math.max(pct, 4)}%` }}
                     >
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-forest text-white text-[9px] font-mono px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
