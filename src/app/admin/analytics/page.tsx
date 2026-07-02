@@ -37,7 +37,7 @@ export default function AnalyticsPage() {
       <div className="bg-white rounded-lg border border-hoarfrost p-6 mb-6">
         <div className="flex items-end justify-between mb-1">
           <p className="text-[10px] uppercase tracking-[0.13em] text-soil font-sans font-medium">Daily revenue</p>
-          <p className="font-mono text-xs text-soil">£{maxRevenue.toFixed(0)} peak</p>
+          <p className="font-mono text-xs text-soil">£{maxRevenue.toFixed(2)} peak</p>
         </div>
 
         {revenue.length === 0 ? (
@@ -52,8 +52,8 @@ export default function AnalyticsPage() {
                 return (
                   <div key={d.period} className="flex-1 flex flex-col items-center gap-1 group/bar" title={`${d.period}: £${parseFloat(d.revenue).toFixed(2)} · ${d.order_count} orders`}>
                     <div
-                      className="w-full bg-meadow/40 group-hover/bar:bg-meadow rounded-t-sm transition-colors duration-150 relative"
-                      style={{ height: `${Math.max(pct, 2)}%` }}
+                      className="w-full bg-meadow/60 group-hover/bar:bg-meadow rounded-t-sm transition-colors duration-150 relative min-h-[3px]"
+                      style={{ height: `${Math.max(pct, 4)}%` }}
                     >
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-forest text-white text-[9px] font-mono px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
                         £{d.revenue}

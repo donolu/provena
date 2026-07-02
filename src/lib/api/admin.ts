@@ -49,7 +49,7 @@ export async function getAdminPayouts(params?: {
 }
 
 export async function processAdminPayout(payoutId: string): Promise<Payout> {
-  const { data } = await apiClient.post<Payout>(`/payments/admin/payouts/`)
+  const { data } = await apiClient.post<Payout>(`/payments/admin/payouts/${payoutId}/process/`)
   return data
 }
 
