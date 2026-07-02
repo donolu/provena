@@ -49,7 +49,19 @@ def handle_payment_succeeded(stripe_payment_intent_id: str) -> Payment:
     payment.status = PaymentStatus.SUCCEEDED
     payment.save(update_fields=["status", "updated_at"])
     _create_payouts(payment)
+    _send_order_emails(payment.order)
     return payment
+
+
+def _send_order_emails(order) -> None:
+    from apps.notifications.email_service import (
+        send_order_confirmation_buyer,
+        send_order_notification_supplier,
+    )
+
+    send_order_confirmation_buyer(order)
+    for sub_order in order.sub_orders.select_related("supplier__user").all():
+        send_order_notification_supplier(sub_order)
 
 
 @transaction.atomic

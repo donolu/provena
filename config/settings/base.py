@@ -251,6 +251,15 @@ PLATFORM_FEE_PERCENT = env("PLATFORM_FEE_PERCENT", default="10")
 # Frontend
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
 
+# Email
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = env("EMAIL_HOST", default="smtp.resend.com")
+EMAIL_PORT = env.int("EMAIL_PORT", default=465)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="resend")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=True)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="onboarding@resend.dev")
+
 # CORS - overridden in environment-specific settings
 CORS_ALLOWED_ORIGINS: list[str] = []
 
