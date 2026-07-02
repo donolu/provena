@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAdmin
+from apps.pagination import PaginatedListMixin
 
 from . import services
 from .models import Supplier, SupplierDocument, SupplierStatus
@@ -223,7 +224,7 @@ class StripeConnectView(APIView):
 # Admin views
 
 
-class AdminSupplierListView(APIView):
+class AdminSupplierListView(PaginatedListMixin, APIView):
     """Admin: list all suppliers with optional status filter."""
 
     permission_classes = [IsAdmin]
@@ -247,7 +248,7 @@ class AdminSupplierListView(APIView):
         status_filter = request.query_params.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter.upper())
-        return Response(AdminSupplierSerializer(qs, many=True).data)
+        return self.paginate(qs, AdminSupplierSerializer, request)
 
 
 class AdminSupplierDetailView(APIView):

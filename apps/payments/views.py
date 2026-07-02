@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 from stripe import SignatureVerificationError as StripeSignatureError
 
 from apps.orders.models import Order
+from apps.pagination import StandardPagination
 from apps.suppliers.permissions import IsApprovedSupplier
 
 from . import services
@@ -66,7 +67,7 @@ class CreatePaymentIntentView(APIView):
 class PaymentListView(generics.ListAPIView):
     serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = None
+    pagination_class = StandardPagination
 
     @extend_schema(tags=["Payments (Buyer)"], summary="List own payments")
     def get_queryset(self):
@@ -130,7 +131,7 @@ class StripeWebhookView(APIView):
 class SupplierPayoutListView(generics.ListAPIView):
     serializer_class = PayoutSerializer
     permission_classes = [IsApprovedSupplier]
-    pagination_class = None
+    pagination_class = StandardPagination
 
     @extend_schema(
         tags=["Payments (Supplier)"],
@@ -152,7 +153,7 @@ class SupplierPayoutListView(generics.ListAPIView):
 class AdminPayoutListView(generics.ListAPIView):
     serializer_class = PayoutSerializer
     permission_classes = [IsAdminUser]
-    pagination_class = None
+    pagination_class = StandardPagination
 
     @extend_schema(
         tags=["Admin: Payments"],
@@ -173,7 +174,7 @@ class AdminPayoutListView(generics.ListAPIView):
 class AdminPaymentListView(generics.ListAPIView):
     serializer_class = PaymentSerializer
     permission_classes = [IsAdminUser]
-    pagination_class = None
+    pagination_class = StandardPagination
 
     @extend_schema(
         tags=["Admin: Payments"],

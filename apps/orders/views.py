@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.catalogue.models import ProductVariant
+from apps.pagination import PaginatedListMixin
 from apps.suppliers.permissions import IsApprovedSupplier
 
 from . import services
@@ -28,7 +29,7 @@ from .serializers import (
 
 
 @extend_schema(tags=["Orders (Buyer)"])
-class OrderListCreateView(APIView):
+class OrderListCreateView(PaginatedListMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
@@ -46,7 +47,7 @@ class OrderListCreateView(APIView):
         )
         if status_filter := request.query_params.get("status"):
             qs = qs.filter(status=status_filter)
-        return Response(OrderSerializer(qs, many=True).data)
+        return self.paginate(qs, OrderSerializer, request)
 
     @extend_schema(
         summary="Place an order",
@@ -179,7 +180,7 @@ class RaiseDisputeView(APIView):
 
 
 @extend_schema(tags=["Orders (Supplier)"])
-class SupplierSubOrderListView(APIView):
+class SupplierSubOrderListView(PaginatedListMixin, APIView):
     permission_classes = [IsApprovedSupplier]
 
     @extend_schema(
@@ -197,7 +198,7 @@ class SupplierSubOrderListView(APIView):
         )
         if status_filter := request.query_params.get("status"):
             qs = qs.filter(status=status_filter)
-        return Response(SubOrderListSerializer(qs, many=True).data)
+        return self.paginate(qs, SubOrderListSerializer, request)
 
 
 @extend_schema(tags=["Orders (Supplier)"])
@@ -291,7 +292,7 @@ class SupplierDeliverView(APIView):
 
 
 @extend_schema(tags=["Admin: Orders"])
-class AdminOrderListView(APIView):
+class AdminOrderListView(PaginatedListMixin, APIView):
     permission_classes = [IsAdminUser]
 
     @extend_schema(
@@ -310,7 +311,7 @@ class AdminOrderListView(APIView):
             qs = qs.filter(status=status_filter)
         if buyer_email := request.query_params.get("buyer"):
             qs = qs.filter(buyer__email__icontains=buyer_email)
-        return Response(OrderSerializer(qs, many=True).data)
+        return self.paginate(qs, OrderSerializer, request)
 
 
 @extend_schema(tags=["Admin: Orders"])

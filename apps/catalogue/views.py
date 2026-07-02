@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAdmin
+from apps.pagination import PaginatedListMixin
 from apps.suppliers.permissions import IsApprovedSupplier
 
 from . import services
@@ -163,7 +164,7 @@ class AdminCategoryDetailView(APIView):
 # ---------------------------------------------------------------------------
 
 
-class ProductListCreateView(APIView):
+class ProductListCreateView(PaginatedListMixin, APIView):
     def get_permissions(self):
         if self.request.method == "POST":
             return [IsApprovedSupplier()]
@@ -204,7 +205,7 @@ class ProductListCreateView(APIView):
             qs = qs.filter(Q(name__icontains=search) | Q(description__icontains=search))
         if request.query_params.get("featured") == "true":
             qs = qs.filter(is_featured=True)
-        return Response(ProductSerializer(qs, many=True).data)
+        return self.paginate(qs, ProductSerializer, request)
 
     @extend_schema(
         tags=["Catalogue: Products"],
@@ -239,7 +240,7 @@ class ProductListCreateView(APIView):
 # ---------------------------------------------------------------------------
 
 
-class SupplierProductListView(APIView):
+class SupplierProductListView(PaginatedListMixin, APIView):
     permission_classes = [IsApprovedSupplier]
 
     @extend_schema(
@@ -262,7 +263,7 @@ class SupplierProductListView(APIView):
         )
         if status_filter := request.query_params.get("status"):
             qs = qs.filter(status=status_filter.upper())
-        return Response(ProductSerializer(qs, many=True).data)
+        return self.paginate(qs, ProductSerializer, request)
 
 
 # ---------------------------------------------------------------------------
