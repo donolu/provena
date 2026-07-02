@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { StatusBadge } from '@/components/supplier/status-badge'
 import { Pagination } from '@/components/pagination'
@@ -111,9 +111,8 @@ export default function OrdersPage() {
               </thead>
               <tbody>
                 {displayed.map((order) => (
-                  <>
+                  <Fragment key={order.id}>
                     <tr
-                      key={order.id}
                       className="border-b border-hoarfrost hover:bg-mist/50 transition-colors duration-100"
                     >
                       <td className="px-4 py-3.5 font-mono text-xs text-forest">{order.order_reference}</td>
@@ -170,7 +169,7 @@ export default function OrdersPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

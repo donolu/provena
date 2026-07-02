@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { StatusBadge } from '@/components/supplier/status-badge'
 import { Pagination } from '@/components/pagination'
@@ -95,8 +95,8 @@ export default function SuppliersPage() {
               </thead>
               <tbody>
                 {displayed.map((s) => (
-                  <>
-                    <tr key={s.id} className="border-b border-hoarfrost hover:bg-mist/50 transition-colors duration-100">
+                  <Fragment key={s.id}>
+                    <tr className="border-b border-hoarfrost hover:bg-mist/50 transition-colors duration-100">
                       <td className="px-4 py-3.5">
                         <p className="text-sm font-sans font-medium text-forest">{s.business_name}</p>
                         <p className="text-[10px] font-mono text-hoarfrost">{s.slug}</p>
@@ -137,7 +137,7 @@ export default function SuppliersPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
