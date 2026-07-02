@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Store,
@@ -30,7 +30,14 @@ const BASE_NAV = [
 
 function AdminNav({ onLinkClick }: { onLinkClick?: () => void }) {
   const pathname = usePathname()
+  const router = useRouter()
   const user = useAuthStore((s) => s.user)
+  const logout = useAuthStore((s) => s.logout)
+
+  function handleLogout() {
+    logout()
+    router.push('/login')
+  }
   const { data: suppliersData } = useQuery({
     queryKey: ['admin', 'suppliers', 'all'],
     queryFn: () => getAdminSuppliers(),
@@ -96,7 +103,7 @@ function AdminNav({ onLinkClick }: { onLinkClick?: () => void }) {
             </p>
             <p className="text-[10px] text-white/40 font-sans truncate">{user?.email ?? ''}</p>
           </div>
-          <button aria-label="Sign out" className="ml-auto text-white/30 hover:text-white/70 transition-colors">
+          <button onClick={handleLogout} aria-label="Sign out" className="ml-auto text-white/30 hover:text-white/70 transition-colors">
             <LogOut className="w-3.5 h-3.5" strokeWidth={1.5} />
           </button>
         </div>

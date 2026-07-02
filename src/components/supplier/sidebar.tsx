@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Package,
@@ -23,7 +23,14 @@ const NAV = [
 
 function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
   const pathname = usePathname()
+  const router = useRouter()
   const user = useAuthStore((s) => s.user)
+  const logout = useAuthStore((s) => s.logout)
+
+  function handleLogout() {
+    logout()
+    router.push('/login')
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -80,6 +87,7 @@ function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
             </p>
           </div>
           <button
+            onClick={handleLogout}
             aria-label="Sign out"
             className="ml-auto text-white/30 hover:text-white/70 transition-colors"
           >
