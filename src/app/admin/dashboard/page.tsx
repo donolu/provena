@@ -44,7 +44,7 @@ export default function AdminDashboardPage() {
         <StatCard
           label="Revenue"
           prefix="£"
-          value={salesData?.total_revenue ?? '—'}
+          value={salesData ? parseFloat(salesData.total_revenue).toFixed(2) : '—'}
           icon={BarChart2}
         />
         <StatCard

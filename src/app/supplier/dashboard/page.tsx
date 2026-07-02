@@ -53,7 +53,7 @@ export default function DashboardPage() {
         <StatCard
           label="Revenue"
           prefix="£"
-          value={summary?.total_revenue ?? '—'}
+          value={summary ? parseFloat(summary.total_revenue).toFixed(2) : '—'}
           icon={BarChart2}
         />
         <StatCard
