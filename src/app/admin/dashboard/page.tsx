@@ -29,9 +29,9 @@ export default function AdminDashboardPage() {
     queryFn: getAdminOrders,
   })
 
-  const pendingSuppliers = (suppliersData ?? []).filter((s) => s.status === 'PENDING')
-  const recentOrders = (ordersData ?? []).slice(0, 6)
-  const totalSuppliers = suppliersData?.length ?? 0
+  const pendingSuppliers = (suppliersData?.results ?? []).filter((s) => s.status === 'PENDING')
+  const recentOrders = (ordersData?.results ?? []).slice(0, 6)
+  const totalSuppliers = suppliersData?.count ?? 0
 
   return (
     <div className="px-6 py-8 max-w-5xl mx-auto">

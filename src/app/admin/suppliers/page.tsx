@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { StatusBadge } from '@/components/supplier/status-badge'
+import { Pagination } from '@/components/pagination'
 import { getAdminSuppliers, approveSupplier, rejectSupplier } from '@/lib/api/suppliers'
 import type { AdminSupplier } from '@/lib/api/types'
 
@@ -23,11 +24,12 @@ function formatDate(iso: string) {
 export default function SuppliersPage() {
   const qc = useQueryClient()
   const [tab, setTab] = useState<Tab>('ALL')
+  const [page, setPage] = useState(1)
   const [confirming, setConfirming] = useState<{ id: string; action: 'approve' | 'reject' } | null>(null)
 
   const { data, isPending } = useQuery({
-    queryKey: ['admin', 'suppliers', 'all'],
-    queryFn: () => getAdminSuppliers(),
+    queryKey: ['admin', 'suppliers', 'all', page],
+    queryFn: () => getAdminSuppliers({ page }),
   })
 
   const approveMutation = useMutation({
@@ -40,14 +42,15 @@ export default function SuppliersPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin', 'suppliers'] }); setConfirming(null) },
   })
 
-  const all = data ?? []
+  const all = data?.results ?? []
+  const totalCount = data?.count ?? 0
   const displayed: AdminSupplier[] = tab === 'ALL' ? all : all.filter((s) => s.status === tab)
 
   return (
     <div className="px-6 py-8 max-w-5xl mx-auto">
       <div className="mb-6">
         <h1 className="font-display italic text-2xl text-forest">Suppliers</h1>
-        <p className="text-sm text-soil font-sans mt-0.5">{all.length} registered supplier{all.length !== 1 ? 's' : ''}</p>
+        <p className="text-sm text-soil font-sans mt-0.5">{totalCount} registered supplier{totalCount !== 1 ? 's' : ''}</p>
       </div>
 
       <div className="border-b border-hoarfrost mb-6 -mx-6 px-6 overflow-x-auto">
@@ -140,6 +143,7 @@ export default function SuppliersPage() {
             </table>
           </div>
         )}
+        <Pagination page={page} count={totalCount} onChange={(p) => { setPage(p); setConfirming(null) }} />
       </div>
     </div>
   )

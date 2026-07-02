@@ -1,10 +1,10 @@
 import { apiClient } from './client'
-import type { Order, SubOrderListItem } from './types'
+import type { Order, PaginatedResponse, SubOrderListItem } from './types'
 
 // ── Buyer ─────────────────────────────────────────────────────────────────────
 
-export async function getOrders(): Promise<Order[]> {
-  const { data } = await apiClient.get<Order[]>('/orders/')
+export async function getOrders(page = 1): Promise<PaginatedResponse<Order>> {
+  const { data } = await apiClient.get<PaginatedResponse<Order>>('/orders/', { params: { page } })
   return data
 }
 
@@ -34,8 +34,8 @@ export async function cancelOrder(reference: string): Promise<Order> {
 
 // ── Supplier ──────────────────────────────────────────────────────────────────
 
-export async function getSupplierSubOrders(): Promise<SubOrderListItem[]> {
-  const { data } = await apiClient.get<SubOrderListItem[]>('/orders/supplier/')
+export async function getSupplierSubOrders(page = 1): Promise<PaginatedResponse<SubOrderListItem>> {
+  const { data } = await apiClient.get<PaginatedResponse<SubOrderListItem>>('/orders/supplier/', { params: { page } })
   return data
 }
 
@@ -59,8 +59,8 @@ export async function dispatchSubOrder(
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
-export async function getAdminOrders(): Promise<Order[]> {
-  const { data } = await apiClient.get<Order[]>('/orders/admin/')
+export async function getAdminOrders(page = 1): Promise<PaginatedResponse<Order>> {
+  const { data } = await apiClient.get<PaginatedResponse<Order>>('/orders/admin/', { params: { page } })
   return data
 }
 

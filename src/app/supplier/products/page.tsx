@@ -4,25 +4,28 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, MoreHorizontal } from 'lucide-react'
 import { StatusBadge } from '@/components/supplier/status-badge'
+import { Pagination } from '@/components/pagination'
 import { getMyProducts } from '@/lib/api/catalogue'
 import type { Product } from '@/lib/api/types'
 
 export default function ProductsPage() {
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   const { data, isPending } = useQuery({
-    queryKey: ['supplier', 'products'],
+    queryKey: ['supplier', 'products', page],
     queryFn: getMyProducts,
   })
 
-  const products: Product[] = data ?? []
+  const products: Product[] = data?.results ?? []
+  const totalCount = data?.count ?? 0
 
   return (
     <div className="px-6 py-8 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="font-display italic text-2xl text-forest">Products</h1>
-          <p className="text-sm text-soil font-sans mt-0.5">{products.length} listing{products.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-soil font-sans mt-0.5">{totalCount} listing{totalCount !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={() => alert('Product creation coming soon.')}
@@ -105,6 +108,7 @@ export default function ProductsPage() {
             </table>
           </div>
         )}
+        <Pagination page={page} count={totalCount} onChange={(p) => { setPage(p); setOpenMenu(null) }} />
       </div>
     </div>
   )

@@ -35,9 +35,9 @@ export default function DashboardPage() {
     queryFn: getSupplierPayouts,
   })
 
-  const recentOrders = subOrdersData?.slice(0, 5) ?? []
-  const products = productsData ?? []
-  const pendingPayout = (payoutsData ?? [])
+  const recentOrders = subOrdersData?.results.slice(0, 5) ?? []
+  const products = productsData?.results ?? []
+  const pendingPayout = (payoutsData?.results ?? [])
     .filter((p) => p.status === 'PENDING')
     .reduce((s, p) => s + parseFloat(p.net_amount), 0)
     .toFixed(2)

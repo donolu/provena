@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { StatusBadge } from '@/components/supplier/status-badge'
+import { Pagination } from '@/components/pagination'
 import { getAdminOrders } from '@/lib/api/orders'
 import type { Order, OrderStatus } from '@/lib/api/types'
 
@@ -23,13 +24,15 @@ function formatDate(iso: string) {
 
 export default function AdminOrdersPage() {
   const [filter, setFilter] = useState<Tab>('ALL')
+  const [page, setPage] = useState(1)
 
   const { data, isPending } = useQuery({
-    queryKey: ['admin', 'orders'],
-    queryFn: getAdminOrders,
+    queryKey: ['admin', 'orders', page],
+    queryFn: () => getAdminOrders(page),
   })
 
-  const all: Order[] = data ?? []
+  const all: Order[] = data?.results ?? []
+  const totalCount = data?.count ?? 0
   const displayed = filter === 'ALL' ? all : all.filter((o) => o.status === filter)
 
   const totalRevenue = displayed
@@ -111,6 +114,7 @@ export default function AdminOrdersPage() {
             </table>
           </div>
         )}
+        <Pagination page={page} count={totalCount} onChange={setPage} />
       </div>
     </div>
   )

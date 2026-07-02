@@ -1,5 +1,6 @@
 import { apiClient } from './client'
 import type {
+  PaginatedResponse,
   Payout,
   RevenueDataPoint,
   SalesSummary,
@@ -41,8 +42,9 @@ export async function getSupplierPerformance(): Promise<SupplierPerformanceStat[
 
 export async function getAdminPayouts(params?: {
   status?: string
-}): Promise<Payout[]> {
-  const { data } = await apiClient.get<Payout[]>('/payments/admin/payouts/', { params })
+  page?: number
+}): Promise<PaginatedResponse<Payout>> {
+  const { data } = await apiClient.get<PaginatedResponse<Payout>>('/payments/admin/payouts/', { params })
   return data
 }
 
@@ -51,7 +53,7 @@ export async function processAdminPayout(payoutId: string): Promise<Payout> {
   return data
 }
 
-export async function getSupplierPayouts(): Promise<Payout[]> {
-  const { data } = await apiClient.get<Payout[]>('/payments/payouts/')
+export async function getSupplierPayouts(page = 1): Promise<PaginatedResponse<Payout>> {
+  const { data } = await apiClient.get<PaginatedResponse<Payout>>('/payments/payouts/', { params: { page } })
   return data
 }

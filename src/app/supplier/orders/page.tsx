@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { StatusBadge } from '@/components/supplier/status-badge'
+import { Pagination } from '@/components/pagination'
 import { getSupplierSubOrders, confirmSubOrder, dispatchSubOrder } from '@/lib/api/orders'
 import type { OrderStatus } from '@/lib/api/types'
 
@@ -24,12 +25,13 @@ function formatDate(iso: string) {
 export default function OrdersPage() {
   const qc = useQueryClient()
   const [filter, setFilter] = useState<FilterTab>('ALL')
+  const [page, setPage] = useState(1)
   const [dispatching, setDispatching] = useState<string | null>(null)
   const [trackingInput, setTrackingInput] = useState('')
 
   const { data, isPending } = useQuery({
-    queryKey: ['supplier', 'suborders'],
-    queryFn: getSupplierSubOrders,
+    queryKey: ['supplier', 'suborders', page],
+    queryFn: () => getSupplierSubOrders(page),
   })
 
   const confirmMutation = useMutation({
@@ -47,7 +49,8 @@ export default function OrdersPage() {
     },
   })
 
-  const all = data ?? []
+  const all = data?.results ?? []
+  const totalCount = data?.count ?? 0
   const displayed = filter === 'ALL' ? all : all.filter((o) => o.status === filter)
 
   return (
@@ -172,6 +175,7 @@ export default function OrdersPage() {
               </tbody>
             </table>
           </div>
+        <Pagination page={page} count={totalCount} onChange={(p) => { setPage(p); setDispatching(null) }} />
         </div>
       )}
     </div>

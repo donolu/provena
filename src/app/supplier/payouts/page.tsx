@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Wallet } from 'lucide-react'
 import { StatusBadge } from '@/components/supplier/status-badge'
+import { Pagination } from '@/components/pagination'
 import { getSupplierPayouts } from '@/lib/api/admin'
 import type { Payout } from '@/lib/api/types'
 
@@ -18,12 +20,15 @@ function sumByStatus(payouts: Payout[], status: string) {
 }
 
 export default function PayoutsPage() {
+  const [page, setPage] = useState(1)
+
   const { data, isPending } = useQuery({
-    queryKey: ['supplier', 'payouts'],
-    queryFn: getSupplierPayouts,
+    queryKey: ['supplier', 'payouts', page],
+    queryFn: () => getSupplierPayouts(page),
   })
 
-  const payouts = data ?? []
+  const payouts = data?.results ?? []
+  const totalCount = data?.count ?? 0
   const pending    = sumByStatus(payouts, 'PENDING')
   const processing = sumByStatus(payouts, 'PROCESSING')
   const paid       = sumByStatus(payouts, 'PAID')
@@ -91,6 +96,7 @@ export default function PayoutsPage() {
             </table>
           </div>
         )}
+        <Pagination page={page} count={totalCount} onChange={setPage} />
       </div>
     </div>
   )

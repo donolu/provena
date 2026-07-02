@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { AdminSupplier, SupplierProfile } from './types'
+import type { AdminSupplier, PaginatedResponse, SupplierProfile } from './types'
 
 // ── Supplier self-service ─────────────────────────────────────────────────────
 
@@ -33,8 +33,9 @@ export async function getMyPerformance(): Promise<SupplierPerformanceResponse> {
 export async function getAdminSuppliers(params?: {
   status?: string
   search?: string
-}): Promise<AdminSupplier[]> {
-  const { data } = await apiClient.get<AdminSupplier[]>('/suppliers/admin/', { params })
+  page?: number
+}): Promise<PaginatedResponse<AdminSupplier>> {
+  const { data } = await apiClient.get<PaginatedResponse<AdminSupplier>>('/suppliers/admin/', { params })
   return data
 }
 
