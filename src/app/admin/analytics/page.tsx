@@ -25,7 +25,7 @@ export default function AnalyticsPage() {
   })
 
   const revenue = revenueData ?? []
-  const maxRevenue = Math.max(...revenue.map((d) => parseFloat(d.revenue)), 1)
+  const maxRevenue = revenue.length ? Math.max(...revenue.map((d) => parseFloat(d.revenue))) : 1
 
   return (
     <div className="px-6 py-8 max-w-5xl mx-auto">
@@ -50,13 +50,13 @@ export default function AnalyticsPage() {
               {revenue.map((d) => {
                 const pct = (parseFloat(d.revenue) / maxRevenue) * 100
                 return (
-                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group/bar" title={`${d.date}: £${d.revenue} · ${d.orders} orders`}>
+                  <div key={d.period} className="flex-1 flex flex-col items-center gap-1 group/bar" title={`${d.period}: £${parseFloat(d.revenue).toFixed(2)} · ${d.order_count} orders`}>
                     <div
                       className="w-full bg-meadow/40 group-hover/bar:bg-meadow rounded-t-sm transition-colors duration-150 relative"
-                      style={{ height: `${pct}%` }}
+                      style={{ height: `${Math.max(pct, 2)}%` }}
                     >
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-forest text-white text-[9px] font-mono px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover/bar:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
-                        £{d.revenue}
+                        £{parseFloat(d.revenue).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -65,10 +65,10 @@ export default function AnalyticsPage() {
             </div>
             <div className="flex gap-1">
               {revenue.map((d, i) => (
-                <div key={d.date} className="flex-1 text-center">
+                <div key={d.period} className="flex-1 text-center">
                   {i % 2 === 0 && (
                     <span className="text-[9px] font-mono text-soil">
-                      {d.date.slice(5, 10)}
+                      {d.period.slice(5, 10)}
                     </span>
                   )}
                 </div>
@@ -80,7 +80,7 @@ export default function AnalyticsPage() {
         <div className="flex gap-8 mt-5 pt-5 border-t border-hoarfrost">
           <div>
             <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans mb-1">Total revenue</p>
-            <p className="font-mono text-lg font-medium text-forest">£{summary?.total_revenue ?? '—'}</p>
+            <p className="font-mono text-lg font-medium text-forest">£{summary ? parseFloat(summary.total_revenue).toFixed(2) : '—'}</p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans mb-1">Total orders</p>
@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
           <div>
             <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans mb-1">Avg. order value</p>
             <p className="font-mono text-lg font-medium text-forest">
-              £{summary?.avg_order_value ?? '—'}
+              £{summary ? parseFloat(summary.avg_order_value).toFixed(2) : '—'}
             </p>
           </div>
         </div>
@@ -152,9 +152,9 @@ export default function AnalyticsPage() {
                 {supplierPerf.map((s, i) => (
                   <tr key={i} className="hover:bg-mist/50 transition-colors duration-100">
                     <td className="px-4 py-3 text-xs font-sans font-medium text-forest">{s.supplier_name}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-forest text-right">£{s.revenue}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-soil text-right">{s.orders}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-marigold text-right">£{s.payout_pending}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-forest text-right">£{parseFloat(s.total_revenue).toFixed(2)}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-soil text-right">{s.sub_order_count}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-marigold text-right">£{parseFloat(s.pending_payout).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>

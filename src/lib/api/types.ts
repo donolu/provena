@@ -228,28 +228,29 @@ export interface SalesSummary {
   total_revenue: string
   total_orders: number
   avg_order_value: string
-  period_start: string
-  period_end: string
+  from_date: string
+  to_date: string
 }
 
 export interface RevenueDataPoint {
-  date: string
+  period: string
   revenue: string
-  orders: number
+  order_count: number
 }
 
 export interface TopProduct {
   product_name: string
-  supplier_name: string
+  supplier_name?: string
+  variant_sku?: string
   units_sold: number
   revenue: string
 }
 
 export interface SupplierPerformanceStat {
   supplier_name: string
-  revenue: string
-  orders: number
-  payout_pending: string
+  total_revenue: string
+  sub_order_count: number
+  pending_payout: string
 }
 
 export interface SupplierOwnSummary {
