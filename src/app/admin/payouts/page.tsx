@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Wallet } from 'lucide-react'
 import { StatusBadge } from '@/components/supplier/status-badge'
 import { Pagination } from '@/components/pagination'
-import { getAdminPayouts } from '@/lib/api/admin'
+import { getAdminPayouts, processAdminPayout } from '@/lib/api/admin'
 import type { Payout } from '@/lib/api/types'
 
 function formatDate(iso: string) {
@@ -21,10 +21,16 @@ function sumByStatus(payouts: Payout[], status: string) {
 
 export default function AdminPayoutsPage() {
   const [page, setPage] = useState(1)
+  const qc = useQueryClient()
 
   const { data, isPending } = useQuery({
     queryKey: ['admin', 'payouts', page],
     queryFn: () => getAdminPayouts({ page }),
+  })
+
+  const processMutation = useMutation({
+    mutationFn: (id: string) => processAdminPayout(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'payouts'] }),
   })
 
   const payouts = data?.results ?? []
@@ -78,7 +84,7 @@ export default function AdminPayoutsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-hoarfrost">
-                  {['Supplier', 'Order', 'Gross', 'Fee', 'Net', 'Status', 'Date'].map((h) => (
+                  {['Supplier', 'Order', 'Gross', 'Fee', 'Net', 'Status', 'Date', ''].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium">{h}</th>
                   ))}
                 </tr>
@@ -93,6 +99,17 @@ export default function AdminPayoutsPage() {
                     <td className="px-4 py-3.5 font-mono text-xs font-medium text-forest">£{p.net_amount}</td>
                     <td className="px-4 py-3.5"><StatusBadge status={p.status} /></td>
                     <td className="px-4 py-3.5 text-xs font-sans text-soil whitespace-nowrap">{formatDate(p.created_at)}</td>
+                    <td className="px-4 py-3.5">
+                      {p.status === 'PENDING' && (
+                        <button
+                          onClick={() => processMutation.mutate(p.id)}
+                          disabled={processMutation.isPending}
+                          className="text-xs font-sans text-meadow hover:text-forest transition-colors duration-100 disabled:opacity-40"
+                        >
+                          Process
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
