@@ -1,6 +1,21 @@
 import { apiClient } from './client'
 import type { Order, PaginatedResponse, SubOrderListItem } from './types'
 
+export interface PaymentIntentResponse {
+  client_secret: string
+  payment_id: string
+  amount: string
+}
+
+export async function createPaymentIntent(
+  orderReference: string,
+): Promise<PaymentIntentResponse> {
+  const { data } = await apiClient.post<PaymentIntentResponse>('/payments/create-intent/', {
+    order_reference: orderReference,
+  })
+  return data
+}
+
 // ── Buyer ─────────────────────────────────────────────────────────────────────
 
 export async function getOrders(page = 1): Promise<PaginatedResponse<Order>> {
