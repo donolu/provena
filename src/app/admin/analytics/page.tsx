@@ -124,7 +124,7 @@ export default function AnalyticsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-soil text-right">{p.units_sold}</td>
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-forest text-right">£{p.revenue}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-medium text-forest text-right">£{parseFloat(p.revenue).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
