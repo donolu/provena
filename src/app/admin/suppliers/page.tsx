@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, Fragment } from 'react'
+import { useState, Fragment, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Pencil, Check, X } from 'lucide-react'
 import { StatusBadge } from '@/components/supplier/status-badge'
 import { Pagination } from '@/components/pagination'
-import { getAdminSuppliers, approveSupplier, rejectSupplier } from '@/lib/api/suppliers'
+import { getAdminSuppliers, approveSupplier, rejectSupplier, updateSupplierCommission } from '@/lib/api/suppliers'
 import type { AdminSupplier } from '@/lib/api/types'
 
 type Tab = 'ALL' | 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'REJECTED'
@@ -19,6 +20,83 @@ const TABS: { key: Tab; label: string }[] = [
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function CommissionCell({ supplier }: { supplier: AdminSupplier }) {
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(supplier.commission_rate)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
+
+  const mutation = useMutation({
+    mutationFn: (rate: string) => updateSupplierCommission(supplier.id, rate),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'suppliers'] })
+      setEditing(false)
+    },
+  })
+
+  function handleSave() {
+    const parsed = parseFloat(value)
+    if (isNaN(parsed) || parsed < 0 || parsed > 100) return
+    mutation.mutate(parsed.toFixed(2))
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') { setEditing(false); setValue(supplier.commission_rate) }
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <div className="relative">
+          <input
+            ref={inputRef}
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-16 pl-2 pr-5 py-1 text-xs font-mono border border-meadow rounded focus:outline-none"
+          />
+          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-soil">%</span>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={mutation.isPending}
+          className="text-meadow hover:text-forest disabled:opacity-40 transition-colors"
+          title="Save"
+        >
+          <Check size={13} strokeWidth={2} />
+        </button>
+        <button
+          onClick={() => { setEditing(false); setValue(supplier.commission_rate) }}
+          className="text-soil hover:text-forest transition-colors"
+          title="Cancel"
+        >
+          <X size={13} strokeWidth={2} />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={() => { setValue(supplier.commission_rate); setEditing(true) }}
+      className="group flex items-center gap-1.5 font-mono text-xs text-forest hover:text-meadow transition-colors"
+      title="Edit commission rate"
+    >
+      {supplier.commission_rate}%
+      <Pencil size={11} strokeWidth={1.5} className="text-hoarfrost group-hover:text-meadow transition-colors" />
+    </button>
+  )
 }
 
 export default function SuppliersPage() {
@@ -103,7 +181,7 @@ export default function SuppliersPage() {
                       </td>
                       <td className="px-4 py-3.5 text-xs font-sans text-soil">{s.user_email}</td>
                       <td className="px-4 py-3.5 text-xs font-sans text-soil whitespace-nowrap">{formatDate(s.created_at)}</td>
-                      <td className="px-4 py-3.5 font-mono text-xs text-forest">{s.commission_rate}%</td>
+                      <td className="px-4 py-3.5"><CommissionCell supplier={s} /></td>
                       <td className="px-4 py-3.5"><StatusBadge status={s.status} /></td>
                       <td className="px-4 py-3.5">
                         {s.status === 'PENDING' && (

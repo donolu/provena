@@ -64,3 +64,13 @@ export async function suspendSupplier(id: string, reason?: string): Promise<Admi
   })
   return data
 }
+
+export async function updateSupplierCommission(
+  id: string,
+  commissionRate: string,
+): Promise<AdminSupplier> {
+  const { data } = await apiClient.patch<AdminSupplier>(`/suppliers/admin/${id}/`, {
+    commission_rate: commissionRate,
+  })
+  return data
+}
