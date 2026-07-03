@@ -1,9 +1,35 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Minus, Plus, ShoppingBasket, Trash2 } from 'lucide-react'
+import { X, Minus, Plus, ShoppingBasket, Trash2, Clock } from 'lucide-react'
 import type { CartItem } from '@/lib/api/types'
+
+function ReservationCountdown({ expiresAt }: { expiresAt: string }) {
+  const [label, setLabel] = useState('')
+  const [urgent, setUrgent] = useState(false)
+
+  useEffect(() => {
+    function update() {
+      const ms = new Date(expiresAt).getTime() - Date.now()
+      if (ms <= 0) { setLabel('Expired'); setUrgent(true); return }
+      const mins = Math.floor(ms / 60_000)
+      const secs = Math.floor((ms % 60_000) / 1_000)
+      setLabel(`${mins}:${secs.toString().padStart(2, '0')}`)
+      setUrgent(ms < 5 * 60_000)
+    }
+    update()
+    const id = setInterval(update, 1_000)
+    return () => clearInterval(id)
+  }, [expiresAt])
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-mono ${urgent ? 'text-red-500' : 'text-soil'}`}>
+      <Clock size={10} strokeWidth={1.5} />
+      {label}
+    </span>
+  )
+}
 
 interface CartDrawerProps {
   open: boolean
@@ -95,6 +121,11 @@ export function CartDrawer({ open, onClose, items, total, onUpdateQuantity, onRe
                     <p className="mt-0.5 text-[11px] uppercase tracking-[0.1em] text-soil font-sans">
                       {item.variant_name} · {item.variant_sku}
                     </p>
+                    {item.reservation_expires_at && (
+                      <div className="mt-1">
+                        <ReservationCountdown expiresAt={item.reservation_expires_at} />
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={() => onRemove(item.id)}

@@ -96,6 +96,7 @@ export interface CartItem {
   price: string
   quantity: number
   subtotal: string
+  reservation_expires_at: string | null
   added_at: string
   updated_at: string
 }
