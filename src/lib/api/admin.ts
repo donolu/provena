@@ -1,5 +1,6 @@
 import { apiClient } from './client'
 import type {
+  AdminUser,
   PaginatedResponse,
   Payout,
   RevenueDataPoint,
@@ -56,4 +57,29 @@ export async function processAdminPayout(payoutId: string): Promise<Payout> {
 export async function getSupplierPayouts(page = 1): Promise<PaginatedResponse<Payout>> {
   const { data } = await apiClient.get<PaginatedResponse<Payout>>('/payments/payouts/', { params: { page } })
   return data
+}
+
+// ── Admin Users ───────────────────────────────────────────────────────────────
+
+export async function getAdminUsers(params?: {
+  role?: string
+  q?: string
+  page?: number
+}): Promise<PaginatedResponse<AdminUser>> {
+  const { data } = await apiClient.get<PaginatedResponse<AdminUser>>('/auth/admin/users/', { params })
+  return data
+}
+
+export async function suspendUser(userId: string): Promise<AdminUser> {
+  const { data } = await apiClient.post<AdminUser>(`/auth/admin/users/${userId}/suspend/`)
+  return data
+}
+
+export async function activateUser(userId: string): Promise<AdminUser> {
+  const { data } = await apiClient.post<AdminUser>(`/auth/admin/users/${userId}/activate/`)
+  return data
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  await apiClient.delete(`/auth/admin/users/${userId}/`)
 }

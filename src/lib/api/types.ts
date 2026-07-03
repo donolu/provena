@@ -225,6 +225,20 @@ export interface AdminSupplier extends SupplierProfile {
   updated_at: string
 }
 
+// ── Admin Users ───────────────────────────────────────────────────────────────
+
+export interface AdminUser {
+  id: string
+  email: string
+  first_name: string
+  last_name: string
+  role: UserRole
+  is_active: boolean
+  is_staff: boolean
+  totp_enabled: boolean
+  created_at: string
+}
+
 // ── Analytics ─────────────────────────────────────────────────────────────────
 
 export interface SalesSummary {
