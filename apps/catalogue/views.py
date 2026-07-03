@@ -202,9 +202,18 @@ class ProductListCreateView(PaginatedListMixin, APIView):
         if supplier_slug := request.query_params.get("supplier"):
             qs = qs.filter(supplier__slug=supplier_slug)
         if search := request.query_params.get("search"):
-            qs = qs.filter(Q(name__icontains=search) | Q(description__icontains=search))
+            qs = qs.filter(
+                Q(name__icontains=search)
+                | Q(description__icontains=search)
+                | Q(category__name__icontains=search)
+                | Q(variants__name__icontains=search)
+            ).distinct()
         if request.query_params.get("featured") == "true":
             qs = qs.filter(is_featured=True)
+        if min_price := request.query_params.get("min_price"):
+            qs = qs.filter(variants__price__gte=min_price).distinct()
+        if max_price := request.query_params.get("max_price"):
+            qs = qs.filter(variants__price__lte=max_price).distinct()
         return self.paginate(qs, ProductSerializer, request)
 
     @extend_schema(
