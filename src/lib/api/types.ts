@@ -307,3 +307,11 @@ export interface Payment {
   created_at: string
   updated_at: string
 }
+
+export interface NotificationPreferences {
+  email_order_placed: boolean
+  email_order_dispatched: boolean
+  email_new_order: boolean
+  email_payout_received: boolean
+  updated_at: string
+}

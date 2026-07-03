@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ShoppingBasket, User, ChevronDown, LogOut, LogIn } from 'lucide-react'
+import { ShoppingBasket, User, ChevronDown, LogOut, LogIn, Bell } from 'lucide-react'
 import Link from 'next/link'
 import { useAuthStore } from '@/store/auth'
 
@@ -68,6 +68,14 @@ export function Nav({ cartCount, onCartClick }: NavProps) {
                       className="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-sans text-soil hover:text-forest hover:bg-mist transition-colors duration-100"
                     >
                       My orders
+                    </Link>
+                    <Link
+                      href="/account/notifications"
+                      onClick={() => setOpen(false)}
+                      className="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-sans text-soil hover:text-forest hover:bg-mist transition-colors duration-100"
+                    >
+                      <Bell className="w-3.5 h-3.5" strokeWidth={1.5} />
+                      Notifications
                     </Link>
                     <button
                       onClick={handleLogout}
