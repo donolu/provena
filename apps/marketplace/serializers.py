@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Cart, CartItem, Review, WishlistItem
+from .models import Cart, CartItem, CartReservation, Review, WishlistItem
 
 
 class CartItemSerializer(serializers.ModelSerializer):
@@ -11,6 +11,7 @@ class CartItemSerializer(serializers.ModelSerializer):
         source="variant.price", max_digits=10, decimal_places=2, read_only=True
     )
     subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    reservation_expires_at = serializers.SerializerMethodField()
 
     class Meta:
         model = CartItem
@@ -23,10 +24,17 @@ class CartItemSerializer(serializers.ModelSerializer):
             "price",
             "quantity",
             "subtotal",
+            "reservation_expires_at",
             "added_at",
             "updated_at",
         ]
         read_only_fields = ["id", "added_at", "updated_at"]
+
+    def get_reservation_expires_at(self, obj) -> str | None:
+        try:
+            return obj.reservation.expires_at.isoformat()
+        except CartReservation.DoesNotExist:
+            return None
 
 
 class CartSerializer(serializers.ModelSerializer):

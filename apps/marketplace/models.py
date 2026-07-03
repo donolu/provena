@@ -3,6 +3,9 @@ from decimal import Decimal
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
+
+RESERVATION_MINUTES = 30
 
 
 class Cart(models.Model):
@@ -45,6 +48,34 @@ class CartItem(models.Model):
     @property
     def subtotal(self) -> Decimal:
         return self.variant.price * self.quantity
+
+
+class CartReservation(models.Model):
+    """Tracks a stock reservation held against a cart item. Expires after RESERVATION_MINUTES."""
+
+    cart_item = models.OneToOneField(
+        CartItem,
+        on_delete=models.CASCADE,
+        related_name="reservation",
+    )
+    variant = models.ForeignKey(
+        "catalogue.ProductVariant",
+        on_delete=models.CASCADE,
+        related_name="cart_reservations",
+    )
+    quantity = models.PositiveIntegerField()
+    reserved_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["expires_at"]
+
+    def __str__(self) -> str:
+        return f"Reservation {self.variant.sku} x{self.quantity} (expires {self.expires_at:%H:%M})"
+
+    @property
+    def is_expired(self) -> bool:
+        return timezone.now() >= self.expires_at
 
 
 class WishlistItem(models.Model):

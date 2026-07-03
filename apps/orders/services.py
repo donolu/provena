@@ -40,6 +40,44 @@ def _sync_order_status(order: Order) -> None:
     order.save(update_fields=["status", "updated_at"])
 
 
+def _consume_cart_reservation(buyer, variant: ProductVariant, quantity: int) -> bool:
+    """
+    If the buyer holds a non-expired cart reservation for `variant` covering at least
+    `quantity` units, delete it and return True (stock is already reserved).
+    Returns False if no valid reservation exists.
+    """
+    from django.utils import timezone
+
+    from apps.marketplace.models import CartReservation
+
+    try:
+        res = CartReservation.objects.select_related("cart_item").get(
+            cart_item__cart__buyer=buyer,
+            variant=variant,
+            expires_at__gt=timezone.now(),
+        )
+    except CartReservation.DoesNotExist:
+        return False
+
+    if res.quantity < quantity:
+        # Partial reservation — release the cart portion and re-reserve the full amount.
+        inventory_services.release_reservation(
+            variant, res.quantity, reference=f"CART:{res.cart_item_id}"
+        )
+        res.cart_item.delete()
+        return False
+
+    if res.quantity > quantity:
+        # More reserved than needed — release the surplus, keep the order amount reserved.
+        surplus = res.quantity - quantity
+        inventory_services.release_reservation(
+            variant, surplus, reference=f"CART:{res.cart_item_id}"
+        )
+
+    res.cart_item.delete()
+    return True
+
+
 @transaction.atomic
 def place_order(
     buyer,
@@ -65,7 +103,13 @@ def place_order(
             raise ValueError(f"Quantity must be positive for SKU {variant.sku}.")
         if not variant.is_active:
             raise ValueError(f"SKU {variant.sku} is not available.")
-        inventory_services.reserve_stock(variant, quantity, reference=reference)
+
+        # If the buyer has a live cart reservation for this variant the stock is already
+        # held in quantity_reserved — don't reserve again, just clear the cart record.
+        cart_reserved = _consume_cart_reservation(buyer, variant, quantity)
+        if not cart_reserved:
+            inventory_services.reserve_stock(variant, quantity, reference=reference)
+
         line_total = variant.price * quantity
         total_amount += line_total
         sid = variant.product.supplier_id

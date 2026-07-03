@@ -233,6 +233,12 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_BEAT_SCHEDULE = {
+    "release-expired-cart-reservations": {
+        "task": "apps.marketplace.tasks.release_expired_cart_reservations",
+        "schedule": 300,  # every 5 minutes
+    },
+}
 
 # Cache
 CACHES = {
