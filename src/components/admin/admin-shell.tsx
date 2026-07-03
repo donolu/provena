@@ -10,6 +10,7 @@ import {
   ShoppingBag,
   BarChart2,
   Wallet,
+  Package,
   Menu,
   X,
   LogOut,
@@ -24,6 +25,7 @@ const BASE_NAV = [
   { href: '/admin/suppliers',  label: 'Suppliers', icon: Store },
   { href: '/admin/users',      label: 'Users',     icon: Users },
   { href: '/admin/orders',     label: 'Orders',    icon: ShoppingBag },
+  { href: '/admin/products',   label: 'Products',  icon: Package },
   { href: '/admin/analytics',  label: 'Analytics', icon: BarChart2 },
   { href: '/admin/payouts',    label: 'Payouts',   icon: Wallet },
 ]

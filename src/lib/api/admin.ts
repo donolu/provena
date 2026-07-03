@@ -3,6 +3,7 @@ import type {
   AdminUser,
   PaginatedResponse,
   Payout,
+  Product,
   RevenueDataPoint,
   SalesSummary,
   SupplierPerformanceStat,
@@ -56,6 +57,21 @@ export async function processAdminPayout(payoutId: string): Promise<Payout> {
 
 export async function getSupplierPayouts(page = 1): Promise<PaginatedResponse<Payout>> {
   const { data } = await apiClient.get<PaginatedResponse<Payout>>('/payments/payouts/', { params: { page } })
+  return data
+}
+
+// ── Admin Products ────────────────────────────────────────────────────────────
+
+export async function getAdminProducts(params?: {
+  status?: string
+  supplier?: string
+}): Promise<Product[]> {
+  const { data } = await apiClient.get<Product[]>('/catalogue/admin/products/', { params })
+  return data
+}
+
+export async function adminToggleFeature(slug: string): Promise<Product> {
+  const { data } = await apiClient.post<Product>(`/catalogue/admin/products/${slug}/feature/`)
   return data
 }
 

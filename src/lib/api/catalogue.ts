@@ -16,6 +16,7 @@ export async function getProducts(params?: {
   search?: string
   min_price?: number
   max_price?: number
+  featured?: boolean
   page?: number
   page_size?: number
 }): Promise<PaginatedResponse<Product>> {
