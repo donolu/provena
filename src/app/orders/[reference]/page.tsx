@@ -1,12 +1,12 @@
 'use client'
 
-import { use } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { CheckCircle2, ChevronLeft } from 'lucide-react'
+import { use, useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { CheckCircle2, ChevronLeft, XCircle } from 'lucide-react'
 import Link from 'next/link'
 import { Nav } from '@/components/nav'
 import { StatusBadge } from '@/components/supplier/status-badge'
-import { getOrder } from '@/lib/api/orders'
+import { getOrder, cancelOrder } from '@/lib/api/orders'
 import { getCart } from '@/lib/api/cart'
 import { useAuthStore } from '@/store/auth'
 
@@ -16,14 +16,30 @@ function formatDate(iso: string) {
   })
 }
 
+const CANCELLABLE = new Set(['PENDING', 'CONFIRMED'])
+
 export default function OrderDetailPage({ params }: { params: Promise<{ reference: string }> }) {
   const { reference } = use(params)
   const { user } = useAuthStore()
+  const qc = useQueryClient()
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   const { data: order, isPending } = useQuery({
     queryKey: ['order', reference],
     queryFn: () => getOrder(reference),
     enabled: !!user,
+  })
+
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelOrder(reference),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['order', reference] })
+      qc.invalidateQueries({ queryKey: ['orders'] })
+      setCancelError(null)
+    },
+    onError: (err: { response?: { data?: { detail?: string } } }) => {
+      setCancelError(err.response?.data?.detail ?? 'Could not cancel order.')
+    },
   })
 
   const { data: cart } = useQuery({
@@ -66,8 +82,27 @@ export default function OrderDetailPage({ params }: { params: Promise<{ referenc
               <p className="text-xs font-sans text-soil">
                 Total <span className="font-mono text-forest font-medium">£{order.total_amount}</span>
               </p>
-              <StatusBadge status={order.status} />
+              <div className="flex items-center gap-3">
+                <StatusBadge status={order.status} />
+                {CANCELLABLE.has(order.status) && (
+                  <button
+                    onClick={() => {
+                      if (confirm('Are you sure you want to cancel this order?')) {
+                        cancelMutation.mutate()
+                      }
+                    }}
+                    disabled={cancelMutation.isPending}
+                    className="flex items-center gap-1 text-xs font-sans text-red-600 hover:text-red-700 disabled:opacity-40 transition-colors duration-100"
+                  >
+                    <XCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
+                    Cancel order
+                  </button>
+                )}
+              </div>
             </div>
+            {cancelError && (
+              <p className="text-xs font-sans text-red-600 mt-1">{cancelError}</p>
+            )}
 
             <div className="space-y-4 mt-6">
               {order.sub_orders.map((sub) => (
