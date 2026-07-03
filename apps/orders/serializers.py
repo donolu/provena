@@ -19,10 +19,32 @@ class OrderItemSerializer(serializers.ModelSerializer):
         ]
 
 
+class DisputeSerializer(serializers.ModelSerializer):
+    raised_by_email = serializers.SerializerMethodField()
+    sub_order_id = serializers.UUIDField(source="sub_order.id", read_only=True)
+
+    class Meta:
+        model = OrderDispute
+        fields = [
+            "id",
+            "sub_order_id",
+            "reason",
+            "status",
+            "resolution",
+            "raised_by_email",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_raised_by_email(self, obj) -> str | None:
+        return obj.raised_by.email if obj.raised_by else None
+
+
 class SubOrderSerializer(serializers.ModelSerializer):
     supplier_name = serializers.CharField(source="supplier.business_name", read_only=True)
     supplier_slug = serializers.SlugField(source="supplier.slug", read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
+    disputes = DisputeSerializer(many=True, read_only=True)
 
     class Meta:
         model = SubOrder
@@ -33,7 +55,9 @@ class SubOrderSerializer(serializers.ModelSerializer):
             "status",
             "subtotal",
             "tracking_number",
+            "delivered_at",
             "items",
+            "disputes",
             "created_at",
             "updated_at",
         ]
@@ -101,27 +125,6 @@ class OrderSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-
-
-class DisputeSerializer(serializers.ModelSerializer):
-    raised_by_email = serializers.SerializerMethodField()
-    sub_order_id = serializers.UUIDField(source="sub_order.id", read_only=True)
-
-    class Meta:
-        model = OrderDispute
-        fields = [
-            "id",
-            "sub_order_id",
-            "reason",
-            "status",
-            "resolution",
-            "raised_by_email",
-            "created_at",
-            "updated_at",
-        ]
-
-    def get_raised_by_email(self, obj) -> str | None:
-        return obj.raised_by.email if obj.raised_by else None
 
 
 # --- Write serialisers ---

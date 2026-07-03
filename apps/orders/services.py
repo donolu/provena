@@ -1,7 +1,9 @@
 import logging
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
+from django.utils import timezone
 
 from apps.catalogue.models import ProductVariant
 from apps.inventory import services as inventory_services
@@ -189,7 +191,8 @@ def deliver_sub_order(sub_order: SubOrder) -> SubOrder:
     if sub_order.status != OrderStatus.DISPATCHED:
         raise ValueError(f"Cannot deliver a sub-order with status {sub_order.status}.")
     sub_order.status = OrderStatus.DELIVERED
-    sub_order.save(update_fields=["status", "updated_at"])
+    sub_order.delivered_at = timezone.now()
+    sub_order.save(update_fields=["status", "delivered_at", "updated_at"])
     _sync_order_status(sub_order.order)
     return sub_order
 
@@ -225,6 +228,11 @@ def cancel_order(order: Order) -> Order:
 def raise_dispute(sub_order: SubOrder, raised_by, reason: str) -> OrderDispute:
     if sub_order.status not in (OrderStatus.DISPATCHED, OrderStatus.DELIVERED):
         raise ValueError("Disputes can only be raised for dispatched or delivered sub-orders.")
+    if sub_order.status == OrderStatus.DELIVERED:
+        if not sub_order.delivered_at or timezone.now() > sub_order.delivered_at + timedelta(
+            days=7
+        ):
+            raise ValueError("Disputes must be raised within 7 days of delivery.")
     return OrderDispute.objects.create(
         sub_order=sub_order,
         raised_by=raised_by,

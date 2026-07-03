@@ -76,15 +76,16 @@ class TestOrderListCreate:
     def test_list_own_orders(self, buyer_client, placed_order):
         response = buyer_client.get("/api/v1/orders/")
         assert response.status_code == 200
-        assert len(response.json()) == 1
-        assert response.json()[0]["reference"] == placed_order.reference
+        results = response.json()["results"]
+        assert len(results) == 1
+        assert results[0]["reference"] == placed_order.reference
 
     def test_list_filter_by_status(self, buyer_client, placed_order):
         response = buyer_client.get("/api/v1/orders/?status=PENDING")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert len(response.json()["results"]) == 1
         response2 = buyer_client.get("/api/v1/orders/?status=DELIVERED")
-        assert response2.json() == []
+        assert response2.json()["results"] == []
 
     def test_buyer_cannot_see_other_buyer_orders(self, buyer_client, admin_user, variant):
         from apps.orders import services
@@ -92,7 +93,7 @@ class TestOrderListCreate:
         services.place_order(admin_user, [{"variant": variant, "quantity": 1}], SHIPPING)
         response = buyer_client.get("/api/v1/orders/")
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json()["results"] == []
 
     def test_unauthenticated(self, client):
         response = client.post("/api/v1/orders/", {}, format="json")
@@ -136,19 +137,20 @@ class TestSupplierSubOrderList:
     def test_list_own_sub_orders(self, supplier_client, sub_order):
         response = supplier_client.get("/api/v1/orders/supplier/")
         assert response.status_code == 200
-        assert len(response.json()) == 1
-        assert response.json()[0]["status"] == "PENDING"
+        results = response.json()["results"]
+        assert len(results) == 1
+        assert results[0]["status"] == "PENDING"
 
     def test_does_not_show_other_supplier(self, second_supplier_client, sub_order):
         response = second_supplier_client.get("/api/v1/orders/supplier/")
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json()["results"] == []
 
     def test_filter_by_status(self, supplier_client, sub_order):
         response = supplier_client.get("/api/v1/orders/supplier/?status=PENDING")
-        assert len(response.json()) == 1
+        assert len(response.json()["results"]) == 1
         response2 = supplier_client.get("/api/v1/orders/supplier/?status=CONFIRMED")
-        assert response2.json() == []
+        assert response2.json()["results"] == []
 
     def test_requires_approved_supplier(self, buyer_client):
         response = buyer_client.get("/api/v1/orders/supplier/")
@@ -259,13 +261,13 @@ class TestAdminOrderViews:
     def test_list_all_orders(self, admin_client, placed_order):
         response = admin_client.get("/api/v1/orders/admin/")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert len(response.json()["results"]) == 1
 
     def test_filter_by_status(self, admin_client, placed_order):
         response = admin_client.get("/api/v1/orders/admin/?status=PENDING")
-        assert len(response.json()) == 1
+        assert len(response.json()["results"]) == 1
         response2 = admin_client.get("/api/v1/orders/admin/?status=DELIVERED")
-        assert response2.json() == []
+        assert response2.json()["results"] == []
 
     def test_order_detail(self, admin_client, placed_order):
         response = admin_client.get(f"/api/v1/orders/admin/{placed_order.reference}/")

@@ -63,6 +63,7 @@ class SubOrder(models.Model):
     )
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     tracking_number = models.CharField(max_length=200, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
