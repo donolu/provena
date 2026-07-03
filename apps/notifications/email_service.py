@@ -93,8 +93,18 @@ def _button(text: str, url: str) -> str:
     </table>"""
 
 
+def _prefs_allow(user, field: str) -> bool:
+    from .models import NotificationPreference
+
+    prefs, _ = NotificationPreference.objects.get_or_create(user=user)
+    return bool(getattr(prefs, field, True))
+
+
 def send_order_confirmation_buyer(order) -> None:
     """Send order confirmation to the buyer after successful payment."""
+    if not _prefs_allow(order.buyer, "email_order_placed"):
+        logger.debug("Skipping order confirmation email: user %s opted out", order.buyer.email)
+        return
     from django.conf import settings
 
     frontend = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
@@ -162,6 +172,11 @@ def send_order_confirmation_buyer(order) -> None:
 
 def send_order_notification_supplier(sub_order) -> None:
     """Notify a supplier they have a new order to fulfil."""
+    if not _prefs_allow(sub_order.supplier.user, "email_new_order"):
+        logger.debug(
+            "Skipping new order email: supplier %s opted out", sub_order.supplier.user.email
+        )
+        return
     from django.conf import settings
 
     frontend = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
@@ -269,6 +284,9 @@ def send_password_reset(user, reset_url: str) -> None:
 
 def send_shipping_update(sub_order) -> None:
     """Notify the buyer that a sub-order has been dispatched."""
+    if not _prefs_allow(sub_order.order.buyer, "email_order_dispatched"):
+        logger.debug("Skipping dispatch email: user %s opted out", sub_order.order.buyer.email)
+        return
     from django.conf import settings
 
     frontend = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
@@ -313,6 +331,9 @@ def send_shipping_update(sub_order) -> None:
 
 def send_payout_received(payout) -> None:
     """Notify a supplier their payout has been processed."""
+    if not _prefs_allow(payout.supplier.user, "email_payout_received"):
+        logger.debug("Skipping payout email: supplier %s opted out", payout.supplier.user.email)
+        return
     from django.conf import settings
 
     frontend = getattr(settings, "FRONTEND_URL", "http://localhost:3000")

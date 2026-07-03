@@ -1,6 +1,6 @@
 from rest_framework.test import APIClient
 
-from apps.notifications.models import Notification
+from apps.notifications.models import Notification, NotificationPreference
 
 
 class TestNotificationListView:
@@ -67,3 +67,58 @@ class TestNotificationDeleteView:
         n = Notification.objects.create(recipient=buyer, title="T", body="B")
         response = staff_client.delete(f"/api/v1/notifications/{n.id}/")
         assert response.status_code == 404
+
+
+class TestNotificationPreferenceView:
+    URL = "/api/v1/notifications/preferences/"
+
+    def test_get_creates_defaults_on_first_call(self, buyer_client, buyer):
+        assert not NotificationPreference.objects.filter(user=buyer).exists()
+        response = buyer_client.get(self.URL)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["email_order_placed"] is True
+        assert data["email_order_dispatched"] is True
+        assert data["email_new_order"] is True
+        assert data["email_payout_received"] is True
+        assert NotificationPreference.objects.filter(user=buyer).count() == 1
+
+    def test_get_returns_existing_prefs(self, buyer_client, buyer):
+        NotificationPreference.objects.create(user=buyer, email_order_placed=False)
+        response = buyer_client.get(self.URL)
+        assert response.status_code == 200
+        assert response.json()["email_order_placed"] is False
+
+    def test_patch_updates_single_field(self, buyer_client, buyer):
+        response = buyer_client.patch(self.URL, {"email_order_placed": False}, format="json")
+        assert response.status_code == 200
+        assert response.json()["email_order_placed"] is False
+        # Other fields still true
+        assert response.json()["email_order_dispatched"] is True
+
+    def test_patch_multiple_fields(self, buyer_client, buyer):
+        response = buyer_client.patch(
+            self.URL,
+            {"email_order_placed": False, "email_payout_received": False},
+            format="json",
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["email_order_placed"] is False
+        assert data["email_payout_received"] is False
+        assert data["email_order_dispatched"] is True
+        assert data["email_new_order"] is True
+
+    def test_patch_idempotent(self, buyer_client, buyer):
+        buyer_client.patch(self.URL, {"email_order_placed": False}, format="json")
+        response = buyer_client.patch(self.URL, {"email_order_placed": False}, format="json")
+        assert response.status_code == 200
+        assert response.json()["email_order_placed"] is False
+
+    def test_unauthenticated_get(self):
+        response = APIClient().get("/api/v1/notifications/preferences/")
+        assert response.status_code == 401
+
+    def test_unauthenticated_patch(self):
+        response = APIClient().patch("/api/v1/notifications/preferences/", {}, format="json")
+        assert response.status_code == 401

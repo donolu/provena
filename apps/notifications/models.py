@@ -3,6 +3,22 @@ import uuid
 from django.db import models
 
 
+class NotificationPreference(models.Model):
+    user = models.OneToOneField(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="notification_preferences",
+    )
+    email_order_placed = models.BooleanField(default=True)
+    email_order_dispatched = models.BooleanField(default=True)
+    email_new_order = models.BooleanField(default=True)
+    email_payout_received = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"NotificationPreference for {self.user.email}"
+
+
 class NotificationType(models.TextChoices):
     LOW_STOCK = "LOW_STOCK", "Low Stock Alert"
     ORDER_PLACED = "ORDER_PLACED", "Order Placed"

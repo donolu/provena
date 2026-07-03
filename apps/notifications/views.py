@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import services
-from .models import Notification
-from .serializers import NotificationSerializer
+from .models import Notification, NotificationPreference
+from .serializers import NotificationPreferenceSerializer, NotificationSerializer
 
 
 class NotificationListView(APIView):
@@ -62,3 +62,32 @@ class NotificationDeleteView(APIView):
     def delete(self, request, pk):
         services.delete_notification(request.user, pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class NotificationPreferenceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={200: NotificationPreferenceSerializer},
+        tags=["Notifications"],
+        summary="Get email notification preferences",
+        description="Returns the current user's email notification preferences. "
+        "Created with all options enabled if this is the first request.",
+    )
+    def get(self, request):
+        prefs, _ = NotificationPreference.objects.get_or_create(user=request.user)
+        return Response(NotificationPreferenceSerializer(prefs).data)
+
+    @extend_schema(
+        request=NotificationPreferenceSerializer,
+        responses={200: NotificationPreferenceSerializer},
+        tags=["Notifications"],
+        summary="Update email notification preferences",
+        description="Partially update one or more email notification toggles.",
+    )
+    def patch(self, request):
+        prefs, _ = NotificationPreference.objects.get_or_create(user=request.user)
+        serializer = NotificationPreferenceSerializer(prefs, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
