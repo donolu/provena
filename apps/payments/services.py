@@ -167,13 +167,52 @@ def _create_payouts(payment: Payment) -> None:
 def process_payout(payout: Payout) -> Payout:
     if payout.status != PayoutStatus.PENDING:
         raise ValueError(f"Cannot process a payout with status {payout.status}.")
+
+    supplier = payout.supplier
+    if not supplier.stripe_account_id or not supplier.stripe_onboarding_complete:
+        raise ValueError(
+            f"Supplier '{supplier.business_name}' has not completed Stripe Connect onboarding."
+        )
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    payment = payout.sub_order.order.payment
+    intent = stripe.PaymentIntent.retrieve(payment.stripe_payment_intent_id)
+    charge_id = getattr(intent, "latest_charge", None)
+
     payout.status = PayoutStatus.PROCESSING
     payout.save(update_fields=["status", "updated_at"])
-    logger.info("Payout %s marked as PROCESSING", payout.id)
+
+    try:
+        transfer_kwargs: dict = {
+            "amount": _to_pence(payout.net_amount),
+            "currency": payment.currency,
+            "destination": supplier.stripe_account_id,
+            "metadata": {
+                "payout_id": str(payout.id),
+                "sub_order_id": str(payout.sub_order.id),
+                "order_reference": payment.order.reference,
+            },
+        }
+        if charge_id:
+            transfer_kwargs["source_transaction"] = charge_id
+
+        transfer = stripe.Transfer.create(**transfer_kwargs)
+        payout.stripe_transfer_id = transfer.id
+        payout.status = PayoutStatus.PAID
+        payout.save(update_fields=["status", "stripe_transfer_id", "updated_at"])
+        logger.info("Stripe transfer %s created for payout %s", transfer.id, payout.id)
+    except stripe.StripeError as exc:
+        payout.status = PayoutStatus.FAILED
+        payout.save(update_fields=["status", "updated_at"])
+        logger.exception("Stripe transfer failed for payout %s", payout.id)
+        raise ValueError(f"Stripe transfer failed: {exc}") from exc
+
     try:
         from apps.notifications.email_service import send_payout_received
 
         send_payout_received(payout)
     except Exception:
         logger.exception("Failed to send payout email for payout %s", payout.id)
+
     return payout

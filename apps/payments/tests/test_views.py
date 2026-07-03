@@ -1,5 +1,6 @@
 import json
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 from apps.payments.models import PaymentStatus
 from apps.payments.tests.conftest import FAKE_CLIENT_SECRET, FAKE_INTENT_ID
@@ -78,12 +79,12 @@ class TestPaymentListView:
     def test_lists_own_payments(self, buyer_client, payment):
         response = buyer_client.get("/api/v1/payments/")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_does_not_show_other_buyers(self, supplier_client, payment):
         response = supplier_client.get("/api/v1/payments/")
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json()["results"] == []
 
     def test_unauthenticated(self, client):
         from rest_framework.test import APIClient
@@ -161,9 +162,13 @@ class TestStripeWebhookView:
     def test_webhook_charge_refunded(self, client, payment, mock_stripe_views):
         from rest_framework.test import APIClient
 
+        charge_obj = MagicMock()
+        charge_obj.payment_intent = FAKE_INTENT_ID
+        charge_obj.amount_refunded = int(payment.amount * 100)
+        charge_obj.amount = int(payment.amount * 100)
         event = {
             "type": "charge.refunded",
-            "data": {"object": {"id": "ch_test_123", "payment_intent": FAKE_INTENT_ID}},
+            "data": {"object": charge_obj},
         }
         mock_stripe_views.Webhook.construct_event.return_value = event
         response = APIClient().post(
@@ -205,13 +210,13 @@ class TestSupplierPayoutListView:
     def test_lists_own_payouts(self, supplier_client, succeeded_payment, sub_order):
         response = supplier_client.get("/api/v1/payments/payouts/")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_filter_by_status(self, supplier_client, succeeded_payment):
         response = supplier_client.get("/api/v1/payments/payouts/?status=PENDING")
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
         response2 = supplier_client.get("/api/v1/payments/payouts/?status=PAID")
-        assert response2.json() == []
+        assert response2.json()["results"] == []
 
     def test_requires_approved_supplier(self, buyer_client):
         response = buyer_client.get("/api/v1/payments/payouts/")
@@ -219,7 +224,7 @@ class TestSupplierPayoutListView:
 
     def test_payout_fields(self, supplier_client, succeeded_payment, sub_order, placed_order):
         response = supplier_client.get("/api/v1/payments/payouts/")
-        data = response.json()[0]
+        data = response.json()["results"][0]
         assert data["order_reference"] == placed_order.reference
         assert data["supplier_name"] == "Green Roots Farm"
         assert "gross_amount" in data
@@ -231,13 +236,13 @@ class TestAdminPaymentListView:
     def test_lists_all_payments(self, admin_client, payment):
         response = admin_client.get("/api/v1/payments/admin/")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_filter_by_status(self, admin_client, payment):
         response = admin_client.get("/api/v1/payments/admin/?status=PROCESSING")
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
         response2 = admin_client.get("/api/v1/payments/admin/?status=SUCCEEDED")
-        assert response2.json() == []
+        assert response2.json()["results"] == []
 
     def test_requires_admin(self, buyer_client):
         response = buyer_client.get("/api/v1/payments/admin/")
@@ -248,17 +253,17 @@ class TestAdminPayoutListView:
     def test_lists_all_payouts(self, admin_client, succeeded_payment):
         response = admin_client.get("/api/v1/payments/admin/payouts/")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_filter_by_status(self, admin_client, succeeded_payment):
         response = admin_client.get("/api/v1/payments/admin/payouts/?status=PENDING")
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_filter_by_supplier(self, admin_client, succeeded_payment):
         response = admin_client.get("/api/v1/payments/admin/payouts/?supplier=green-roots-farm")
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
         response2 = admin_client.get("/api/v1/payments/admin/payouts/?supplier=nonexistent")
-        assert response2.json() == []
+        assert response2.json()["results"] == []
 
     def test_requires_admin(self, supplier_client):
         response = supplier_client.get("/api/v1/payments/admin/payouts/")

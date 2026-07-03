@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -113,3 +114,87 @@ class TestHandlePaymentCancelled:
     def test_updates_status(self, payment):
         result = services.handle_payment_cancelled(payment.stripe_payment_intent_id)
         assert result.status == PaymentStatus.CANCELLED
+
+
+class TestProcessPayout:
+    @pytest.fixture
+    def onboarded_supplier(self, approved_supplier):
+        approved_supplier.stripe_account_id = "acct_test_123"
+        approved_supplier.stripe_onboarding_complete = True
+        approved_supplier.save(update_fields=["stripe_account_id", "stripe_onboarding_complete"])
+        return approved_supplier
+
+    @pytest.fixture
+    def pending_payout(self, succeeded_payment, sub_order):
+        return Payout.objects.get(sub_order=sub_order)
+
+    @pytest.fixture
+    def mock_stripe_transfer(self, mock_stripe_services):
+        intent_mock = MagicMock()
+        intent_mock.latest_charge = "ch_test_abc"
+        mock_stripe_services.PaymentIntent.retrieve.return_value = intent_mock
+
+        transfer_mock = MagicMock()
+        transfer_mock.id = "tr_test_abc"
+        mock_stripe_services.Transfer.create.return_value = transfer_mock
+        return mock_stripe_services
+
+    def test_raises_if_not_pending(self, pending_payout, onboarded_supplier, mock_stripe_transfer):
+        pending_payout.status = PayoutStatus.PROCESSING
+        pending_payout.save(update_fields=["status"])
+        with pytest.raises(ValueError, match="status"):
+            services.process_payout(pending_payout)
+
+    def test_raises_if_no_stripe_account(self, pending_payout, mock_stripe_transfer):
+        with pytest.raises(ValueError, match="Stripe Connect onboarding"):
+            services.process_payout(pending_payout)
+
+    def test_raises_if_onboarding_incomplete(
+        self, pending_payout, approved_supplier, mock_stripe_transfer
+    ):
+        approved_supplier.stripe_account_id = "acct_test_123"
+        approved_supplier.stripe_onboarding_complete = False
+        approved_supplier.save(update_fields=["stripe_account_id", "stripe_onboarding_complete"])
+        with pytest.raises(ValueError, match="Stripe Connect onboarding"):
+            services.process_payout(pending_payout)
+
+    def test_creates_transfer_to_supplier(
+        self, pending_payout, onboarded_supplier, mock_stripe_transfer
+    ):
+        services.process_payout(pending_payout)
+        call_kwargs = mock_stripe_transfer.Transfer.create.call_args[1]
+        assert call_kwargs["destination"] == "acct_test_123"
+        assert call_kwargs["currency"] == "gbp"
+
+    def test_transfer_amount_is_net(self, pending_payout, onboarded_supplier, mock_stripe_transfer):
+        net_pence = int(pending_payout.net_amount * 100)
+        services.process_payout(pending_payout)
+        call_kwargs = mock_stripe_transfer.Transfer.create.call_args[1]
+        assert call_kwargs["amount"] == net_pence
+
+    def test_transfer_uses_source_transaction(
+        self, pending_payout, onboarded_supplier, mock_stripe_transfer
+    ):
+        services.process_payout(pending_payout)
+        call_kwargs = mock_stripe_transfer.Transfer.create.call_args[1]
+        assert call_kwargs["source_transaction"] == "ch_test_abc"
+
+    def test_saves_transfer_id(self, pending_payout, onboarded_supplier, mock_stripe_transfer):
+        services.process_payout(pending_payout)
+        pending_payout.refresh_from_db()
+        assert pending_payout.stripe_transfer_id == "tr_test_abc"
+
+    def test_marks_paid(self, pending_payout, onboarded_supplier, mock_stripe_transfer):
+        services.process_payout(pending_payout)
+        pending_payout.refresh_from_db()
+        assert pending_payout.status == PayoutStatus.PAID
+
+    def test_stripe_error_marks_failed_and_raises(
+        self, pending_payout, onboarded_supplier, mock_stripe_transfer
+    ):
+        mock_stripe_transfer.StripeError = Exception
+        mock_stripe_transfer.Transfer.create.side_effect = Exception("card declined")
+        with pytest.raises(ValueError, match="Stripe transfer failed"):
+            services.process_payout(pending_payout)
+        pending_payout.refresh_from_db()
+        assert pending_payout.status == PayoutStatus.FAILED
