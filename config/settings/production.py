@@ -1,7 +1,7 @@
-import sentry_sdk
 import environ
+import sentry_sdk
 
-from .base import *  # noqa: F401, F403
+from .base import *  # noqa: F403
 
 env = environ.Env()
 

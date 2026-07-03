@@ -1,8 +1,8 @@
 # Business Requirements Document
 
-**Product:** Provena  
-**Version:** 1.0  
-**Status:** Draft  
+**Product:** Provena
+**Version:** 1.0
+**Status:** Draft
 **Owner:** Olumide Ibilaiye
 
 ---

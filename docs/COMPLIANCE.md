@@ -1,7 +1,7 @@
 # Compliance and Security
 
-**Product:** Provena  
-**Version:** 1.0  
+**Product:** Provena
+**Version:** 1.0
 **Frameworks:** PCI DSS, UK GDPR, OWASP Top 10, WCAG 2.1
 
 ---

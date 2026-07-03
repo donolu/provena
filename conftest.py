@@ -13,7 +13,7 @@ def api_client():
 def buyer(db):
     return User.objects.create_user(
         email="buyer@example.com",
-        password="Securepass123!",
+        password="Securepass123!",  # noqa: S106  # nosec B106
         first_name="Test",
         last_name="Buyer",
         role=Role.BUYER,
@@ -24,7 +24,7 @@ def buyer(db):
 def supplier(db):
     return User.objects.create_user(
         email="supplier@example.com",
-        password="Securepass123!",
+        password="Securepass123!",  # noqa: S106  # nosec B106
         first_name="Test",
         last_name="Supplier",
         role=Role.SUPPLIER,
@@ -35,7 +35,7 @@ def supplier(db):
 def admin_user(db):
     return User.objects.create_user(
         email="admin@example.com",
-        password="Securepass123!",
+        password="Securepass123!",  # noqa: S106  # nosec B106
         first_name="Test",
         last_name="Admin",
         role=Role.ADMIN,

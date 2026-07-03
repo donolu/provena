@@ -1,12 +1,11 @@
 import hashlib
-from unittest.mock import patch
 
 import pyotp
 import pytest
 from django.core.cache import cache
 from django.utils import timezone
 
-from apps.accounts.models import PasswordResetToken, User
+from apps.accounts.models import PasswordResetToken
 from apps.accounts.services import (
     MAX_LOGIN_ATTEMPTS,
     authenticate_user,
@@ -24,7 +23,9 @@ from apps.accounts.services import (
 @pytest.mark.django_db
 class TestRegisterUser:
     def test_creates_user_with_correct_fields(self):
-        user = register_user("new@example.com", "Securepass123!", first_name="Jane", last_name="Doe")
+        user = register_user(
+            "new@example.com", "Securepass123!", first_name="Jane", last_name="Doe"
+        )
         assert user.email == "new@example.com"
         assert user.first_name == "Jane"
         assert user.check_password("Securepass123!")
@@ -138,6 +139,7 @@ class TestPasswordReset:
 
     def test_confirm_resets_password(self, buyer):
         import secrets
+
         raw_token = secrets.token_urlsafe(48)
         PasswordResetToken.objects.create(
             user=buyer,
@@ -156,6 +158,7 @@ class TestPasswordReset:
 
     def test_confirm_marks_token_used(self, buyer):
         import secrets
+
         raw_token = secrets.token_urlsafe(48)
         token_obj = PasswordResetToken.objects.create(
             user=buyer,
@@ -168,6 +171,7 @@ class TestPasswordReset:
 
     def test_confirm_token_cannot_be_reused(self, buyer):
         import secrets
+
         raw_token = secrets.token_urlsafe(48)
         PasswordResetToken.objects.create(
             user=buyer,

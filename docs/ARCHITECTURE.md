@@ -1,7 +1,7 @@
 # Architecture
 
-**Product:** Provena  
-**Version:** 1.0  
+**Product:** Provena
+**Version:** 1.0
 **Pattern:** Modular Monolith (API) + Decoupled Frontend
 
 ---

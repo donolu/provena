@@ -6,7 +6,15 @@ from .models import PasswordResetToken, User
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ["email", "first_name", "last_name", "role", "is_active", "totp_enabled", "created_at"]
+    list_display = [
+        "email",
+        "first_name",
+        "last_name",
+        "role",
+        "is_active",
+        "totp_enabled",
+        "created_at",
+    ]
     list_filter = ["role", "is_active", "totp_enabled"]
     search_fields = ["email", "first_name", "last_name"]
     ordering = ["-created_at"]
@@ -20,10 +28,13 @@ class UserAdmin(BaseUserAdmin):
         ("Timestamps", {"fields": ("created_at", "updated_at", "last_login")}),
     )
     add_fieldsets = (
-        (None, {
-            "classes": ("wide",),
-            "fields": ("email", "password1", "password2", "role", "first_name", "last_name"),
-        }),
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": ("email", "password1", "password2", "role", "first_name", "last_name"),
+            },
+        ),
     )
 
 

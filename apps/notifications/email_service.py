@@ -75,10 +75,10 @@ def _items_table(items: list[dict]) -> str:
     rows = ""
     for item in items:
         rows += f"""<tr>
-          <td style="padding:10px 0;font-size:13px;color:{_TEXT};border-bottom:1px solid #F0EDE8;">{item['name']}<br>
-            <span style="font-size:11px;color:{_MUTED};">{item['variant']} · qty {item['quantity']}</span>
+          <td style="padding:10px 0;font-size:13px;color:{_TEXT};border-bottom:1px solid #F0EDE8;">{item["name"]}<br>
+            <span style="font-size:11px;color:{_MUTED};">{item["variant"]} · qty {item["quantity"]}</span>
           </td>
-          <td style="padding:10px 0;font-size:13px;color:{_TEXT};text-align:right;font-family:monospace;border-bottom:1px solid #F0EDE8;">£{item['subtotal']}</td>
+          <td style="padding:10px 0;font-size:13px;color:{_TEXT};text-align:right;font-family:monospace;border-bottom:1px solid #F0EDE8;">£{item["subtotal"]}</td>
         </tr>"""
     return (
         f'<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;">{rows}</table>'
@@ -252,7 +252,7 @@ def send_welcome(user) -> None:
     )
 
     html = _base("Welcome to Provena", body)
-    plain = f"Hi {name}, welcome to Provena!\n\n" f"Browse the marketplace: {frontend}/catalogue"
+    plain = f"Hi {name}, welcome to Provena!\n\nBrowse the marketplace: {frontend}/catalogue"
 
     _send(subject="Welcome to Provena", plain=plain, html=html, to=[user.email])
 
@@ -274,9 +274,7 @@ def send_password_reset(user, reset_url: str) -> None:
 
     html = _base("Reset your password", body)
     plain = (
-        f"Hi {name},\n\n"
-        f"Reset your Provena password: {reset_url}\n\n"
-        "This link expires in 1 hour."
+        f"Hi {name},\n\nReset your Provena password: {reset_url}\n\nThis link expires in 1 hour."
     )
 
     _send(subject="Reset your Provena password", plain=plain, html=html, to=[user.email])
