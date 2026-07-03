@@ -83,3 +83,9 @@ export async function getAdminOrder(reference: string): Promise<Order> {
   const { data } = await apiClient.get<Order>(`/orders/admin/${reference}/`)
   return data
 }
+
+export async function adminRefundPayment(paymentId: string, amount?: number): Promise<void> {
+  await apiClient.post(`/payments/admin/payments/${paymentId}/refund/`, {
+    ...(amount !== undefined && { amount }),
+  })
+}

@@ -169,6 +169,9 @@ export interface Order {
   shipping_country: string
   total_amount: string
   notes: string
+  payment_id: string | null
+  payment_status: string | null
+  refunded_amount: string | null
   sub_orders: SubOrder[]
   created_at: string
   updated_at: string

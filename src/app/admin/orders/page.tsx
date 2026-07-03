@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { StatusBadge } from '@/components/supplier/status-badge'
 import { Pagination } from '@/components/pagination'
-import { getAdminOrders } from '@/lib/api/orders'
+import { getAdminOrders, adminRefundPayment } from '@/lib/api/orders'
 import type { Order, OrderStatus } from '@/lib/api/types'
 
 type Tab = 'ALL' | OrderStatus
@@ -22,13 +22,28 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+const REFUNDABLE_PAYMENT = new Set(['SUCCEEDED', 'PARTIAL_REFUND'])
+
 export default function AdminOrdersPage() {
   const [filter, setFilter] = useState<Tab>('ALL')
   const [page, setPage] = useState(1)
+  const [refundTarget, setRefundTarget] = useState<{ paymentId: string; max: number } | null>(null)
+  const [refundAmount, setRefundAmount] = useState('')
+  const qc = useQueryClient()
 
   const { data, isPending } = useQuery({
     queryKey: ['admin', 'orders', page],
     queryFn: () => getAdminOrders(page),
+  })
+
+  const refundMutation = useMutation({
+    mutationFn: ({ paymentId, amount }: { paymentId: string; amount?: number }) =>
+      adminRefundPayment(paymentId, amount),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'orders'] })
+      setRefundTarget(null)
+      setRefundAmount('')
+    },
   })
 
   const all: Order[] = data?.results ?? []
@@ -39,6 +54,13 @@ export default function AdminOrdersPage() {
     .filter((o) => o.status !== 'CANCELLED')
     .reduce((s, o) => s + parseFloat(o.total_amount), 0)
     .toFixed(2)
+
+  function handleRefundSubmit() {
+    if (!refundTarget) return
+    const amount = refundAmount ? parseFloat(refundAmount) : undefined
+    if (amount !== undefined && (isNaN(amount) || amount <= 0 || amount > refundTarget.max)) return
+    refundMutation.mutate({ paymentId: refundTarget.paymentId, amount })
+  }
 
   return (
     <div className="px-6 py-8 max-w-5xl mx-auto">
@@ -87,7 +109,7 @@ export default function AdminOrdersPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-hoarfrost">
-                  {['Reference', 'Date', 'Buyer', 'Suppliers', 'Total', 'Status'].map((h) => (
+                  {['Reference', 'Date', 'Buyer', 'Suppliers', 'Total', 'Status', ''].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium">{h}</th>
                   ))}
                 </tr>
@@ -103,11 +125,56 @@ export default function AdminOrdersPage() {
                     </td>
                     <td className="px-4 py-3.5 font-mono text-xs text-forest">£{o.total_amount}</td>
                     <td className="px-4 py-3.5"><StatusBadge status={o.status} /></td>
+                    <td className="px-4 py-3.5">
+                      {o.payment_id && o.payment_status && REFUNDABLE_PAYMENT.has(o.payment_status) && (
+                        refundTarget?.paymentId === o.payment_id ? (
+                          <div className="flex items-center gap-2">
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-soil">£</span>
+                              <input
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                max={refundTarget.max}
+                                placeholder={String(refundTarget.max)}
+                                value={refundAmount}
+                                onChange={(e) => setRefundAmount(e.target.value)}
+                                className="pl-4 pr-2 py-1 w-20 text-xs font-mono border border-hoarfrost rounded focus:outline-none focus:border-meadow"
+                              />
+                            </div>
+                            <button
+                              onClick={() => handleRefundSubmit()}
+                              disabled={refundMutation.isPending}
+                              className="text-xs font-sans text-red-600 hover:text-red-700 disabled:opacity-40 transition-colors"
+                            >
+                              {refundAmount ? 'Partial' : 'Full'}
+                            </button>
+                            <button
+                              onClick={() => { setRefundTarget(null); setRefundAmount('') }}
+                              className="text-xs font-sans text-soil hover:text-forest transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              const max = parseFloat(o.total_amount) - parseFloat(o.refunded_amount ?? '0')
+                              setRefundTarget({ paymentId: o.payment_id!, max })
+                              setRefundAmount('')
+                            }}
+                            className="text-xs font-sans text-red-600 hover:text-red-700 transition-colors"
+                          >
+                            Refund
+                          </button>
+                        )
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {displayed.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-sm font-sans text-soil">No orders in this category.</td>
+                    <td colSpan={7} className="px-4 py-12 text-center text-sm font-sans text-soil">No orders in this category.</td>
                   </tr>
                 )}
               </tbody>
