@@ -55,7 +55,7 @@ export default function Home() {
     return Array.from(localCart.entries()).flatMap(([variantId, quantity]) => {
       for (const p of allProducts) {
         const v = p.variants.find((v) => v.id === variantId)
-        if (v) return [{ id: variantId, variant: variantId, variant_sku: v.sku, variant_name: v.name, product_name: p.name, price: v.price, quantity, subtotal: (parseFloat(v.price) * quantity).toFixed(2), added_at: '', updated_at: '' } as CartItem]
+        if (v) return [{ id: variantId, variant: variantId, variant_sku: v.sku, variant_name: v.name, product_name: p.name, price: v.price, quantity, subtotal: (parseFloat(v.price) * quantity).toFixed(2), reservation_expires_at: null, added_at: '', updated_at: '' } as CartItem]
       }
       return []
     })

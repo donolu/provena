@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Cart, WishlistItem } from './types'
+import type { Cart, CartItem, WishlistItem } from './types'
 
 // ── Cart ──────────────────────────────────────────────────────────────────────
 

@@ -56,6 +56,7 @@ function buildLocalCartItems(cart: Map<string, number>, products: Product[]): Ca
           price: variant.price,
           quantity,
           subtotal: (parseFloat(variant.price) * quantity).toFixed(2),
+          reservation_expires_at: null,
           added_at: '',
           updated_at: '',
         } satisfies CartItem]

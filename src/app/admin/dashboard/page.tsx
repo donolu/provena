@@ -21,12 +21,12 @@ export default function AdminDashboardPage() {
 
   const { data: suppliersData } = useQuery({
     queryKey: ['admin', 'suppliers', 'all'],
-    queryFn: () => getAdminSuppliers({ page_size: 100 } as Parameters<typeof getAdminSuppliers>[0]),
+    queryFn: () => getAdminSuppliers(),
   })
 
   const { data: ordersData } = useQuery({
     queryKey: ['admin', 'orders'],
-    queryFn: getAdminOrders,
+    queryFn: () => getAdminOrders(),
   })
 
   const pendingSuppliers = (suppliersData?.results ?? []).filter((s) => s.status === 'PENDING')

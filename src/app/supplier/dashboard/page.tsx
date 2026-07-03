@@ -22,17 +22,17 @@ export default function DashboardPage() {
 
   const { data: subOrdersData } = useQuery({
     queryKey: ['supplier', 'suborders'],
-    queryFn: getSupplierSubOrders,
+    queryFn: () => getSupplierSubOrders(),
   })
 
   const { data: productsData } = useQuery({
     queryKey: ['supplier', 'products'],
-    queryFn: getMyProducts,
+    queryFn: () => getMyProducts(),
   })
 
   const { data: payoutsData } = useQuery({
     queryKey: ['supplier', 'payouts'],
-    queryFn: getSupplierPayouts,
+    queryFn: () => getSupplierPayouts(),
   })
 
   const recentOrders = subOrdersData?.results.slice(0, 5) ?? []
