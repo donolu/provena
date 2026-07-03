@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Search, X, SlidersHorizontal } from 'lucide-react'
 import { Nav } from '@/components/nav'
 import { CategoryTabs } from '@/components/category-tabs'
 import { SupplierSection } from '@/components/supplier-section'
@@ -70,21 +70,39 @@ export default function CataloguePage() {
   const queryClient = useQueryClient()
 
   const [activeCategory, setActiveCategory] = useState('all')
-  const [sort, setSort]         = useState<SortKey>('best-match')
-  const [sortOpen, setSortOpen] = useState(false)
-  const [cartOpen, setCartOpen] = useState(false)
-  const [wishlist, setWishlist] = useState<Set<string>>(new Set())
+  const [sort, setSort]           = useState<SortKey>('best-match')
+  const [sortOpen, setSortOpen]   = useState(false)
+  const [cartOpen, setCartOpen]   = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [search, setSearch]       = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [minPrice, setMinPrice]   = useState('')
+  const [maxPrice, setMaxPrice]   = useState('')
+  const [wishlist, setWishlist]   = useState<Set<string>>(new Set())
   const [localCart, setLocalCart] = useState<Map<string, number>>(new Map())
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current) }
+  }, [search])
 
   const { data: categoriesData } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
   })
 
+  const productParams = useMemo(() => ({
+    ...(activeCategory !== 'all' && { category: activeCategory }),
+    ...(debouncedSearch && { search: debouncedSearch }),
+    ...(minPrice && { min_price: parseFloat(minPrice) }),
+    ...(maxPrice && { max_price: parseFloat(maxPrice) }),
+  }), [activeCategory, debouncedSearch, minPrice, maxPrice])
+
   const { data: productsData, isPending: loadingProducts } = useQuery({
-    queryKey: ['products', activeCategory === 'all' ? null : activeCategory],
-    queryFn: () =>
-      getProducts(activeCategory === 'all' ? undefined : { category: activeCategory }),
+    queryKey: ['products', productParams],
+    queryFn: () => getProducts(Object.keys(productParams).length ? productParams : undefined),
   })
 
   const { data: serverCart } = useQuery({
@@ -184,10 +202,74 @@ export default function CataloguePage() {
 
       <main className="max-w-6xl mx-auto px-6 py-10">
 
+        {/* Search bar */}
+        <div className="relative mb-6">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-soil pointer-events-none" strokeWidth={1.5} />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search products, categories…"
+            className="w-full pl-10 pr-10 py-2.5 text-sm font-sans text-forest bg-white border border-hoarfrost rounded-lg focus:outline-none focus:border-meadow placeholder:text-soil transition-colors duration-150"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-soil hover:text-forest transition-colors"
+              aria-label="Clear search"
+            >
+              <X className="w-4 h-4" strokeWidth={1.5} />
+            </button>
+          )}
+        </div>
+
+        {/* Filter panel */}
+        {filterOpen && (
+          <div className="mb-6 p-4 bg-white border border-hoarfrost rounded-lg">
+            <p className="text-xs font-sans font-semibold text-soil uppercase tracking-widest mb-3">Price range</p>
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-soil">£</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Min"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
+                  className="w-full pl-6 pr-3 py-2 text-sm font-sans text-forest border border-hoarfrost rounded focus:outline-none focus:border-meadow"
+                />
+              </div>
+              <span className="text-xs text-soil">to</span>
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-soil">£</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Max"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
+                  className="w-full pl-6 pr-3 py-2 text-sm font-sans text-forest border border-hoarfrost rounded focus:outline-none focus:border-meadow"
+                />
+              </div>
+              {(minPrice || maxPrice) && (
+                <button
+                  onClick={() => { setMinPrice(''); setMaxPrice('') }}
+                  className="text-xs font-sans text-soil hover:text-forest transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-10">
           <p className="text-sm text-soil font-sans">
             <span className="font-mono text-forest font-medium">{filtered.length}</span>
             {' '}product{filtered.length !== 1 ? 's' : ''}
+            {debouncedSearch && (
+              <span className="ml-1.5">for <span className="text-forest italic">&ldquo;{debouncedSearch}&rdquo;</span></span>
+            )}
           </p>
 
           <div className="flex items-center gap-3">
@@ -233,8 +315,18 @@ export default function CataloguePage() {
 
             <div aria-hidden="true" className="h-3.5 w-px bg-hoarfrost" />
 
-            <button className="text-xs font-sans text-forest border border-hoarfrost px-3 py-1.5 rounded hover:border-forest transition-colors duration-150">
+            <button
+              onClick={() => setFilterOpen((o) => !o)}
+              className={[
+                'flex items-center gap-1.5 text-xs font-sans border px-3 py-1.5 rounded transition-colors duration-150',
+                (filterOpen || minPrice || maxPrice)
+                  ? 'text-forest border-meadow bg-mist'
+                  : 'text-forest border-hoarfrost hover:border-forest',
+              ].join(' ')}
+            >
+              <SlidersHorizontal className="w-3 h-3" strokeWidth={1.5} />
               Filter
+              {(minPrice || maxPrice) && <span className="w-1.5 h-1.5 rounded-full bg-meadow ml-0.5" />}
             </button>
           </div>
         </div>
@@ -246,8 +338,12 @@ export default function CataloguePage() {
           </div>
         ) : grouped.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-28 text-center">
-            <p className="font-display italic text-3xl text-hoarfrost mb-2">Nothing here yet.</p>
-            <p className="text-sm text-soil">Try a different category or clear the filter.</p>
+            <p className="font-display italic text-3xl text-hoarfrost mb-2">No results found.</p>
+            <p className="text-sm text-soil">
+              {debouncedSearch
+                ? <>No products match &ldquo;<span className="text-forest italic">{debouncedSearch}</span>&rdquo;. Try a different term.</>
+                : 'Try a different category or clear your filters.'}
+            </p>
           </div>
         ) : (
           <div className="space-y-16">

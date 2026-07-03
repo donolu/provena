@@ -14,6 +14,8 @@ export async function getCategory(slug: string): Promise<Category> {
 export async function getProducts(params?: {
   category?: string
   search?: string
+  min_price?: number
+  max_price?: number
   page?: number
   page_size?: number
 }): Promise<PaginatedResponse<Product>> {
