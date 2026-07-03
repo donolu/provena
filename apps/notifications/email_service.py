@@ -219,6 +219,138 @@ def send_order_notification_supplier(sub_order) -> None:
     )
 
 
+def send_welcome(user) -> None:
+    """Send a welcome email to a newly registered user."""
+    from django.conf import settings
+
+    frontend = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+    name = user.first_name or user.email.split("@")[0]
+
+    body = (
+        _h1("Welcome to Provena")
+        + _p(
+            f"Hi {name}, thanks for joining. You can start browsing and ordering fresh produce from our network of local suppliers straight away."
+        )
+        + _divider()
+        + _button("Browse the marketplace", frontend + "/catalogue")
+        + _p("If you have any questions, just reply to this email.", muted=True)
+    )
+
+    html = _base("Welcome to Provena", body)
+    plain = f"Hi {name}, welcome to Provena!\n\n" f"Browse the marketplace: {frontend}/catalogue"
+
+    _send(subject="Welcome to Provena", plain=plain, html=html, to=[user.email])
+
+
+def send_password_reset(user, reset_url: str) -> None:
+    """Send a password reset link."""
+    name = user.first_name or "there"
+
+    body = (
+        _h1("Reset your password")
+        + _p(f"Hi {name}, we received a request to reset the password for your account.")
+        + _divider()
+        + _button("Reset password", reset_url)
+        + _p(
+            "This link expires in 1 hour. If you didn't request a reset, you can ignore this email — your password won't change.",
+            muted=True,
+        )
+    )
+
+    html = _base("Reset your password", body)
+    plain = (
+        f"Hi {name},\n\n"
+        f"Reset your Provena password: {reset_url}\n\n"
+        "This link expires in 1 hour."
+    )
+
+    _send(subject="Reset your Provena password", plain=plain, html=html, to=[user.email])
+
+
+def send_shipping_update(sub_order) -> None:
+    """Notify the buyer that a sub-order has been dispatched."""
+    from django.conf import settings
+
+    frontend = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+    order = sub_order.order
+    order_url = f"{frontend}/orders/{order.reference}"
+    supplier_name = sub_order.supplier.business_name
+
+    tracking_block = ""
+    if sub_order.tracking_number:
+        tracking_block = (
+            _divider() + _label("Tracking reference") + _value(sub_order.tracking_number)
+        )
+
+    body = (
+        _h1("Your order is on its way")
+        + _p(f"Good news - {supplier_name} has dispatched your items.")
+        + _divider()
+        + _label("Order reference")
+        + _value(order.reference)
+        + _label("Supplier")
+        + _value(supplier_name)
+        + tracking_block
+        + _divider()
+        + _button("Track your order", order_url)
+        + _p("Deliveries typically arrive within 1-3 working days.", muted=True)
+    )
+
+    html = _base(f"Your order is on its way · {order.reference}", body)
+    plain = (
+        f"Your order {order.reference} has been dispatched by {supplier_name}.\n"
+        + (f"Tracking: {sub_order.tracking_number}\n" if sub_order.tracking_number else "")
+        + f"\nView order: {order_url}"
+    )
+
+    _send(
+        subject=f"Your order is on its way · {order.reference}",
+        plain=plain,
+        html=html,
+        to=[order.buyer.email],
+    )
+
+
+def send_payout_received(payout) -> None:
+    """Notify a supplier their payout has been processed."""
+    from django.conf import settings
+
+    frontend = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+    payouts_url = f"{frontend}/supplier/payouts"
+    order_ref = payout.sub_order.order.reference
+
+    body = (
+        _h1("Payout processed")
+        + _p(f"Your payout for order {order_ref} has been sent to your bank account.")
+        + _divider()
+        + _label("Gross amount")
+        + _value(f"£{payout.gross_amount}")
+        + _label("Platform fee")
+        + _value(f"£{payout.platform_fee}")
+        + _label("Net payout")
+        + _value(f"£{payout.net_amount}")
+        + _divider()
+        + _button("View payouts", payouts_url)
+        + _p("Funds typically clear within 2-5 business days depending on your bank.", muted=True)
+    )
+
+    html = _base(f"Payout processed · {order_ref}", body)
+    plain = (
+        f"Payout processed for order {order_ref}\n\n"
+        f"Gross: £{payout.gross_amount}\n"
+        f"Fee: £{payout.platform_fee}\n"
+        f"Net: £{payout.net_amount}\n\n"
+        f"View payouts: {payouts_url}"
+    )
+
+    _send(
+        subject=f"Payout processed · {order_ref}",
+        plain=plain,
+        html=html,
+        to=[payout.supplier.user.email],
+    )
+
+
 def _send(subject: str, plain: str, html: str, to: list[str]) -> None:
     from django.conf import settings
 

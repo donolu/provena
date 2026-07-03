@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 
 from django.db import transaction
@@ -14,6 +15,8 @@ from .models import (
     SubOrder,
     _generate_order_reference,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _sync_order_status(order: Order) -> None:
@@ -128,6 +131,12 @@ def dispatch_sub_order(sub_order: SubOrder, tracking_number: str = "") -> SubOrd
     sub_order.tracking_number = tracking_number
     sub_order.save(update_fields=["status", "tracking_number", "updated_at"])
     _sync_order_status(sub_order.order)
+    try:
+        from apps.notifications.email_service import send_shipping_update
+
+        send_shipping_update(sub_order)
+    except Exception:
+        logger.exception("Failed to send shipping update email for sub_order %s", sub_order.id)
     return sub_order
 
 

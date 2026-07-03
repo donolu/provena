@@ -132,4 +132,10 @@ def process_payout(payout: Payout) -> Payout:
     payout.status = PayoutStatus.PROCESSING
     payout.save(update_fields=["status", "updated_at"])
     logger.info("Payout %s marked as PROCESSING", payout.id)
+    try:
+        from apps.notifications.email_service import send_payout_received
+
+        send_payout_received(payout)
+    except Exception:
+        logger.exception("Failed to send payout email for payout %s", payout.id)
     return payout

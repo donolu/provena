@@ -25,14 +25,23 @@ def _totp_session_key(token: str) -> str:
     return f"totp_session:{token}"
 
 
-def register_user(email: str, password: str, first_name: str = "", last_name: str = "", role: str = Role.BUYER) -> User:
-    return User.objects.create_user(
+def register_user(
+    email: str, password: str, first_name: str = "", last_name: str = "", role: str = Role.BUYER
+) -> User:
+    user = User.objects.create_user(
         email=email.lower(),
         password=password,
         first_name=first_name,
         last_name=last_name,
         role=role,
     )
+    try:
+        from apps.notifications.email_service import send_welcome
+
+        send_welcome(user)
+    except Exception:
+        logger.exception("Failed to send welcome email to %s", email)
+    return user
 
 
 def authenticate_user(email: str, password: str) -> tuple[User | None, str | None]:
@@ -101,7 +110,7 @@ def disable_totp(user: User, code: str) -> bool:
     if not _verify_totp_code(user, code):
         return False
     user.totp_enabled = False
-    user.totp_secret = ""
+    user.totp_secret = ""  # nosec B105 - clearing secret on TOTP disable, not hardcoding
     user.save(update_fields=["totp_enabled", "totp_secret"])
     return True
 
@@ -120,7 +129,9 @@ def request_password_reset(email: str) -> None:
         return
 
     # Invalidate any live tokens for this user
-    PasswordResetToken.objects.filter(user=user, used_at__isnull=True).update(used_at=timezone.now())
+    PasswordResetToken.objects.filter(user=user, used_at__isnull=True).update(
+        used_at=timezone.now()
+    )
 
     raw_token = secrets.token_urlsafe(48)
     PasswordResetToken.objects.create(
@@ -128,7 +139,16 @@ def request_password_reset(email: str) -> None:
         token_hash=hashlib.sha256(raw_token.encode()).hexdigest(),
         expires_at=timezone.now() + timedelta(hours=1),
     )
-    # TODO: send email via notifications.services.send() once that app is built
+    try:
+        from django.conf import settings
+
+        from apps.notifications.email_service import send_password_reset
+
+        frontend = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+        reset_url = f"{frontend}/reset-password?token={raw_token}"
+        send_password_reset(user, reset_url)
+    except Exception:
+        logger.exception("Failed to send password reset email to %s", email)
     logger.info("Password reset token created for %s", email)
 
 
