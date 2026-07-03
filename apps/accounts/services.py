@@ -67,6 +67,14 @@ def authenticate_user(email: str, password: str) -> tuple[User | None, str | Non
     return user, None
 
 
+def unlock_user(user: User) -> None:
+    cache.delete(_attempts_key(user.email))
+
+
+def is_locked(user: User) -> bool:
+    return cache.get(_attempts_key(user.email), 0) >= MAX_LOGIN_ATTEMPTS
+
+
 def create_totp_session(user: User) -> str:
     """Issue a short-lived token after password is verified but before TOTP check."""
     session_token = secrets.token_urlsafe(32)

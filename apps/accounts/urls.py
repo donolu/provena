@@ -12,7 +12,11 @@ urlpatterns = [
     path("refresh/", TokenRefreshView.as_view(), name="auth-refresh"),
     # Password management
     path("password-reset/", views.PasswordResetRequestView.as_view(), name="auth-password-reset"),
-    path("password-reset/confirm/", views.PasswordResetConfirmView.as_view(), name="auth-password-reset-confirm"),
+    path(
+        "password-reset/confirm/",
+        views.PasswordResetConfirmView.as_view(),
+        name="auth-password-reset-confirm",
+    ),
     path("change-password/", views.ChangePasswordView.as_view(), name="auth-change-password"),
     # Two-factor authentication
     path("totp/setup/", views.TOTPSetupView.as_view(), name="auth-totp-setup"),
@@ -20,4 +24,10 @@ urlpatterns = [
     path("totp/disable/", views.TOTPDisableView.as_view(), name="auth-totp-disable"),
     # User profile
     path("me/", views.UserProfileView.as_view(), name="auth-me"),
+    # Admin
+    path(
+        "admin/users/<uuid:user_id>/unlock/",
+        views.AdminUnlockUserView.as_view(),
+        name="admin-user-unlock",
+    ),
 ]

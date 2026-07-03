@@ -1,7 +1,8 @@
+from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import serializers as drf_serializers
 from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -299,6 +300,24 @@ class TOTPEnableView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response({"totp_enabled": True})
+
+
+class AdminUnlockUserView(APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        tags=["User Profile"],
+        summary="Unlock a locked account (admin)",
+        description="Clears the failed-login attempt counter for a user, allowing them to log in again immediately.",
+        responses={200: OpenApiResponse(description="`{unlocked: true}`")},
+    )
+    def post(self, request: Request, user_id: str) -> Response:
+        from .models import User
+
+        user = get_object_or_404(User, id=user_id)
+        was_locked = services.is_locked(user)
+        services.unlock_user(user)
+        return Response({"unlocked": True, "was_locked": was_locked})
 
 
 class TOTPDisableView(APIView):
