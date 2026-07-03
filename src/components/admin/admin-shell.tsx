@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
+  AlertTriangle,
   LayoutDashboard,
   Store,
   Users,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { getAdminSuppliers } from '@/lib/api/suppliers'
+import { getAdminDisputes } from '@/lib/api/orders'
 import { useAuthStore } from '@/store/auth'
 
 const BASE_NAV = [
@@ -25,6 +27,7 @@ const BASE_NAV = [
   { href: '/admin/suppliers',  label: 'Suppliers', icon: Store },
   { href: '/admin/users',      label: 'Users',     icon: Users },
   { href: '/admin/orders',     label: 'Orders',    icon: ShoppingBag },
+  { href: '/admin/disputes',   label: 'Disputes',  icon: AlertTriangle },
   { href: '/admin/products',   label: 'Products',  icon: Package },
   { href: '/admin/analytics',  label: 'Analytics', icon: BarChart2 },
   { href: '/admin/payouts',    label: 'Payouts',   icon: Wallet },
@@ -44,13 +47,18 @@ function AdminNav({ onLinkClick }: { onLinkClick?: () => void }) {
     queryKey: ['admin', 'suppliers', 'all'],
     queryFn: () => getAdminSuppliers(),
   })
+  const { data: openDisputes } = useQuery({
+    queryKey: ['admin', 'disputes', 'open'],
+    queryFn: () => getAdminDisputes('OPEN'),
+  })
   const pendingCount = suppliersData?.results.filter((s) => s.status === 'PENDING').length ?? 0
+  const openDisputeCount = openDisputes?.length ?? 0
 
-  const NAV = BASE_NAV.map((item) =>
-    item.href === '/admin/suppliers'
-      ? { ...item, badge: pendingCount }
-      : { ...item, badge: null },
-  )
+  const NAV = BASE_NAV.map((item) => {
+    if (item.href === '/admin/suppliers') return { ...item, badge: pendingCount }
+    if (item.href === '/admin/disputes') return { ...item, badge: openDisputeCount }
+    return { ...item, badge: null }
+  })
 
   return (
     <div className="flex flex-col h-full">

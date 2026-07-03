@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Order, PaginatedResponse, SubOrderListItem } from './types'
+import type { Order, OrderDispute, PaginatedResponse, SubOrderListItem } from './types'
 
 export interface PaymentIntentResponse {
   client_secret: string
@@ -47,6 +47,18 @@ export async function cancelOrder(reference: string): Promise<Order> {
   return data
 }
 
+export async function raiseDispute(
+  reference: string,
+  subOrderId: string,
+  reason: string,
+): Promise<OrderDispute> {
+  const { data } = await apiClient.post<OrderDispute>(
+    `/orders/${reference}/sub-orders/${subOrderId}/dispute/`,
+    { reason },
+  )
+  return data
+}
+
 // ── Supplier ──────────────────────────────────────────────────────────────────
 
 export async function getSupplierSubOrders(page = 1): Promise<PaginatedResponse<SubOrderListItem>> {
@@ -88,4 +100,25 @@ export async function adminRefundPayment(paymentId: string, amount?: number): Pr
   await apiClient.post(`/payments/admin/payments/${paymentId}/refund/`, {
     ...(amount !== undefined && { amount }),
   })
+}
+
+export async function getAdminDisputes(disputeStatus?: string): Promise<OrderDispute[]> {
+  const { data } = await apiClient.get<OrderDispute[]>('/orders/admin/disputes/', {
+    params: disputeStatus ? { status: disputeStatus } : undefined,
+  })
+  return data
+}
+
+export async function adminResolveDispute(id: string, resolution: string): Promise<OrderDispute> {
+  const { data } = await apiClient.post<OrderDispute>(`/orders/admin/disputes/${id}/resolve/`, {
+    resolution,
+  })
+  return data
+}
+
+export async function adminRejectDispute(id: string, resolution: string): Promise<OrderDispute> {
+  const { data } = await apiClient.post<OrderDispute>(`/orders/admin/disputes/${id}/reject/`, {
+    resolution,
+  })
+  return data
 }

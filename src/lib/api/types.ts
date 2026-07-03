@@ -123,6 +123,18 @@ export interface WishlistItem {
 // ── Orders ────────────────────────────────────────────────────────────────────
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED'
+export type DisputeStatus = 'OPEN' | 'RESOLVED' | 'REJECTED'
+
+export interface OrderDispute {
+  id: string
+  sub_order_id: string
+  reason: string
+  status: DisputeStatus
+  resolution: string
+  raised_by_email: string | null
+  created_at: string
+  updated_at: string
+}
 
 export interface OrderItem {
   id: string
@@ -141,7 +153,9 @@ export interface SubOrder {
   status: OrderStatus
   subtotal: string
   tracking_number: string
+  delivered_at: string | null
   items: OrderItem[]
+  disputes: OrderDispute[]
   created_at: string
   updated_at: string
 }
