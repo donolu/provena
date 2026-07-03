@@ -9,8 +9,12 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.pagination import PaginatedListMixin
+
 from . import services
+from .models import User
 from .serializers import (
+    AdminUserSerializer,
     ChangePasswordSerializer,
     LoginSerializer,
     PasswordResetConfirmSerializer,
@@ -342,3 +346,84 @@ class TOTPDisableView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response({"totp_enabled": False})
+
+
+class AdminUserListView(PaginatedListMixin, APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        tags=["Admin: Users"],
+        summary="List all users",
+        responses={200: AdminUserSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        qs = User.objects.order_by("-created_at")
+        if role := request.query_params.get("role"):
+            qs = qs.filter(role=role)
+        if active := request.query_params.get("is_active"):
+            qs = qs.filter(is_active=active.lower() in ("1", "true", "yes"))
+        if q := request.query_params.get("q"):
+            from django.db.models import Q as DQ
+
+            qs = qs.filter(
+                DQ(email__icontains=q) | DQ(first_name__icontains=q) | DQ(last_name__icontains=q)
+            )
+        return self.paginate(qs, AdminUserSerializer, request)
+
+
+class AdminSuspendUserView(APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        tags=["Admin: Users"],
+        summary="Suspend a user account",
+        responses={200: AdminUserSerializer},
+    )
+    def post(self, request: Request, user_id: str) -> Response:
+        user = get_object_or_404(User, id=user_id)
+        if user == request.user:
+            return Response(
+                {"detail": "Cannot suspend your own account."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if user.is_staff:
+            return Response(
+                {"detail": "Cannot suspend a staff account."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        services.suspend_user(user)
+        return Response(AdminUserSerializer(user).data)
+
+
+class AdminActivateUserView(APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        tags=["Admin: Users"],
+        summary="Re-activate a suspended user account",
+        responses={200: AdminUserSerializer},
+    )
+    def post(self, request: Request, user_id: str) -> Response:
+        user = get_object_or_404(User, id=user_id)
+        services.activate_user(user)
+        return Response(AdminUserSerializer(user).data)
+
+
+class AdminDeleteUserView(APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        tags=["Admin: Users"],
+        summary="Delete a user account",
+        responses={204: OpenApiResponse(description="Deleted")},
+    )
+    def delete(self, request: Request, user_id: str) -> Response:
+        user = get_object_or_404(User, id=user_id)
+        if user == request.user:
+            return Response(
+                {"detail": "Cannot delete your own account."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if user.is_staff:
+            return Response(
+                {"detail": "Cannot delete a staff account."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        services.delete_user(user)
+        return Response(status=status.HTTP_204_NO_CONTENT)

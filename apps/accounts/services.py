@@ -75,6 +75,24 @@ def is_locked(user: User) -> bool:
     return cache.get(_attempts_key(user.email), 0) >= MAX_LOGIN_ATTEMPTS
 
 
+def suspend_user(user: User) -> None:
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+    logger.info("User %s suspended", user.email)
+
+
+def activate_user(user: User) -> None:
+    user.is_active = True
+    user.save(update_fields=["is_active"])
+    logger.info("User %s activated", user.email)
+
+
+def delete_user(user: User) -> None:
+    email = user.email
+    user.delete()
+    logger.info("User %s deleted", email)
+
+
 def create_totp_session(user: User) -> str:
     """Issue a short-lived token after password is verified but before TOTP check."""
     session_token = secrets.token_urlsafe(32)

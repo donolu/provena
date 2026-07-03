@@ -70,3 +70,20 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 class TOTPVerifySerializer(serializers.Serializer):
     code = serializers.CharField(min_length=6, max_length=6)
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "role",
+            "is_active",
+            "is_staff",
+            "totp_enabled",
+            "created_at",
+        ]
+        read_only_fields = fields

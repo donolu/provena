@@ -25,9 +25,25 @@ urlpatterns = [
     # User profile
     path("me/", views.UserProfileView.as_view(), name="auth-me"),
     # Admin
+    path("admin/users/", views.AdminUserListView.as_view(), name="admin-user-list"),
     path(
         "admin/users/<uuid:user_id>/unlock/",
         views.AdminUnlockUserView.as_view(),
         name="admin-user-unlock",
+    ),
+    path(
+        "admin/users/<uuid:user_id>/suspend/",
+        views.AdminSuspendUserView.as_view(),
+        name="admin-user-suspend",
+    ),
+    path(
+        "admin/users/<uuid:user_id>/activate/",
+        views.AdminActivateUserView.as_view(),
+        name="admin-user-activate",
+    ),
+    path(
+        "admin/users/<uuid:user_id>/",
+        views.AdminDeleteUserView.as_view(),
+        name="admin-user-delete",
     ),
 ]
