@@ -43,6 +43,7 @@ class OrderListCreateView(PaginatedListMixin, APIView):
         qs = (
             Order.objects.filter(buyer=request.user)
             .prefetch_related("sub_orders__items", "sub_orders__supplier")
+            .select_related("payment")
             .order_by("-created_at")
         )
         if status_filter := request.query_params.get("status"):
@@ -109,7 +110,9 @@ class OrderDetailView(APIView):
     )
     def get(self, request: Request, reference: str) -> Response:
         order = get_object_or_404(
-            Order.objects.prefetch_related("sub_orders__items", "sub_orders__supplier"),
+            Order.objects.prefetch_related(
+                "sub_orders__items", "sub_orders__supplier"
+            ).select_related("payment"),
             reference=reference,
             buyer=request.user,
         )
@@ -306,7 +309,7 @@ class AdminOrderListView(PaginatedListMixin, APIView):
     def get(self, request: Request) -> Response:
         qs = Order.objects.prefetch_related(
             "sub_orders__items", "sub_orders__supplier"
-        ).select_related("buyer")
+        ).select_related("buyer", "payment")
         if status_filter := request.query_params.get("status"):
             qs = qs.filter(status=status_filter)
         if buyer_email := request.query_params.get("buyer"):

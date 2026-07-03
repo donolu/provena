@@ -16,11 +16,22 @@ class PaymentSerializer(serializers.ModelSerializer):
             "currency",
             "status",
             "status_display",
+            "refunded_amount",
             "stripe_payment_intent_id",
             "created_at",
             "updated_at",
         ]
         read_only_fields = fields
+
+
+class RefundSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+        help_text="Amount to refund in GBP. Omit for a full refund.",
+    )
 
 
 class CreatePaymentIntentSerializer(serializers.Serializer):

@@ -77,16 +77,54 @@ def handle_payment_failed(stripe_payment_intent_id: str) -> Payment:
 
 
 @transaction.atomic
-def handle_refund(stripe_payment_intent_id: str) -> Payment:
+def handle_refund(
+    stripe_payment_intent_id: str,
+    amount_refunded_pence: int | None = None,
+    charge_amount_pence: int | None = None,
+) -> Payment:
     payment = Payment.objects.select_for_update().get(
         stripe_payment_intent_id=stripe_payment_intent_id
     )
-    payment.status = PaymentStatus.REFUNDED
-    payment.save(update_fields=["status", "updated_at"])
-    Payout.objects.filter(
-        sub_order__order=payment.order,
-        status__in=[PayoutStatus.PENDING, PayoutStatus.PROCESSING],
-    ).update(status=PayoutStatus.FAILED)
+    if amount_refunded_pence is not None and charge_amount_pence is not None:
+        payment.refunded_amount = Decimal(amount_refunded_pence) / 100
+        is_full = amount_refunded_pence >= charge_amount_pence
+    else:
+        payment.refunded_amount = payment.amount
+        is_full = True
+
+    payment.status = PaymentStatus.REFUNDED if is_full else PaymentStatus.PARTIALLY_REFUNDED
+    payment.save(update_fields=["status", "refunded_amount", "updated_at"])
+
+    if is_full:
+        Payout.objects.filter(
+            sub_order__order=payment.order,
+            status__in=[PayoutStatus.PENDING, PayoutStatus.PROCESSING],
+        ).update(status=PayoutStatus.FAILED)
+    return payment
+
+
+def initiate_refund(payment: Payment, amount: Decimal | None = None) -> Payment:
+    """Issue a refund via Stripe. amount=None means full refund."""
+    if payment.status not in (PaymentStatus.SUCCEEDED, PaymentStatus.PARTIALLY_REFUNDED):
+        raise ValueError(f"Cannot refund a payment with status {payment.status}.")
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    intent = stripe.PaymentIntent.retrieve(payment.stripe_payment_intent_id)
+    charge_id = getattr(intent, "latest_charge", None)
+    if not charge_id:
+        raise ValueError("No charge found on this PaymentIntent.")
+
+    kwargs: dict = {"charge": charge_id}
+    if amount is not None:
+        max_refundable = payment.amount - payment.refunded_amount
+        if amount > max_refundable:
+            raise ValueError(
+                f"Refund amount £{amount} exceeds refundable balance £{max_refundable}."
+            )
+        kwargs["amount"] = _to_pence(amount)
+
+    stripe.Refund.create(**kwargs)
+    logger.info("Stripe refund initiated for payment %s (amount=%s)", payment.id, amount or "full")
     return payment
 
 

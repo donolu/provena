@@ -63,6 +63,21 @@ class SubOrderListSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     buyer_email = serializers.EmailField(source="buyer.email", read_only=True)
     sub_orders = SubOrderSerializer(many=True, read_only=True)
+    payment_id = serializers.SerializerMethodField()
+    payment_status = serializers.SerializerMethodField()
+    refunded_amount = serializers.SerializerMethodField()
+
+    def get_payment_id(self, obj):
+        payment = getattr(obj, "payment", None)
+        return str(payment.id) if payment else None
+
+    def get_payment_status(self, obj):
+        payment = getattr(obj, "payment", None)
+        return payment.status if payment else None
+
+    def get_refunded_amount(self, obj):
+        payment = getattr(obj, "payment", None)
+        return str(payment.refunded_amount) if payment else None
 
     class Meta:
         model = Order
@@ -79,6 +94,9 @@ class OrderSerializer(serializers.ModelSerializer):
             "shipping_country",
             "total_amount",
             "notes",
+            "payment_id",
+            "payment_status",
+            "refunded_amount",
             "sub_orders",
             "created_at",
             "updated_at",

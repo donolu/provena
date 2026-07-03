@@ -5,7 +5,7 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, status
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -23,6 +23,7 @@ from .serializers import (
     PaymentIntentResponseSerializer,
     PaymentSerializer,
     PayoutSerializer,
+    RefundSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -116,9 +117,13 @@ class StripeWebhookView(APIView):
             elif event_type == "payment_intent.canceled":
                 services.handle_payment_cancelled(obj["id"])
             elif event_type == "charge.refunded":
-                pi_id = obj.get("payment_intent")
+                pi_id = getattr(obj, "payment_intent", None)
                 if pi_id:
-                    services.handle_refund(pi_id)
+                    services.handle_refund(
+                        pi_id,
+                        amount_refunded_pence=getattr(obj, "amount_refunded", None),
+                        charge_amount_pence=getattr(obj, "amount", None),
+                    )
         except Payment.DoesNotExist:
             pass
         except Exception:
@@ -169,6 +174,32 @@ class AdminPayoutListView(generics.ListAPIView):
         if supplier_slug:
             qs = qs.filter(supplier__slug=supplier_slug)
         return qs
+
+
+class AdminRefundView(APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        tags=["Admin: Payments"],
+        summary="Issue a refund (admin)",
+        description="Initiates a full or partial refund via Stripe. Omit `amount` for a full refund. "
+        "The payment status is updated when Stripe fires the `charge.refunded` webhook.",
+        request=RefundSerializer,
+        responses={
+            200: PaymentSerializer,
+            400: OpenApiResponse(description="Invalid amount or payment not refundable"),
+        },
+    )
+    def post(self, request, payment_id):
+        payment = get_object_or_404(Payment, id=payment_id)
+        ser = RefundSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        amount = ser.validated_data.get("amount")
+        try:
+            payment = services.initiate_refund(payment, amount=amount)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(PaymentSerializer(payment).data)
 
 
 class AdminProcessPayoutView(APIView):

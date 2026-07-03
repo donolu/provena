@@ -12,6 +12,11 @@ urlpatterns = [
         views.AdminProcessPayoutView.as_view(),
         name="admin-payout-process",
     ),
+    path(
+        "admin/payments/<uuid:payment_id>/refund/",
+        views.AdminRefundView.as_view(),
+        name="admin-payment-refund",
+    ),
     path("admin/", views.AdminPaymentListView.as_view(), name="admin-payment-list"),
     path("", views.PaymentListView.as_view(), name="payment-list"),
     path("<str:reference>/", views.PaymentDetailView.as_view(), name="payment-detail"),

@@ -8,6 +8,7 @@ class PaymentStatus(models.TextChoices):
     PROCESSING = "PROCESSING", "Processing"
     SUCCEEDED = "SUCCEEDED", "Succeeded"
     FAILED = "FAILED", "Failed"
+    PARTIALLY_REFUNDED = "PARTIAL_REFUND", "Partially refunded"
     REFUNDED = "REFUNDED", "Refunded"
     CANCELLED = "CANCELLED", "Cancelled"
 
@@ -27,8 +28,9 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, default="gbp")
     status = models.CharField(
-        max_length=10, choices=PaymentStatus.choices, default=PaymentStatus.PENDING
+        max_length=14, choices=PaymentStatus.choices, default=PaymentStatus.PENDING
     )
+    refunded_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
