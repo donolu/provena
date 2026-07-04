@@ -88,7 +88,7 @@ class PaymentDetailView(generics.RetrieveAPIView):
 
     @extend_schema(tags=["Payments (Buyer)"], summary="Retrieve payment by order reference")
     def get_queryset(self):
-        return Payment.objects.filter(order__buyer=self.request.user).select_related("order")
+        return Payment.objects.filter(order__buyer=self.request.user).select_related("order")  # type: ignore[misc]
 
 
 @method_decorator(csrf_exempt, name="dispatch")

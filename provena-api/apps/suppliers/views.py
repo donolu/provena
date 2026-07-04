@@ -217,9 +217,9 @@ class StripeConnectView(APIView):
         return_url = f"{request.build_absolute_uri('/api/v1/suppliers/me/')}"
         refresh_url = f"{request.build_absolute_uri('/api/v1/suppliers/me/stripe-connect/')}"
         url = services.get_stripe_connect_onboarding_url(
-            request.user.supplier,
+            request.user.supplier,  # type: ignore[union-attr]
             return_url=return_url,
-            refresh_url=refresh_url,  # type: ignore[union-attr]
+            refresh_url=refresh_url,
         )
         return Response({"onboarding_url": url})
 
