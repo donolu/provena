@@ -189,39 +189,57 @@ class TestWishlistItemDeleteView:
 
 class TestProductReviewListCreateView:
     def test_list_approved_reviews_public(self, variant, buyer):
-        review = services.create_review(buyer, variant.id, 5, "Great", "Loved it")
+        review = Review.objects.create(
+            variant=variant,
+            reviewer=buyer,
+            rating=5,
+            title="Great",
+            body="Loved it",
+            is_verified_purchase=True,
+            is_approved=True,
+        )
         services.approve_review(review)
         response = APIClient().get(f"/api/v1/marketplace/products/{variant.id}/reviews/")
         assert response.status_code == 200
         assert len(response.json()) == 1
 
     def test_unapproved_not_in_public_list(self, variant, buyer):
-        services.create_review(buyer, variant.id, 4, "Good", "Nice")
+        Review.objects.create(
+            variant=variant,
+            reviewer=buyer,
+            rating=4,
+            title="Good",
+            body="Nice",
+            is_verified_purchase=True,
+            is_approved=False,
+        )
         response = APIClient().get(f"/api/v1/marketplace/products/{variant.id}/reviews/")
         assert response.json() == []
 
-    def test_submit_review(self, buyer_client, variant):
+    def test_unverified_buyer_cannot_submit_review(self, buyer_client, variant):
         response = buyer_client.post(
             f"/api/v1/marketplace/products/{variant.id}/reviews/",
             {"rating": 4, "title": "Good product", "body": "Would buy again."},
             format="json",
         )
-        assert response.status_code == 201
-        data = response.json()
-        assert data["rating"] == 4
-        assert data["is_approved"] is False
-        assert data["is_verified_purchase"] is False
+        assert response.status_code == 400
+        assert "purchased and received" in response.json()["detail"]
 
-    def test_verified_purchase_flagged(self, buyer_client, buyer, variant, delivered_order):
+    def test_verified_purchaser_can_submit_review(
+        self, buyer_client, buyer, variant, delivered_order
+    ):
         response = buyer_client.post(
             f"/api/v1/marketplace/products/{variant.id}/reviews/",
             {"rating": 5, "title": "Perfect", "body": "Excellent quality."},
             format="json",
         )
         assert response.status_code == 201
-        assert response.json()["is_verified_purchase"] is True
+        data = response.json()
+        assert data["rating"] == 5
+        assert data["is_approved"] is False
+        assert data["is_verified_purchase"] is True
 
-    def test_duplicate_review_returns_400(self, buyer_client, buyer, variant):
+    def test_duplicate_review_returns_400(self, buyer_client, buyer, variant, delivered_order):
         services.create_review(buyer, variant.id, 3, "OK", "Fine")
         response = buyer_client.post(
             f"/api/v1/marketplace/products/{variant.id}/reviews/",
@@ -248,34 +266,45 @@ class TestProductReviewListCreateView:
 
 
 class TestAdminReviewViews:
+    def _make_review(self, buyer, variant, rating=3, title="OK", body="Fine", approved=False):
+        return Review.objects.create(
+            variant=variant,
+            reviewer=buyer,
+            rating=rating,
+            title=title,
+            body=body,
+            is_verified_purchase=True,
+            is_approved=approved,
+        )
+
     def test_list_all_reviews(self, admin_client, buyer, variant):
-        services.create_review(buyer, variant.id, 3, "OK", "Fine")
+        self._make_review(buyer, variant)
         response = admin_client.get("/api/v1/marketplace/admin/reviews/")
         assert response.status_code == 200
         assert len(response.json()) == 1
 
     def test_filter_approved(self, admin_client, buyer, variant):
-        review = services.create_review(buyer, variant.id, 4, "Good", "Nice")
+        review = self._make_review(buyer, variant, rating=4, title="Good", body="Nice")
         services.approve_review(review)
         response = admin_client.get("/api/v1/marketplace/admin/reviews/?is_approved=true")
         assert len(response.json()) == 1
         response2 = admin_client.get("/api/v1/marketplace/admin/reviews/?is_approved=false")
         assert response2.json() == []
 
-    def test_filter_by_variant(self, admin_client, buyer, variant, second_variant):
-        services.create_review(buyer, variant.id, 4, "Good", "Nice")
-        services.create_review(buyer, second_variant.id, 3, "OK", "Fine")
+    def test_filter_by_variant(self, admin_client, buyer, second_buyer, variant, second_variant):
+        self._make_review(buyer, variant, rating=4, title="Good", body="Nice")
+        self._make_review(second_buyer, second_variant, rating=3, title="OK", body="Fine")
         response = admin_client.get(f"/api/v1/marketplace/admin/reviews/?variant={variant.id}")
         assert len(response.json()) == 1
 
     def test_approve_review(self, admin_client, buyer, variant):
-        review = services.create_review(buyer, variant.id, 5, "Great", "Awesome")
+        review = self._make_review(buyer, variant, rating=5, title="Great", body="Awesome")
         response = admin_client.post(f"/api/v1/marketplace/admin/reviews/{review.id}/approve/")
         assert response.status_code == 200
         assert response.json()["is_approved"] is True
 
     def test_delete_review(self, admin_client, buyer, variant):
-        review = services.create_review(buyer, variant.id, 2, "Bad", "Not good")
+        review = self._make_review(buyer, variant, rating=2, title="Bad", body="Not good")
         response = admin_client.delete(f"/api/v1/marketplace/admin/reviews/{review.id}/")
         assert response.status_code == 204
         assert Review.objects.filter(id=review.id).count() == 0

@@ -104,28 +104,30 @@ class TestWishlist:
 
 
 class TestReviews:
-    def test_create_review(self, buyer, variant):
-        review = services.create_review(buyer, variant.id, 4, "Great", "Loved it")
-        assert review.rating == 4
+    def test_unverified_buyer_cannot_review(self, buyer, variant):
+        with pytest.raises(ValueError, match="purchased and received"):
+            services.create_review(buyer, variant.id, 4, "Great", "Loved it")
+
+    def test_verified_purchaser_can_review(self, buyer, variant, delivered_order):
+        review = services.create_review(buyer, variant.id, 5, "Perfect", "Amazing")
+        assert review.rating == 5
         assert review.reviewer == buyer
         assert review.is_approved is False
-        assert review.is_verified_purchase is False
-
-    def test_verified_purchase_flag(self, buyer, variant, delivered_order):
-        review = services.create_review(buyer, variant.id, 5, "Perfect", "Amazing")
         assert review.is_verified_purchase is True
 
-    def test_duplicate_review_raises(self, buyer, variant):
+    def test_duplicate_review_raises(self, buyer, variant, delivered_order):
         services.create_review(buyer, variant.id, 3, "OK", "Fine")
         with pytest.raises(ValueError, match="already submitted"):
             services.create_review(buyer, variant.id, 4, "Good", "Better")
 
-    def test_different_buyers_can_review_same_variant(self, buyer, second_buyer, variant):
+    def test_different_buyers_can_review_same_variant(
+        self, buyer, second_buyer, variant, delivered_order, second_delivered_order
+    ):
         services.create_review(buyer, variant.id, 5, "Great", "Love it")
         review2 = services.create_review(second_buyer, variant.id, 3, "OK", "Decent")
         assert review2.reviewer == second_buyer
 
-    def test_approve_review(self, buyer, variant):
+    def test_approve_review(self, buyer, variant, delivered_order):
         review = services.create_review(buyer, variant.id, 4, "Good", "Nice")
         approved = services.approve_review(review)
         assert approved.is_approved is True

@@ -165,8 +165,8 @@ class ProductReviewListCreateView(APIView):
         tags=["Marketplace: Reviews"],
         summary="Submit a review",
         description=(
+            "Restricted to buyers who have a delivered order containing this variant. "
             "One review per buyer per variant. "
-            "Automatically flagged as verified purchase if the buyer has a delivered order for this variant. "
             "Reviews are not public until approved by an admin."
         ),
     )
