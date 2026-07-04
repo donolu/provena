@@ -10,3 +10,4 @@ dist/
 .turbo/
 coverage/
 *.tsbuildinfo
+schema.yaml
