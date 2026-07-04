@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  ::selection {
+    background-color: #E8B84B44;
+    color: #1B2B1E;
+  }
+
+  /* Hide scrollbar for category tab strip */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+}
+
+/* ── Crop-mark corners ─────────────────────────────────────────────
+   Marigold L-shapes that expand outward from each card corner on
+   hover. The .group class on the card wrapper triggers them.
+   ──────────────────────────────────────────────────────────────── */
+.crop-corner {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+  z-index: 10;
+}
+
+.group:hover .crop-corner {
+  opacity: 1;
+}
+
+.crop-corner::before,
+.crop-corner::after {
+  content: '';
+  position: absolute;
+  background-color: #E8B84B;
+}
+
+/* Top-left */
+.crop-tl {
+  top: -7px;
+  left: -7px;
+  transform: translate(4px, 4px);
+}
+.group:hover .crop-tl { transform: translate(0, 0); }
+.crop-tl::before { width: 1.5px; height: 14px; top: 0; left: 0; }
+.crop-tl::after  { height: 1.5px; width: 14px;  top: 0; left: 0; }
+
+/* Top-right */
+.crop-tr {
+  top: -7px;
+  right: -7px;
+  transform: translate(-4px, 4px);
+}
+.group:hover .crop-tr { transform: translate(0, 0); }
+.crop-tr::before { width: 1.5px; height: 14px; top: 0; right: 0; }
+.crop-tr::after  { height: 1.5px; width: 14px;  top: 0; right: 0; }
+
+/* Bottom-left */
+.crop-bl {
+  bottom: -7px;
+  left: -7px;
+  transform: translate(4px, -4px);
+}
+.group:hover .crop-bl { transform: translate(0, 0); }
+.crop-bl::before { width: 1.5px; height: 14px; bottom: 0; left: 0; }
+.crop-bl::after  { height: 1.5px; width: 14px;  bottom: 0; left: 0; }
+
+/* Bottom-right */
+.crop-br {
+  bottom: -7px;
+  right: -7px;
+  transform: translate(-4px, -4px);
+}
+.group:hover .crop-br { transform: translate(0, 0); }
+.crop-br::before { width: 1.5px; height: 14px; bottom: 0; right: 0; }
+.crop-br::after  { height: 1.5px; width: 14px;  bottom: 0; right: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .crop-corner {
+    transition: opacity 140ms ease;
+  }
+  .crop-tl,
+  .crop-tr,
+  .crop-bl,
+  .crop-br {
+    transform: translate(0, 0) !important;
+  }
+}
