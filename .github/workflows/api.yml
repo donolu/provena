@@ -1,14 +1,24 @@
-name: CI
+name: API CI
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'provena-api/**'
+      - '.github/workflows/api.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'provena-api/**'
+      - '.github/workflows/api.yml'
+
+defaults:
+  run:
+    working-directory: provena-api
 
 jobs:
   lint:
-    name: Lint and type-check
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,8 +26,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: provena-api/pyproject.toml
       - run: pip install -e ".[dev]"
-      - run: pre-commit run --all-files
+      - run: ruff check apps/
+      - run: ruff format --check apps/
       - run: bandit -r apps/ -c pyproject.toml
       - run: safety check
       - run: mypy apps/
@@ -63,5 +75,6 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: provena-api/pyproject.toml
       - run: pip install -e ".[dev]"
       - run: pytest
