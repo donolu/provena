@@ -141,7 +141,7 @@ For a full setup guide without Docker, see [docs/onboarding.md](docs/onboarding.
 | Developer Onboarding | [docs/onboarding.md](docs/onboarding.md) | Local setup, prerequisites, running tests |
 | Production Deployment | [docs/deployment.md](docs/deployment.md) | Docker Compose, environment variables, external services |
 | Contributing | [docs/contributing.md](docs/contributing.md) | Branching, standards, PR process, adding endpoints/pages |
-| Backlog and Roadmap | [docs/backlog.md](docs/backlog.md) | Not yet implemented, known limitations, roadmap |
+| Backlog and Roadmap | [GitHub Issues](https://github.com/donolu/provena/issues) | Not yet implemented, known limitations, roadmap |
 | Business Requirements | [provena-api/docs/BRD.md](provena-api/docs/BRD.md) | Features, user stories, success metrics |
 | Technical Requirements | [provena-api/docs/TRD.md](provena-api/docs/TRD.md) | Stack, API design, data architecture |
 | System Architecture | [provena-api/docs/ARCHITECTURE.md](provena-api/docs/ARCHITECTURE.md) | Component diagram, domain structure, request lifecycle |
