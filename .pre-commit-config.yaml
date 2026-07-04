@@ -38,3 +38,4 @@ repos:
         args: [-c, provena-api/pyproject.toml]
         files: ^provena-api/
         exclude: ^provena-api/.*tests/
+        additional_dependencies: ["bandit[toml]"]

@@ -18,7 +18,7 @@ class RegisterSerializer(serializers.Serializer):
 
     def validate(self, data):
         if data["password"] != data["password_confirm"]:
-            raise serializers.ValidationError({"password_confirm": "Passwords do not match."})
+            raise serializers.ValidationError({"password_confirm": "Passwords do not match."})  # nosec B105
         validate_password(data["password"])
         return data
 
@@ -47,7 +47,7 @@ class ChangePasswordSerializer(serializers.Serializer):
 
     def validate(self, data):
         if data["new_password"] != data["new_password_confirm"]:
-            raise serializers.ValidationError({"new_password_confirm": "Passwords do not match."})
+            raise serializers.ValidationError({"new_password_confirm": "Passwords do not match."})  # nosec B105
         validate_password(data["new_password"])
         return data
 
@@ -63,7 +63,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
     def validate(self, data):
         if data["new_password"] != data["new_password_confirm"]:
-            raise serializers.ValidationError({"new_password_confirm": "Passwords do not match."})
+            raise serializers.ValidationError({"new_password_confirm": "Passwords do not match."})  # nosec B105
         validate_password(data["new_password"])
         return data
 
