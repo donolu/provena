@@ -1,0 +1,10 @@
+version: 2
+
+ignore-paths:
+  # Dev-only compose file — credentials are intentional dev placeholders,
+  # not real secrets. Never used in production.
+  - docker-compose.dev.yml
+
+  # CI workflow — all credential values are dummy placeholders for test runs.
+  # No real keys are present.
+  - .github/workflows/api.yml

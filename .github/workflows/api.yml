@@ -14,9 +14,17 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_SECRET_KEY: ci-lint-secret-key
+      DATABASE_URL: postgres://provena:provena@localhost:5432/provena_test
+      REDIS_URL: redis://localhost:6379/0
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -64,8 +72,8 @@ jobs:
       STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
       STRIPE_WEBHOOK_SECRET: whsec_placeholder
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip

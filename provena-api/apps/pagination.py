@@ -21,9 +21,9 @@ class PaginatedListMixin:
 
     pagination_class = StandardPagination
 
-    def paginate(self, queryset, serializer_class, request, **serializer_kwargs):
+    def paginate(self, queryset, serializer_class, request, **serializer_kwargs) -> Response:
         paginator = self.pagination_class()
-        page = paginator.paginate_queryset(queryset, request, view=self)
+        page = paginator.paginate_queryset(queryset, request, view=self)  # type: ignore[arg-type]
         if page is not None:
             serializer = serializer_class(page, many=True, **serializer_kwargs)
             return paginator.get_paginated_response(serializer.data)

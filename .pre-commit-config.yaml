@@ -38,3 +38,14 @@ repos:
         args: [-c, provena-api/pyproject.toml]
         files: ^provena-api/
         exclude: ^provena-api/.*tests/
+        additional_dependencies: ["bandit[toml]"]
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        language: script
+        entry: .github/scripts/run-mypy.sh
+        pass_filenames: false
+        files: ^provena-api/.*\.py$
+        stages: [pre-push]

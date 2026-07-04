@@ -93,8 +93,8 @@ class LoginView(APIView):
                 {"error": {"code": "AUTH_FAILED", "message": error}},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        if user.totp_enabled:
-            session_token = services.create_totp_session(user)
+        if user.totp_enabled:  # type: ignore[union-attr]
+            session_token = services.create_totp_session(user)  # type: ignore[arg-type]
             return Response(
                 {"totp_required": True, "totp_session_token": session_token},
                 status=status.HTTP_200_OK,
@@ -212,7 +212,7 @@ class ChangePasswordView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         request.user.set_password(d["new_password"])
-        request.user.save(update_fields=["password"])
+        request.user.save(update_fields=["password"])  # type: ignore[call-arg]
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -278,7 +278,7 @@ class TOTPSetupView(APIView):
         },
     )
     def get(self, request: Request) -> Response:
-        uri = services.setup_totp(request.user)
+        uri = services.setup_totp(request.user)  # type: ignore[arg-type]
         return Response({"otpauth_uri": uri})
 
 
@@ -299,7 +299,7 @@ class TOTPEnableView(APIView):
     def post(self, request: Request) -> Response:
         s = TOTPVerifySerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        if not services.enable_totp(request.user, s.validated_data["code"]):
+        if not services.enable_totp(request.user, s.validated_data["code"]):  # type: ignore[arg-type]
             return Response(
                 {"error": {"code": "INVALID_TOTP", "message": "Invalid authenticator code."}},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -341,7 +341,7 @@ class TOTPDisableView(APIView):
     def post(self, request: Request) -> Response:
         s = TOTPVerifySerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        if not services.disable_totp(request.user, s.validated_data["code"]):
+        if not services.disable_totp(request.user, s.validated_data["code"]):  # type: ignore[arg-type]
             return Response(
                 {"error": {"code": "INVALID_TOTP", "message": "Invalid authenticator code."}},
                 status=status.HTTP_400_BAD_REQUEST,

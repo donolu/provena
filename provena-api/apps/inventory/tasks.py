@@ -29,6 +29,8 @@ def check_low_stock_levels():
 @shared_task
 def check_lot_expiry(days_ahead: int = 3):
     """Daily task: create in-app notifications for lots expiring within `days_ahead` days."""
+    from datetime import timedelta
+
     from django.utils import timezone
 
     from apps.notifications.models import Notification, NotificationType
@@ -36,7 +38,7 @@ def check_lot_expiry(days_ahead: int = 3):
     from .models import StockLot
 
     today = timezone.now().date()
-    cutoff = today + timezone.timedelta(days=days_ahead)
+    cutoff = today + timedelta(days=days_ahead)
 
     lots = (
         StockLot.objects.filter(
@@ -55,6 +57,8 @@ def check_lot_expiry(days_ahead: int = 3):
         if not supplier or not supplier.user_id:
             continue
 
+        if lot.expires_at is None:  # should not happen given isnull=False filter
+            continue
         days_left = (lot.expires_at - today).days
         label = lot.lot_number or str(lot.id)[:8]
         title = f"Lot {label} expires in {days_left} day{'s' if days_left != 1 else ''}"

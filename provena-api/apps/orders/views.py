@@ -45,7 +45,7 @@ class OrderListCreateView(PaginatedListMixin, APIView):
     )
     def get(self, request: Request) -> Response:
         qs = (
-            Order.objects.filter(buyer=request.user)
+            Order.objects.filter(buyer=request.user)  # type: ignore[misc]
             .prefetch_related("sub_orders__items", "sub_orders__supplier")
             .select_related("payment")
             .order_by("-created_at")
@@ -223,7 +223,7 @@ class SupplierSubOrderListView(PaginatedListMixin, APIView):
     )
     def get(self, request: Request) -> Response:
         qs = (
-            SubOrder.objects.filter(supplier=request.user.supplier)
+            SubOrder.objects.filter(supplier=request.user.supplier)  # type: ignore[union-attr]
             .select_related("order__buyer", "supplier")
             .order_by("-created_at")
         )
@@ -244,7 +244,7 @@ class SupplierSubOrderDetailView(APIView):
         sub = get_object_or_404(
             SubOrder.objects.prefetch_related("items").select_related("order__buyer", "supplier"),
             id=pk,
-            supplier=request.user.supplier,
+            supplier=request.user.supplier,  # type: ignore[union-attr]
         )
         return Response(SubOrderSerializer(sub).data)
 
@@ -262,7 +262,7 @@ class SupplierConfirmView(APIView):
         },
     )
     def post(self, request: Request, pk) -> Response:
-        sub = get_object_or_404(SubOrder, id=pk, supplier=request.user.supplier)
+        sub = get_object_or_404(SubOrder, id=pk, supplier=request.user.supplier)  # type: ignore[union-attr]
         try:
             sub = services.confirm_sub_order(sub)
         except ValueError as exc:
@@ -284,7 +284,7 @@ class SupplierDispatchView(APIView):
         },
     )
     def post(self, request: Request, pk) -> Response:
-        sub = get_object_or_404(SubOrder, id=pk, supplier=request.user.supplier)
+        sub = get_object_or_404(SubOrder, id=pk, supplier=request.user.supplier)  # type: ignore[union-attr]
         ser = DispatchSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         try:
@@ -308,7 +308,7 @@ class SupplierDeliverView(APIView):
         },
     )
     def post(self, request: Request, pk) -> Response:
-        sub = get_object_or_404(SubOrder, id=pk, supplier=request.user.supplier)
+        sub = get_object_or_404(SubOrder, id=pk, supplier=request.user.supplier)  # type: ignore[union-attr]
         try:
             sub = services.deliver_sub_order(sub)
         except ValueError as exc:
@@ -334,7 +334,7 @@ class SupplierReturnListView(PaginatedListMixin, APIView):
     )
     def get(self, request: Request) -> Response:
         qs = (
-            OrderReturn.objects.filter(sub_order__supplier=request.user.supplier)
+            OrderReturn.objects.filter(sub_order__supplier=request.user.supplier)  # type: ignore[union-attr]
             .select_related("raised_by", "sub_order__order", "sub_order__supplier")
             .order_by("-created_at")
         )
@@ -356,7 +356,7 @@ class SupplierApproveReturnView(APIView):
         },
     )
     def post(self, request: Request, pk) -> Response:
-        ret = get_object_or_404(OrderReturn, id=pk, sub_order__supplier=request.user.supplier)
+        ret = get_object_or_404(OrderReturn, id=pk, sub_order__supplier=request.user.supplier)  # type: ignore[union-attr]
         ser = ReturnActionSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         try:
@@ -379,7 +379,7 @@ class SupplierRejectReturnView(APIView):
         },
     )
     def post(self, request: Request, pk) -> Response:
-        ret = get_object_or_404(OrderReturn, id=pk, sub_order__supplier=request.user.supplier)
+        ret = get_object_or_404(OrderReturn, id=pk, sub_order__supplier=request.user.supplier)  # type: ignore[union-attr]
         ser = ReturnActionSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         try:

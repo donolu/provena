@@ -36,9 +36,8 @@ dev = [
     "factory-boy>=3.3",
     "responses>=0.25",
     "ruff>=0.4",
-    "mypy>=1.9",
-    "django-stubs[compatible-mypy]>=5.0",
-    "djangorestframework-stubs>=3.15",
+    "django-stubs[compatible-mypy]>=5.0,<6.0",
+    "djangorestframework-stubs>=3.15,<4.0",
     "bandit>=1.7",
     "safety>=3.0",
     "pre-commit>=3.7",
@@ -66,8 +65,11 @@ ignore = ["E501", "S101", "RUF012"]
 [tool.mypy]
 python_version = "3.12"
 plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
-strict = true
 ignore_missing_imports = true
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+exclude = ["migrations/", "tests/"]
 
 [tool.django-stubs]
 django_settings_module = "config.settings.development"

@@ -15,7 +15,21 @@ Before deploying, obtain credentials for all external services below.
 | **Stripe** | Secret key, publishable key, webhook signing secret | Stripe dashboard → Developers → API keys |
 | **PostgreSQL** | Connection string `postgres://user:pass@host:5432/dbname` | Managed (Render Postgres, AWS RDS, Supabase) |
 | **Redis** | Connection string `redis://:pass@host:6379/0` | Managed (Render Redis, AWS ElastiCache, Upstash) |
-| **Django secret key** | 50+ character random string | `python -c "from django.utils.crypto import get_random_string; print(get_random_string(50))"` |
+| **Django secret key** | 50+ character random string | See below |
+
+**Generating a Django secret key**
+
+Django's secret key must be a long, unpredictable string. Generate one with either of these (no external service needed):
+
+```bash
+# Requires Django installed (inside the provena-api venv)
+python -c "from django.utils.crypto import get_random_string; print(get_random_string(50))"
+
+# Pure Python — no dependencies
+python -c "import secrets; print(secrets.token_urlsafe(50))"
+```
+
+Copy the output directly into `DJANGO_SECRET_KEY`. Never reuse a key across environments, and never commit it to git.
 
 ### Strongly Recommended
 

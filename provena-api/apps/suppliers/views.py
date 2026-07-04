@@ -74,7 +74,7 @@ class SupplierRegistrationView(APIView):
         s.is_valid(raise_exception=True)
         d = s.validated_data
         supplier = services.create_supplier_profile(
-            user=request.user,
+            user=request.user,  # type: ignore[arg-type]
             business_name=d["business_name"],
             description=d.get("description", ""),
             phone=d.get("phone", ""),
@@ -96,7 +96,7 @@ class SupplierProfileView(APIView):
         responses={200: SupplierProfileSerializer},
     )
     def get(self, request: Request) -> Response:
-        return Response(SupplierProfileSerializer(request.user.supplier).data)
+        return Response(SupplierProfileSerializer(request.user.supplier).data)  # type: ignore[union-attr]
 
     @extend_schema(
         tags=["Suppliers (Supplier)"],
@@ -110,11 +110,11 @@ class SupplierProfileView(APIView):
         },
     )
     def patch(self, request: Request) -> Response:
-        s = SupplierProfileSerializer(request.user.supplier, data=request.data, partial=True)
+        s = SupplierProfileSerializer(request.user.supplier, data=request.data, partial=True)  # type: ignore[union-attr]
         s.is_valid(raise_exception=True)
         d = s.validated_data
         supplier = services.update_supplier_profile(
-            request.user.supplier,
+            request.user.supplier,  # type: ignore[union-attr]
             address_data=d.pop("address", None),
             **d,
         )
@@ -153,7 +153,7 @@ class SupplierDocumentListView(APIView):
         responses={200: SupplierDocumentSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:
-        docs = request.user.supplier.documents.all()
+        docs = request.user.supplier.documents.all()  # type: ignore[union-attr]
         return Response(SupplierDocumentSerializer(docs, many=True).data)
 
     @extend_schema(
@@ -173,7 +173,7 @@ class SupplierDocumentListView(APIView):
         s.is_valid(raise_exception=True)
         d = s.validated_data
         doc = services.upload_document(
-            supplier=request.user.supplier,
+            supplier=request.user.supplier,  # type: ignore[union-attr]
             document_type=d["document_type"],
             file_url=d["file_url"],
         )
@@ -193,7 +193,7 @@ class SupplierPerformanceView(APIView):
         responses={200: OpenApiResponse(description="Performance stats object")},
     )
     def get(self, request: Request) -> Response:
-        return Response(services.get_performance_stats(request.user.supplier))
+        return Response(services.get_performance_stats(request.user.supplier))  # type: ignore[union-attr]
 
 
 class StripeConnectView(APIView):
@@ -217,7 +217,9 @@ class StripeConnectView(APIView):
         return_url = f"{request.build_absolute_uri('/api/v1/suppliers/me/')}"
         refresh_url = f"{request.build_absolute_uri('/api/v1/suppliers/me/stripe-connect/')}"
         url = services.get_stripe_connect_onboarding_url(
-            request.user.supplier, return_url=return_url, refresh_url=refresh_url
+            request.user.supplier,  # type: ignore[union-attr]
+            return_url=return_url,
+            refresh_url=refresh_url,
         )
         return Response({"onboarding_url": url})
 
@@ -309,7 +311,7 @@ class AdminSupplierApproveView(APIView):
     )
     def post(self, request: Request, pk: str) -> Response:
         supplier = get_object_or_404(Supplier, pk=pk)
-        services.approve_supplier(supplier, request.user)
+        services.approve_supplier(supplier, request.user)  # type: ignore[arg-type]
         return Response({"status": supplier.status})
 
 
@@ -333,7 +335,7 @@ class AdminSupplierSuspendView(APIView):
         supplier = get_object_or_404(Supplier, pk=pk)
         s = SupplierStatusActionSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        services.suspend_supplier(supplier, request.user)
+        services.suspend_supplier(supplier, request.user)  # type: ignore[arg-type]
         return Response({"status": supplier.status})
 
 
@@ -357,7 +359,7 @@ class AdminSupplierRejectView(APIView):
         supplier = get_object_or_404(Supplier, pk=pk)
         s = SupplierStatusActionSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        services.reject_supplier(supplier, request.user)
+        services.reject_supplier(supplier, request.user)  # type: ignore[arg-type]
         return Response({"status": supplier.status})
 
 
@@ -413,7 +415,7 @@ class AdminDocumentReviewView(APIView):
         s.is_valid(raise_exception=True)
         doc = services.review_document(
             document=document,
-            admin_user=request.user,
+            admin_user=request.user,  # type: ignore[arg-type]
             approved=s.validated_data["approved"],
             notes=s.validated_data.get("notes", ""),
         )

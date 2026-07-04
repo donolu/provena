@@ -32,7 +32,7 @@ class CartItemSerializer(serializers.ModelSerializer):
 
     def get_reservation_expires_at(self, obj) -> str | None:
         try:
-            return obj.reservation.expires_at.isoformat()
+            return str(obj.reservation.expires_at.isoformat())
         except CartReservation.DoesNotExist:
             return None
 
