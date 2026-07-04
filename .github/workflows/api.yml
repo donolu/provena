@@ -80,6 +80,19 @@ jobs:
           cache-dependency-path: provena-api/pyproject.toml
       - run: pip install -e ".[dev]"
       - run: pytest
+      - name: Per-app coverage floor (80%)
+        run: |
+          failed=0
+          for app in accounts analytics catalogue inventory marketplace notifications orders payments suppliers; do
+            echo "--- $app ---"
+            python -m pytest apps/$app/ \
+              --cov=apps/$app \
+              --cov-fail-under=80 \
+              --no-header -q \
+              --cov-report=term-missing:skip-covered \
+              --no-cov-on-fail || failed=1
+          done
+          exit $failed
 
   generate-client:
     name: Generate OpenAPI client
