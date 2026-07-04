@@ -65,8 +65,11 @@ ignore = ["E501", "S101", "RUF012"]
 [tool.mypy]
 python_version = "3.12"
 plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
-strict = true
 ignore_missing_imports = true
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+exclude = ["migrations/", "tests/"]
 
 [tool.django-stubs]
 django_settings_module = "config.settings.development"

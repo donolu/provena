@@ -39,3 +39,13 @@ repos:
         files: ^provena-api/
         exclude: ^provena-api/.*tests/
         additional_dependencies: ["bandit[toml]"]
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        language: system
+        entry: bash -c 'cd provena-api && mypy apps/'
+        pass_filenames: false
+        files: ^provena-api/.*\.py$
+        stages: [pre-push]
