@@ -1,0 +1,67 @@
+# Development overrides: hot-reload, dev settings, exposed ports
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+services:
+
+  db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      target: development
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./provena-api:/app
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_SECRET_KEY: dev-secret-key-not-for-production
+      DATABASE_URL: postgres://provena:provena@db:5432/provena
+      REDIS_URL: redis://redis:6379/0
+      STRIPE_SECRET_KEY: ""
+      STRIPE_PUBLISHABLE_KEY: ""
+      STRIPE_WEBHOOK_SECRET: ""
+    ports:
+      - "8000:8000"
+
+  worker:
+    build:
+      target: development
+    volumes:
+      - ./provena-api:/app
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_SECRET_KEY: dev-secret-key-not-for-production
+      DATABASE_URL: postgres://provena:provena@db:5432/provena
+      REDIS_URL: redis://redis:6379/0
+
+  beat:
+    build:
+      target: development
+    volumes:
+      - ./provena-api:/app
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_SECRET_KEY: dev-secret-key-not-for-production
+      DATABASE_URL: postgres://provena:provena@db:5432/provena
+      REDIS_URL: redis://redis:6379/0
+
+  web:
+    build:
+      context: ./provena-web
+      target: development
+    volumes:
+      - ./provena-web:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+
+  nginx:
+    ports:
+      - "80:80"
