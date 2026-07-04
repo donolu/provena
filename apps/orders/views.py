@@ -11,14 +11,18 @@ from apps.pagination import PaginatedListMixin
 from apps.suppliers.permissions import IsApprovedSupplier
 
 from . import services
-from .models import Order, OrderDispute, OrderStatus, SubOrder
+from .models import Order, OrderDispute, OrderReturn, OrderStatus, SubOrder
 from .serializers import (
     DispatchSerializer,
     DisputeCreateSerializer,
     DisputeSerializer,
+    OrderReturnSerializer,
     OrderSerializer,
     PlaceOrderSerializer,
     ResolveDisputeSerializer,
+    ReturnActionSerializer,
+    ReturnCreateSerializer,
+    ReturnRefundSerializer,
     SubOrderListSerializer,
     SubOrderSerializer,
 )
@@ -151,6 +155,30 @@ class OrderCancelView(APIView):
             pk=order.pk
         )
         return Response(OrderSerializer(order).data)
+
+
+@extend_schema(tags=["Orders (Buyer)"])
+class RequestReturnView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Request a return on a sub-order",
+        request=ReturnCreateSerializer,
+        responses={
+            201: OrderReturnSerializer,
+            400: OpenApiResponse(description="Sub-order not delivered or outside return window"),
+        },
+    )
+    def post(self, request: Request, reference: str, pk) -> Response:
+        order = get_object_or_404(Order, reference=reference, buyer=request.user)
+        sub_order = get_object_or_404(SubOrder, id=pk, order=order)
+        ser = ReturnCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            ret = services.request_return(sub_order, request.user, ser.validated_data["reason"])
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(OrderReturnSerializer(ret).data, status=status.HTTP_201_CREATED)
 
 
 @extend_schema(tags=["Orders (Buyer)"])
@@ -289,6 +317,78 @@ class SupplierDeliverView(APIView):
         return Response(SubOrderSerializer(sub).data)
 
 
+@extend_schema(tags=["Orders (Supplier)"])
+class SupplierReturnListView(PaginatedListMixin, APIView):
+    permission_classes = [IsApprovedSupplier]
+
+    @extend_schema(
+        summary="List return requests for own sub-orders",
+        parameters=[
+            OpenApiParameter(
+                "status",
+                description="Filter by return status (REQUESTED/APPROVED/REJECTED/REFUNDED)",
+                required=False,
+            ),
+        ],
+        responses={200: OrderReturnSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        qs = (
+            OrderReturn.objects.filter(sub_order__supplier=request.user.supplier)
+            .select_related("raised_by", "sub_order__order", "sub_order__supplier")
+            .order_by("-created_at")
+        )
+        if status_filter := request.query_params.get("status"):
+            qs = qs.filter(status=status_filter)
+        return self.paginate(qs, OrderReturnSerializer, request)
+
+
+@extend_schema(tags=["Orders (Supplier)"])
+class SupplierApproveReturnView(APIView):
+    permission_classes = [IsApprovedSupplier]
+
+    @extend_schema(
+        summary="Approve a return request",
+        request=ReturnActionSerializer,
+        responses={
+            200: OrderReturnSerializer,
+            400: OpenApiResponse(description="Return not in REQUESTED state"),
+        },
+    )
+    def post(self, request: Request, pk) -> Response:
+        ret = get_object_or_404(OrderReturn, id=pk, sub_order__supplier=request.user.supplier)
+        ser = ReturnActionSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            ret = services.approve_return(ret, notes=ser.validated_data.get("notes", ""))
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(OrderReturnSerializer(ret).data)
+
+
+@extend_schema(tags=["Orders (Supplier)"])
+class SupplierRejectReturnView(APIView):
+    permission_classes = [IsApprovedSupplier]
+
+    @extend_schema(
+        summary="Reject a return request",
+        request=ReturnActionSerializer,
+        responses={
+            200: OrderReturnSerializer,
+            400: OpenApiResponse(description="Return not in REQUESTED state"),
+        },
+    )
+    def post(self, request: Request, pk) -> Response:
+        ret = get_object_or_404(OrderReturn, id=pk, sub_order__supplier=request.user.supplier)
+        ser = ReturnActionSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            ret = services.reject_return(ret, notes=ser.validated_data.get("notes", ""))
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(OrderReturnSerializer(ret).data)
+
+
 # ---------------------------------------------------------------------------
 # Admin views
 # ---------------------------------------------------------------------------
@@ -401,3 +501,52 @@ class AdminRejectDisputeView(APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(DisputeSerializer(dispute).data)
+
+
+@extend_schema(tags=["Admin: Orders"])
+class AdminReturnListView(PaginatedListMixin, APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        summary="List all return requests",
+        parameters=[
+            OpenApiParameter(
+                "status",
+                description="Filter by return status (REQUESTED/APPROVED/REJECTED/REFUNDED)",
+                required=False,
+            ),
+        ],
+        responses={200: OrderReturnSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        qs = OrderReturn.objects.select_related(
+            "raised_by", "sub_order__order", "sub_order__supplier"
+        )
+        if status_filter := request.query_params.get("status"):
+            qs = qs.filter(status=status_filter)
+        return self.paginate(qs, OrderReturnSerializer, request)
+
+
+@extend_schema(tags=["Admin: Orders"])
+class AdminProcessReturnRefundView(APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        summary="Process refund for an approved return",
+        request=ReturnRefundSerializer,
+        responses={
+            200: OrderReturnSerializer,
+            400: OpenApiResponse(description="Return not approved or refund invalid"),
+        },
+    )
+    def post(self, request: Request, pk) -> Response:
+        ret = get_object_or_404(OrderReturn, id=pk)
+        ser = ReturnRefundSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        try:
+            ret = services.process_return_refund(
+                ret, refund_amount=ser.validated_data.get("amount")
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(OrderReturnSerializer(ret).data)

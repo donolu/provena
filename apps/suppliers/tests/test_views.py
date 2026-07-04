@@ -130,12 +130,12 @@ class TestAdminSupplierViews:
     def test_admin_can_list_all_suppliers(self, admin_client, pending_supplier, approved_supplier):
         res = admin_client.get(ADMIN_LIST_URL)
         assert res.status_code == status.HTTP_200_OK
-        assert len(res.data) == 1  # both pending and approved from the fixture
+        assert res.data["count"] == 1  # approved_supplier depends on pending_supplier — same record
 
     def test_admin_can_filter_by_status(self, admin_client, pending_supplier):
         res = admin_client.get(f"{ADMIN_LIST_URL}?status=pending")
         assert res.status_code == status.HTTP_200_OK
-        assert all(s["status"] == "PENDING" for s in res.data)
+        assert all(s["status"] == "PENDING" for s in res.data["results"])
 
     def test_non_admin_cannot_access_admin_list(self, buyer_client):
         res = buyer_client.get(ADMIN_LIST_URL)

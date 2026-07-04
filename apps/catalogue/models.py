@@ -131,3 +131,21 @@ class ProductImage(models.Model):
 
     def __str__(self) -> str:
         return f"{self.product.name} image ({self.position})"
+
+
+class Banner(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=120)
+    subtitle = models.TextField(blank=True)
+    image_url = models.URLField()
+    link = models.URLField(blank=True)
+    is_active = models.BooleanField(default=True)
+    position = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["position"]
+
+    def __str__(self) -> str:
+        return self.title

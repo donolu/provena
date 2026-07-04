@@ -100,6 +100,42 @@ class OrderItem(models.Model):
         return self.unit_price * self.quantity
 
 
+class ReturnStatus(models.TextChoices):
+    REQUESTED = "REQUESTED", "Requested"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+    REFUNDED = "REFUNDED", "Refunded"
+
+
+RETURN_WINDOW_DAYS = 14
+
+
+class OrderReturn(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sub_order = models.ForeignKey(SubOrder, on_delete=models.CASCADE, related_name="returns")
+    raised_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="return_requests",
+    )
+    reason = models.TextField()
+    status = models.CharField(
+        max_length=12, choices=ReturnStatus.choices, default=ReturnStatus.REQUESTED
+    )
+    supplier_notes = models.TextField(blank=True)
+    refund_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Return on {self.sub_order} ({self.status})"
+
+
 class OrderDispute(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sub_order = models.ForeignKey(SubOrder, on_delete=models.CASCADE, related_name="disputes")

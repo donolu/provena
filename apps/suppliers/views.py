@@ -6,6 +6,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.audit import audit_action
 from apps.accounts.permissions import IsAdmin
 from apps.pagination import PaginatedListMixin
 
@@ -303,6 +304,9 @@ class AdminSupplierApproveView(APIView):
             404: OpenApiResponse(description="Not found"),
         },
     )
+    @audit_action(
+        "supplier.approved", target_type="Supplier", get_target_id=lambda req, kw: kw.get("pk")
+    )
     def post(self, request: Request, pk: str) -> Response:
         supplier = get_object_or_404(Supplier, pk=pk)
         services.approve_supplier(supplier, request.user)
@@ -321,6 +325,9 @@ class AdminSupplierSuspendView(APIView):
             200: OpenApiResponse(description="`{status: 'SUSPENDED'}`"),
             404: OpenApiResponse(description="Not found"),
         },
+    )
+    @audit_action(
+        "supplier.suspended", target_type="Supplier", get_target_id=lambda req, kw: kw.get("pk")
     )
     def post(self, request: Request, pk: str) -> Response:
         supplier = get_object_or_404(Supplier, pk=pk)
@@ -342,6 +349,9 @@ class AdminSupplierRejectView(APIView):
             200: OpenApiResponse(description="`{status: 'REJECTED'}`"),
             404: OpenApiResponse(description="Not found"),
         },
+    )
+    @audit_action(
+        "supplier.rejected", target_type="Supplier", get_target_id=lambda req, kw: kw.get("pk")
     )
     def post(self, request: Request, pk: str) -> Response:
         supplier = get_object_or_404(Supplier, pk=pk)

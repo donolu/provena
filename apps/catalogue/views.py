@@ -12,7 +12,7 @@ from apps.pagination import PaginatedListMixin
 from apps.suppliers.permissions import IsApprovedSupplier
 
 from . import services
-from .models import Category, Product, ProductImage, ProductStatus, ProductVariant
+from .models import Banner, Category, Product, ProductImage, ProductStatus, ProductVariant
 from .serializers import (
     AdminProductSerializer,
     CategorySerializer,
@@ -596,3 +596,61 @@ class AdminProductFeatureView(APIView):
         else:
             product = services.feature_product(product, request.user)
         return Response(AdminProductSerializer(product).data)
+
+
+class BannerListView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Catalogue"],
+        summary="List active banners",
+        description="Returns all active homepage banners ordered by position.",
+    )
+    def get(self, request: Request) -> Response:
+        from .serializers import BannerSerializer
+
+        qs = Banner.objects.filter(is_active=True)
+        return Response(BannerSerializer(qs, many=True).data)
+
+
+class AdminBannerListCreateView(PaginatedListMixin, APIView):
+    permission_classes = [IsAdmin]
+
+    @extend_schema(tags=["Admin: Banners"], summary="List all banners")
+    def get(self, request: Request) -> Response:
+        from .serializers import BannerSerializer
+
+        return self.paginate(Banner.objects.all(), BannerSerializer, request)
+
+    @extend_schema(
+        tags=["Admin: Banners"],
+        summary="Create a banner",
+        responses={201: None},
+    )
+    def post(self, request: Request) -> Response:
+        from .serializers import BannerSerializer, BannerWriteSerializer
+
+        s = BannerWriteSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        banner = Banner.objects.create(**s.validated_data)
+        return Response(BannerSerializer(banner).data, status=status.HTTP_201_CREATED)
+
+
+class AdminBannerDetailView(APIView):
+    permission_classes = [IsAdmin]
+
+    @extend_schema(tags=["Admin: Banners"], summary="Update a banner")
+    def patch(self, request: Request, pk: str) -> Response:
+        from .serializers import BannerSerializer, BannerWriteSerializer
+
+        banner = get_object_or_404(Banner, pk=pk)
+        s = BannerWriteSerializer(banner, data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response(BannerSerializer(banner).data)
+
+    @extend_schema(tags=["Admin: Banners"], summary="Delete a banner")
+    def delete(self, request: Request, pk: str) -> Response:
+        banner = get_object_or_404(Banner, pk=pk)
+        banner.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

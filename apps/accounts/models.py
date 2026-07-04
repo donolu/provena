@@ -53,6 +53,23 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
 
+class AuditLog(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    actor = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name="audit_logs")
+    action = models.CharField(max_length=100)
+    target_type = models.CharField(max_length=100, blank=True)
+    target_id = models.CharField(max_length=100, blank=True)
+    metadata = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        actor_email = self.actor.email if self.actor else "system"
+        return f"{actor_email} · {self.action} · {self.created_at:%Y-%m-%d %H:%M}"
+
+
 class PasswordResetToken(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="password_reset_tokens")

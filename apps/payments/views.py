@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from stripe import SignatureVerificationError as StripeSignatureError
 
+from apps.accounts.audit import audit_action
 from apps.orders.models import Order
 from apps.pagination import StandardPagination
 from apps.suppliers.permissions import IsApprovedSupplier
@@ -189,6 +190,11 @@ class AdminRefundView(APIView):
             200: PaymentSerializer,
             400: OpenApiResponse(description="Invalid amount or payment not refundable"),
         },
+    )
+    @audit_action(
+        "payment.refunded",
+        target_type="Payment",
+        get_target_id=lambda req, kw: kw.get("payment_id"),
     )
     def post(self, request, payment_id):
         payment = get_object_or_404(Payment, id=payment_id)

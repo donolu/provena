@@ -46,4 +46,5 @@ urlpatterns = [
         views.AdminDeleteUserView.as_view(),
         name="admin-user-delete",
     ),
+    path("admin/audit-log/", views.AdminAuditLogView.as_view(), name="admin-audit-log"),
 ]
