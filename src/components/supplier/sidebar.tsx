@@ -6,19 +6,26 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Package,
+  RotateCcw,
   ShoppingBag,
   Wallet,
+  Warehouse,
   Menu,
   X,
   LogOut,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { getSupplierReturns } from '@/lib/api/orders'
 import { useAuthStore } from '@/store/auth'
+import { useAuthGuard } from '@/hooks/use-auth-guard'
 
-const NAV = [
-  { href: '/supplier/dashboard', label: 'Overview',  icon: LayoutDashboard },
-  { href: '/supplier/products',  label: 'Products',  icon: Package },
-  { href: '/supplier/orders',    label: 'Orders',    icon: ShoppingBag },
-  { href: '/supplier/payouts',   label: 'Payouts',   icon: Wallet },
+const BASE_NAV = [
+  { href: '/supplier/dashboard',  label: 'Overview',   icon: LayoutDashboard },
+  { href: '/supplier/products',   label: 'Products',   icon: Package },
+  { href: '/supplier/inventory',  label: 'Inventory',  icon: Warehouse },
+  { href: '/supplier/orders',     label: 'Orders',     icon: ShoppingBag },
+  { href: '/supplier/returns',    label: 'Returns',    icon: RotateCcw },
+  { href: '/supplier/payouts',    label: 'Payouts',    icon: Wallet },
 ]
 
 function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
@@ -26,6 +33,17 @@ function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
   const router = useRouter()
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
+
+  const { data: requestedReturns } = useQuery({
+    queryKey: ['supplier', 'returns', 'REQUESTED'],
+    queryFn: () => getSupplierReturns('REQUESTED'),
+  })
+  const pendingReturnCount = requestedReturns?.count ?? 0
+
+  const NAV = BASE_NAV.map((item) => ({
+    ...item,
+    badge: item.href === '/supplier/returns' ? pendingReturnCount : 0,
+  }))
 
   function handleLogout() {
     logout()
@@ -46,7 +64,7 @@ function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
 
       {/* Nav links */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.map(({ href, label, icon: Icon, badge }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
           return (
             <Link
@@ -64,7 +82,12 @@ function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
                 <span className="absolute left-0 w-0.5 h-6 bg-meadow rounded-r" aria-hidden="true" />
               )}
               <Icon className="w-4 h-4 flex-shrink-0" strokeWidth={1.5} />
-              {label}
+              <span className="flex-1">{label}</span>
+              {badge > 0 && (
+                <span className="ml-auto text-[10px] font-mono bg-marigold text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  {badge}
+                </span>
+              )}
             </Link>
           )
         })}
@@ -100,6 +123,7 @@ function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
 }
 
 export function SupplierShell({ children }: { children: React.ReactNode }) {
+  useAuthGuard('SUPPLIER')
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (

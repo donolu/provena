@@ -1,7 +1,16 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { Download } from 'lucide-react'
 import { getSalesSummary, getRevenueOverTime, getTopProducts, getSupplierPerformance } from '@/lib/api/admin'
+
+function buildExportUrl(days = 14): string {
+  const to = new Date()
+  const from = new Date(Date.now() - days * 86400000)
+  const fmt = (d: Date) => d.toISOString().slice(0, 10)
+  const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+  return `${base}/api/v1/analytics/export/csv/?from_date=${fmt(from)}&to_date=${fmt(to)}`
+}
 
 export default function AnalyticsPage() {
   const { data: summary } = useQuery({
@@ -29,9 +38,19 @@ export default function AnalyticsPage() {
 
   return (
     <div className="px-6 py-8 max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="font-display italic text-2xl text-forest">Analytics</h1>
-        <p className="text-sm text-soil font-sans mt-0.5">Revenue · last 14 days</p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="font-display italic text-2xl text-forest">Analytics</h1>
+          <p className="text-sm text-soil font-sans mt-0.5">Revenue · last 14 days</p>
+        </div>
+        <a
+          href={buildExportUrl(14)}
+          download
+          className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Export CSV
+        </a>
       </div>
 
       <div className="bg-white rounded-lg border border-hoarfrost p-6 mb-6">

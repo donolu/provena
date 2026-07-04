@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import { useState } from 'react'
@@ -7,7 +8,7 @@ import { ArrowRight } from 'lucide-react'
 import { Nav } from '@/components/nav'
 import { ProductCard } from '@/components/product-card'
 import { CartDrawer } from '@/components/cart-drawer'
-import { getProducts } from '@/lib/api/catalogue'
+import { getProducts, getActiveBanners } from '@/lib/api/catalogue'
 import { getCart, addToCart, updateCartItem, removeCartItem } from '@/lib/api/cart'
 import { useAuthStore } from '@/store/auth'
 import type { CartItem } from '@/lib/api/types'
@@ -22,6 +23,11 @@ export default function Home() {
   const { data: featuredData } = useQuery({
     queryKey: ['products', 'featured'],
     queryFn: () => getProducts({ featured: true, page_size: 8 }),
+  })
+
+  const { data: banners = [] } = useQuery({
+    queryKey: ['banners', 'active'],
+    queryFn: getActiveBanners,
   })
 
   const { data: serverCart } = useQuery({
@@ -136,6 +142,36 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Promotional banners */}
+      {banners.length > 0 && (
+        <section className="max-w-6xl mx-auto px-6 pt-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {banners.map((banner) => (
+              <div
+                key={banner.id}
+                className="relative rounded-xl overflow-hidden aspect-[16/6] bg-stone-200"
+              >
+                <img
+                  src={banner.image_url}
+                  alt={banner.title}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-forest/70 to-transparent" />
+                <div className="absolute bottom-0 left-0 p-4">
+                  <p className="font-display italic text-white text-lg leading-tight">{banner.title}</p>
+                  {banner.subtitle && (
+                    <p className="text-xs font-sans text-white/75 mt-0.5">{banner.subtitle}</p>
+                  )}
+                </div>
+                {banner.link && (
+                  <Link href={banner.link} className="absolute inset-0" aria-label={banner.title} />
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Featured products */}
       {featured.length > 0 && (

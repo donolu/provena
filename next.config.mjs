@@ -1,6 +1,16 @@
+import { withSentryConfig } from '@sentry/nextjs'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Image domains can be added here when connecting to the real API
+  output: 'standalone',
 }
 
-export default nextConfig
+export default withSentryConfig(nextConfig, {
+  // Suppress the Sentry CLI output during build
+  silent: !process.env.CI,
+  // Upload source maps only in CI/production
+  telemetry: false,
+  // Disable auto-instrumentation file injection when DSN is not set
+  autoInstrumentServerFunctions: false,
+  hideSourceMaps: true,
+})

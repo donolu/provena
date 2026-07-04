@@ -69,3 +69,16 @@ export async function confirmPasswordReset(
     new_password_confirm: newPasswordConfirm,
   })
 }
+
+export async function getTotpSetupUri(): Promise<{ otpauth_uri: string }> {
+  const { data } = await apiClient.get<{ otpauth_uri: string }>('/auth/totp/setup/')
+  return data
+}
+
+export async function enableTotp(code: string): Promise<void> {
+  await apiClient.post('/auth/totp/enable/', { code })
+}
+
+export async function disableTotp(code: string): Promise<void> {
+  await apiClient.post('/auth/totp/disable/', { code })
+}

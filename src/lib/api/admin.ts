@@ -1,10 +1,13 @@
 import { apiClient } from './client'
 import type {
   AdminUser,
+  AuditLog,
+  Banner,
   PaginatedResponse,
   Payout,
   Product,
   RevenueDataPoint,
+  Review,
   SalesSummary,
   SupplierPerformanceStat,
   TopProduct,
@@ -98,4 +101,46 @@ export async function activateUser(userId: string): Promise<AdminUser> {
 
 export async function deleteUser(userId: string): Promise<void> {
   await apiClient.delete(`/auth/admin/users/${userId}/`)
+}
+
+// ── Admin Reviews ─────────────────────────────────────────────────────────────
+
+export async function getAdminReviews(params?: {
+  is_approved?: boolean
+}): Promise<Review[]> {
+  const { data } = await apiClient.get<Review[]>('/marketplace/admin/reviews/', { params })
+  return data
+}
+
+export async function adminApproveReview(id: string): Promise<Review> {
+  const { data } = await apiClient.post<Review>(`/marketplace/admin/reviews/${id}/approve/`)
+  return data
+}
+
+export async function adminDeleteReview(id: string): Promise<void> {
+  await apiClient.delete(`/marketplace/admin/reviews/${id}/`)
+}
+
+export async function getAuditLog(params?: { action?: string; page?: number }): Promise<PaginatedResponse<AuditLog>> {
+  const { data } = await apiClient.get<PaginatedResponse<AuditLog>>('/auth/admin/audit-log/', { params })
+  return data
+}
+
+export async function getBanners(): Promise<PaginatedResponse<Banner>> {
+  const { data } = await apiClient.get<PaginatedResponse<Banner>>('/catalogue/admin/banners/')
+  return data
+}
+
+export async function createBanner(payload: Omit<Banner, 'id' | 'created_at' | 'updated_at'>): Promise<Banner> {
+  const { data } = await apiClient.post<Banner>('/catalogue/admin/banners/', payload)
+  return data
+}
+
+export async function updateBanner(id: string, payload: Partial<Omit<Banner, 'id' | 'created_at' | 'updated_at'>>): Promise<Banner> {
+  const { data } = await apiClient.patch<Banner>(`/catalogue/admin/banners/${id}/`, payload)
+  return data
+}
+
+export async function deleteBanner(id: string): Promise<void> {
+  await apiClient.delete(`/catalogue/admin/banners/${id}/`)
 }

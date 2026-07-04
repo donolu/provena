@@ -5,13 +5,17 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   AlertTriangle,
+  Image as ImageIcon,
   LayoutDashboard,
+  MessageSquare,
+  RotateCcw,
   Store,
   Users,
   ShoppingBag,
   BarChart2,
   Wallet,
   Package,
+  ClipboardList,
   Menu,
   X,
   LogOut,
@@ -19,8 +23,10 @@ import {
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { getAdminSuppliers } from '@/lib/api/suppliers'
-import { getAdminDisputes } from '@/lib/api/orders'
+import { getAdminDisputes, getAdminReturns } from '@/lib/api/orders'
+import { getAdminReviews } from '@/lib/api/admin'
 import { useAuthStore } from '@/store/auth'
+import { useAuthGuard } from '@/hooks/use-auth-guard'
 
 const BASE_NAV = [
   { href: '/admin/dashboard',  label: 'Overview',  icon: LayoutDashboard },
@@ -28,9 +34,13 @@ const BASE_NAV = [
   { href: '/admin/users',      label: 'Users',     icon: Users },
   { href: '/admin/orders',     label: 'Orders',    icon: ShoppingBag },
   { href: '/admin/disputes',   label: 'Disputes',  icon: AlertTriangle },
+  { href: '/admin/returns',    label: 'Returns',   icon: RotateCcw },
   { href: '/admin/products',   label: 'Products',  icon: Package },
+  { href: '/admin/reviews',    label: 'Reviews',   icon: MessageSquare },
   { href: '/admin/analytics',  label: 'Analytics', icon: BarChart2 },
   { href: '/admin/payouts',    label: 'Payouts',   icon: Wallet },
+  { href: '/admin/banners',    label: 'Banners',   icon: ImageIcon },
+  { href: '/admin/audit-log',  label: 'Audit log', icon: ClipboardList },
 ]
 
 function AdminNav({ onLinkClick }: { onLinkClick?: () => void }) {
@@ -51,12 +61,24 @@ function AdminNav({ onLinkClick }: { onLinkClick?: () => void }) {
     queryKey: ['admin', 'disputes', 'open'],
     queryFn: () => getAdminDisputes('OPEN'),
   })
+  const { data: approvedReturns } = useQuery({
+    queryKey: ['admin', 'returns', 'APPROVED'],
+    queryFn: () => getAdminReturns('APPROVED'),
+  })
+  const { data: pendingReviews } = useQuery({
+    queryKey: ['admin', 'reviews', 'pending'],
+    queryFn: () => getAdminReviews({ is_approved: false }),
+  })
   const pendingCount = suppliersData?.results.filter((s) => s.status === 'PENDING').length ?? 0
   const openDisputeCount = openDisputes?.length ?? 0
+  const approvedReturnCount = approvedReturns?.count ?? 0
+  const pendingReviewCount = pendingReviews?.length ?? 0
 
   const NAV = BASE_NAV.map((item) => {
     if (item.href === '/admin/suppliers') return { ...item, badge: pendingCount }
     if (item.href === '/admin/disputes') return { ...item, badge: openDisputeCount }
+    if (item.href === '/admin/returns') return { ...item, badge: approvedReturnCount }
+    if (item.href === '/admin/reviews') return { ...item, badge: pendingReviewCount }
     return { ...item, badge: null }
   })
 
@@ -123,6 +145,7 @@ function AdminNav({ onLinkClick }: { onLinkClick?: () => void }) {
 }
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
+  useAuthGuard('ADMIN')
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (

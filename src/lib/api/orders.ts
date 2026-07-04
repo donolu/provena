@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Order, OrderDispute, PaginatedResponse, SubOrderListItem } from './types'
+import type { Order, OrderDispute, OrderReturn, PaginatedResponse, Payment, SubOrderListItem } from './types'
 
 export interface PaymentIntentResponse {
   client_secret: string
@@ -17,6 +17,11 @@ export async function createPaymentIntent(
 }
 
 // ── Buyer ─────────────────────────────────────────────────────────────────────
+
+export async function getPayments(page = 1): Promise<PaginatedResponse<Payment>> {
+  const { data } = await apiClient.get<PaginatedResponse<Payment>>('/payments/', { params: { page } })
+  return data
+}
 
 export async function getOrders(page = 1): Promise<PaginatedResponse<Order>> {
   const { data } = await apiClient.get<PaginatedResponse<Order>>('/orders/', { params: { page } })
@@ -44,6 +49,67 @@ export async function placeOrder(payload: {
 
 export async function cancelOrder(reference: string): Promise<Order> {
   const { data } = await apiClient.post<Order>(`/orders/${reference}/cancel/`)
+  return data
+}
+
+export async function requestReturn(
+  reference: string,
+  subOrderId: string,
+  reason: string,
+): Promise<OrderReturn> {
+  const { data } = await apiClient.post<OrderReturn>(
+    `/orders/${reference}/sub-orders/${subOrderId}/return/`,
+    { reason },
+  )
+  return data
+}
+
+export async function getSupplierReturns(
+  returnStatus?: string,
+  page = 1,
+): Promise<PaginatedResponse<OrderReturn>> {
+  const { data } = await apiClient.get<PaginatedResponse<OrderReturn>>(
+    '/orders/supplier/returns/',
+    { params: { page, ...(returnStatus ? { status: returnStatus } : {}) } },
+  )
+  return data
+}
+
+export async function supplierApproveReturn(id: string, notes?: string): Promise<OrderReturn> {
+  const { data } = await apiClient.post<OrderReturn>(
+    `/orders/supplier/returns/${id}/approve/`,
+    { notes: notes ?? '' },
+  )
+  return data
+}
+
+export async function supplierRejectReturn(id: string, notes?: string): Promise<OrderReturn> {
+  const { data } = await apiClient.post<OrderReturn>(
+    `/orders/supplier/returns/${id}/reject/`,
+    { notes: notes ?? '' },
+  )
+  return data
+}
+
+export async function getAdminReturns(
+  returnStatus?: string,
+  page = 1,
+): Promise<PaginatedResponse<OrderReturn>> {
+  const { data } = await apiClient.get<PaginatedResponse<OrderReturn>>(
+    '/orders/admin/returns/',
+    { params: { page, ...(returnStatus ? { status: returnStatus } : {}) } },
+  )
+  return data
+}
+
+export async function adminProcessReturnRefund(
+  id: string,
+  amount?: number,
+): Promise<OrderReturn> {
+  const { data } = await apiClient.post<OrderReturn>(
+    `/orders/admin/returns/${id}/refund/`,
+    amount !== undefined ? { amount } : {},
+  )
   return data
 }
 

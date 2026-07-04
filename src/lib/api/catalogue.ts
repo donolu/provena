@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Category, PaginatedResponse, Product } from './types'
+import type { Banner, Category, PaginatedResponse, Product, Review } from './types'
 
 export async function getCategories(): Promise<Category[]> {
   const { data } = await apiClient.get<Category[]>('/catalogue/categories/')
@@ -33,5 +33,23 @@ export async function getProduct(slug: string): Promise<Product> {
 
 export async function getMyProducts(): Promise<PaginatedResponse<Product>> {
   const { data } = await apiClient.get<PaginatedResponse<Product>>('/catalogue/products/me/')
+  return data
+}
+
+export async function getProductReviews(variantId: string): Promise<Review[]> {
+  const { data } = await apiClient.get<Review[]>(`/marketplace/products/${variantId}/reviews/`)
+  return data
+}
+
+export async function submitReview(
+  variantId: string,
+  payload: { rating: number; title: string; body: string },
+): Promise<Review> {
+  const { data } = await apiClient.post<Review>(`/marketplace/products/${variantId}/reviews/`, payload)
+  return data
+}
+
+export async function getActiveBanners(): Promise<Banner[]> {
+  const { data } = await apiClient.get<Banner[]>('/catalogue/banners/')
   return data
 }

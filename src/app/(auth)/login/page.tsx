@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { login, loginTotp } from '@/lib/api/auth'
 import { useAuthStore } from '@/store/auth'
 import type { LoginResponse, TOTPLoginRequired } from '@/lib/api/types'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { login: storeLogin } = useAuthStore()
 
   const [email, setEmail]     = useState('')
@@ -35,7 +37,8 @@ export default function LoginPage() {
       } else {
         const { access, refresh, user } = result as LoginResponse
         storeLogin(user, access, refresh)
-        const dest = user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue'
+        const next = searchParams.get('next')
+        const dest = next ?? (user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue')
         router.push(dest)
       }
     } catch (err: unknown) {
@@ -55,7 +58,9 @@ export default function LoginPage() {
     try {
       const { access, refresh, user } = await loginTotp(totpToken, totpCode)
       storeLogin(user, access, refresh)
-      router.push('/catalogue')
+      const next = searchParams.get('next')
+      const dest = next ?? (user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue')
+      router.push(dest)
     } catch {
       setTotpError('Invalid code. Please try again.')
     } finally {
@@ -66,9 +71,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-mist flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <a href="/catalogue" className="block font-display italic text-2xl text-forest text-center mb-10">
+        <Link href="/catalogue" className="block font-display italic text-2xl text-forest text-center mb-10">
           Provena
-        </a>
+        </Link>
 
         {totpStep ? (
           <form onSubmit={handleTotp} noValidate>

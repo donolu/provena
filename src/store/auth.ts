@@ -11,7 +11,14 @@ interface AuthState {
   login: (user: UserProfile, accessToken: string, refreshToken: string) => void
   logout: () => void
   setAccessToken: (token: string) => void
+  setUser: (user: UserProfile) => void
   initialise: () => Promise<void>
+}
+
+function setSessionCookies(user: UserProfile) {
+  document.cookie = `has_session=1; path=/; SameSite=Lax`
+  document.cookie = `user_role=${user.role}; path=/; SameSite=Lax`
+  document.cookie = `totp_enabled=${user.totp_enabled ? '1' : '0'}; path=/; SameSite=Lax`
 }
 
 export const useAuthStore = create<AuthState>((set, get) => {
@@ -30,6 +37,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     login(user, accessToken, refreshToken) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('refresh_token', refreshToken)
+        setSessionCookies(user)
       }
       set({ user, accessToken })
     },
@@ -37,12 +45,22 @@ export const useAuthStore = create<AuthState>((set, get) => {
     logout() {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('refresh_token')
+        document.cookie = 'has_session=; path=/; max-age=0'
+        document.cookie = 'user_role=; path=/; max-age=0'
+        document.cookie = 'totp_enabled=; path=/; max-age=0'
       }
       set({ user: null, accessToken: null })
     },
 
     setAccessToken(token) {
       set({ accessToken: token })
+    },
+
+    setUser(user) {
+      if (typeof window !== 'undefined') {
+        setSessionCookies(user)
+      }
+      set({ user })
     },
 
     async initialise() {
@@ -69,9 +87,13 @@ export const useAuthStore = create<AuthState>((set, get) => {
         const { data: profile } = await apiClient.get('/auth/me/', {
           headers: { Authorization: `Bearer ${tokens.access}` },
         })
+        setSessionCookies(profile)
         set({ user: profile, accessToken: tokens.access, isInitialised: true })
       } catch {
         localStorage.removeItem('refresh_token')
+        document.cookie = 'has_session=; path=/; max-age=0'
+        document.cookie = 'user_role=; path=/; max-age=0'
+        document.cookie = 'totp_enabled=; path=/; max-age=0'
         set({ isInitialised: true })
       }
     },

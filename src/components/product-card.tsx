@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Heart } from 'lucide-react'
+import Link from 'next/link'
 import type { Product } from '@/lib/api/types'
 
 interface ProductCardProps {
@@ -99,12 +100,26 @@ export function ProductCard({ product, inWishlist, onAddToCart, onToggleWishlist
             {product.supplier_name}
           </p>
 
-          <h3 className="font-display text-[15px] leading-snug text-forest mb-3">
-            {product.name}
+          <h3 className="font-display text-[15px] leading-snug text-forest mb-1.5">
+            <Link
+              href={`/catalogue/${product.slug}`}
+              className="hover:text-meadow transition-colors"
+            >
+              {product.name}
+            </Link>
             <span className="font-sans not-italic text-[13px] text-soil font-normal ml-1.5">
               · {variant.name}
             </span>
           </h3>
+
+          {product.average_rating !== null && product.review_count > 0 && (
+            <div className="flex items-center gap-1 mb-2.5">
+              <span className="text-marigold text-xs leading-none">{'★'.repeat(Math.round(product.average_rating))}{'☆'.repeat(5 - Math.round(product.average_rating))}</span>
+              <span className="text-[10px] text-soil font-sans">
+                {product.average_rating.toFixed(1)} ({product.review_count})
+              </span>
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <div className="flex items-baseline gap-1.5">

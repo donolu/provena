@@ -2,11 +2,11 @@
 
 import { use, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, ChevronLeft, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronLeft, RotateCcw, XCircle } from 'lucide-react'
 import Link from 'next/link'
 import { Nav } from '@/components/nav'
 import { StatusBadge } from '@/components/supplier/status-badge'
-import { getOrder, cancelOrder, raiseDispute } from '@/lib/api/orders'
+import { getOrder, cancelOrder, raiseDispute, requestReturn } from '@/lib/api/orders'
 import { getCart } from '@/lib/api/cart'
 import { useAuthStore } from '@/store/auth'
 import type { SubOrder } from '@/lib/api/types'
@@ -26,9 +26,9 @@ const DISPUTE_STATUS_LABEL: Record<string, string> = {
   REJECTED: 'Rejected',
 }
 
-function within7Days(deliveredAt: string | null) {
+function withinDays(deliveredAt: string | null, days: number) {
   if (!deliveredAt) return true
-  return Date.now() - new Date(deliveredAt).getTime() < 7 * 24 * 60 * 60 * 1000
+  return Date.now() - new Date(deliveredAt).getTime() < days * 24 * 60 * 60 * 1000
 }
 
 function SubOrderCard({
@@ -60,7 +60,29 @@ function SubOrderCard({
   const canDispute =
     DISPUTABLE.has(sub.status) &&
     !sub.disputes.some((d) => d.status === 'OPEN') &&
-    (sub.status !== 'DELIVERED' || within7Days(sub.delivered_at))
+    (sub.status !== 'DELIVERED' || withinDays(sub.delivered_at, 7))
+
+  const [showReturnForm, setShowReturnForm] = useState(false)
+  const [returnReason, setReturnReason] = useState('')
+  const [returnError, setReturnError] = useState<string | null>(null)
+
+  const returnMutation = useMutation({
+    mutationFn: () => requestReturn(reference, sub.id, returnReason),
+    onSuccess: () => {
+      setShowReturnForm(false)
+      setReturnReason('')
+      setReturnError(null)
+      onDisputeRaised()
+    },
+    onError: (err: { response?: { data?: { detail?: string } } }) => {
+      setReturnError(err.response?.data?.detail ?? 'Could not submit return request.')
+    },
+  })
+
+  const canReturn =
+    sub.status === 'DELIVERED' &&
+    withinDays(sub.delivered_at, 14) &&
+    !sub.returns.some((r) => r.status === 'REQUESTED' || r.status === 'APPROVED')
 
   return (
     <div className="bg-white rounded-lg border border-hoarfrost overflow-hidden">
@@ -121,7 +143,55 @@ function SubOrderCard({
         </div>
       )}
 
-      {canDispute && !showForm && (
+      {sub.returns.length > 0 && (
+        <div className="px-5 py-3 border-t border-hoarfrost space-y-2">
+          {sub.returns.map((r) => {
+            const statusColour =
+              r.status === 'REQUESTED' ? 'text-marigold'
+              : r.status === 'APPROVED' ? 'text-meadow'
+              : r.status === 'REFUNDED' ? 'text-forest'
+              : 'text-soil'
+            return (
+              <div key={r.id} className="flex items-start gap-2">
+                <RotateCcw className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${statusColour}`} strokeWidth={1.5} />
+                <div className="min-w-0">
+                  <p className={`text-[11px] font-sans font-medium ${statusColour}`}>
+                    Return {r.status === 'REQUESTED' ? 'Requested' : r.status === 'APPROVED' ? 'Approved' : r.status === 'REFUNDED' ? 'Refunded' : 'Rejected'}
+                  </p>
+                  <p className="text-[11px] font-sans text-soil mt-0.5 truncate">{r.reason}</p>
+                  {r.supplier_notes && (
+                    <p className="text-[11px] font-sans text-soil/70 mt-0.5">{r.supplier_notes}</p>
+                  )}
+                  {r.refund_amount && (
+                    <p className="text-[11px] font-mono text-forest mt-0.5">£{r.refund_amount} refunded</p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {canReturn && !showReturnForm && (
+        <div className={`px-5 py-3 border-t border-hoarfrost flex items-center gap-4`}>
+          <button
+            onClick={() => setShowReturnForm(true)}
+            className="text-xs font-sans text-soil hover:text-forest underline-offset-2 hover:underline transition-colors"
+          >
+            Request a return
+          </button>
+          {canDispute && !showForm && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="text-xs font-sans text-soil hover:text-forest underline-offset-2 hover:underline transition-colors"
+            >
+              Raise a dispute
+            </button>
+          )}
+        </div>
+      )}
+
+      {!canReturn && canDispute && !showForm && (
         <div className="px-5 py-3 border-t border-hoarfrost">
           <button
             onClick={() => setShowForm(true)}
@@ -129,6 +199,39 @@ function SubOrderCard({
           >
             Raise a dispute
           </button>
+        </div>
+      )}
+
+      {showReturnForm && (
+        <div className="px-5 py-4 border-t border-hoarfrost space-y-3">
+          <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium">
+            Reason for return
+          </p>
+          <textarea
+            value={returnReason}
+            onChange={(e) => setReturnReason(e.target.value)}
+            rows={3}
+            placeholder="e.g. Wrong item received, item not as described…"
+            className="w-full text-xs font-sans border border-hoarfrost rounded px-3 py-2 focus:outline-none focus:border-meadow resize-none"
+          />
+          {returnError && (
+            <p className="text-xs font-sans text-red-600">{returnError}</p>
+          )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => returnMutation.mutate()}
+              disabled={!returnReason.trim() || returnMutation.isPending}
+              className="text-xs font-sans text-white bg-forest rounded px-3 py-1.5 hover:bg-meadow disabled:opacity-40 transition-colors"
+            >
+              Submit return request
+            </button>
+            <button
+              onClick={() => { setShowReturnForm(false); setReturnReason(''); setReturnError(null) }}
+              className="text-xs font-sans text-soil hover:text-forest transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 

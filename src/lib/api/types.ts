@@ -72,6 +72,22 @@ export interface Product {
   category_name: string | null
   variants: ProductVariant[]
   images: ProductImage[]
+  average_rating: number | null
+  review_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface Review {
+  id: string
+  variant: string
+  variant_sku: string
+  reviewer_email: string | null
+  rating: number
+  title: string
+  body: string
+  is_verified_purchase: boolean
+  is_approved: boolean
   created_at: string
   updated_at: string
 }
@@ -124,6 +140,21 @@ export interface WishlistItem {
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED'
 export type DisputeStatus = 'OPEN' | 'RESOLVED' | 'REJECTED'
+export type ReturnStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'REFUNDED'
+
+export interface OrderReturn {
+  id: string
+  sub_order_id: string
+  order_reference: string
+  supplier_name: string
+  reason: string
+  status: ReturnStatus
+  supplier_notes: string
+  refund_amount: string | null
+  raised_by_email: string | null
+  created_at: string
+  updated_at: string
+}
 
 export interface OrderDispute {
   id: string
@@ -156,6 +187,7 @@ export interface SubOrder {
   delivered_at: string | null
   items: OrderItem[]
   disputes: OrderDispute[]
+  returns: OrderReturn[]
   created_at: string
   updated_at: string
 }
@@ -292,6 +324,54 @@ export interface SupplierOwnSummary {
   avg_order_value: string
 }
 
+// ── Audit log ─────────────────────────────────────────────────────────────────
+
+export interface AuditLog {
+  id: string
+  actor_email: string | null
+  action: string
+  target_type: string
+  target_id: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+// ── Inventory ─────────────────────────────────────────────────────────────────
+
+export interface StockLevel {
+  id: string
+  variant_sku: string
+  product_name: string
+  quantity_available: number
+  quantity_reserved: number
+  quantity_on_hand: number
+  low_stock_threshold: number
+  is_low_stock: boolean
+  updated_at: string
+}
+
+export interface StockLot {
+  id: string
+  lot_number: string
+  quantity_received: number
+  quantity_remaining: number
+  received_at: string
+  expires_at: string | null
+  notes: string
+}
+
+export interface StockMovement {
+  id: string
+  movement_type: string
+  movement_type_display: string
+  quantity: number
+  quantity_after: number
+  reference: string
+  notes: string
+  performed_by_email: string | null
+  created_at: string
+}
+
 // ── Payments ──────────────────────────────────────────────────────────────────
 
 export type PayoutStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED'
@@ -319,6 +399,7 @@ export interface Payment {
   status: string
   status_display: string
   stripe_payment_intent_id: string
+  refunded_amount: string | null
   created_at: string
   updated_at: string
 }
@@ -328,5 +409,39 @@ export interface NotificationPreferences {
   email_order_dispatched: boolean
   email_new_order: boolean
   email_payout_received: boolean
+  updated_at: string
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export type NotificationType =
+  | 'LOW_STOCK'
+  | 'ORDER_PLACED'
+  | 'ORDER_DISPATCHED'
+  | 'ORDER_DELIVERED'
+  | 'PAYMENT_SUCCEEDED'
+  | 'GENERAL'
+
+export interface Notification {
+  id: string
+  notification_type: NotificationType
+  title: string
+  body: string
+  data: Record<string, unknown>
+  is_read: boolean
+  created_at: string
+}
+
+// ── Banners ───────────────────────────────────────────────────────────────────
+
+export interface Banner {
+  id: string
+  title: string
+  subtitle: string
+  image_url: string
+  link: string
+  is_active: boolean
+  position: number
+  created_at: string
   updated_at: string
 }
