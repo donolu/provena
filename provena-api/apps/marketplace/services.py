@@ -129,11 +129,14 @@ def create_review(user, variant_id, rating: int, title: str, body: str) -> Revie
 
     from apps.orders.models import OrderItem
 
-    is_verified = OrderItem.objects.filter(
+    has_delivered_order = OrderItem.objects.filter(
         variant=variant,
         sub_order__order__buyer=user,
         sub_order__status=OrderStatus.DELIVERED,
     ).exists()
+
+    if not has_delivered_order:
+        raise ValueError("You can only review products you have purchased and received.")
 
     return Review.objects.create(
         variant=variant,
@@ -141,7 +144,7 @@ def create_review(user, variant_id, rating: int, title: str, body: str) -> Revie
         rating=rating,
         title=title,
         body=body,
-        is_verified_purchase=is_verified,
+        is_verified_purchase=True,
         is_approved=False,
     )
 

@@ -120,3 +120,17 @@ def delivered_order(buyer, variant):
     order_services.dispatch_sub_order(sub)
     order_services.deliver_sub_order(sub)
     return order
+
+
+@pytest.fixture
+def second_delivered_order(second_buyer, variant):
+    """An order where second_buyer has a delivered sub-order for `variant`."""
+    order = order_services.place_order(
+        buyer=second_buyer,
+        items=[{"variant": variant, "quantity": 1}],
+        shipping=SHIPPING,
+    )
+    sub = order.sub_orders.first()
+    order_services.dispatch_sub_order(sub)
+    order_services.deliver_sub_order(sub)
+    return order
