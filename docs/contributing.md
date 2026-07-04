@@ -4,18 +4,37 @@ This guide covers the development workflow for Provena: branching, commit conven
 
 ---
 
+## Issue Tracking
+
+All work starts from a GitHub Issue. Before writing code:
+
+1. Check [existing issues](https://github.com/donolu/provena/issues) to avoid duplication
+2. If none exists, open one using the appropriate template (Bug report, Feature request, or Chore)
+3. Note the issue number — it becomes part of the branch name
+
+Linking a PR to an issue: include `Closes #<number>` in the PR body. GitHub will auto-close the issue when the PR merges.
+
+---
+
 ## Branching Strategy
 
 All development happens off `main`. There is no separate `develop` branch.
 
 | Branch prefix | Purpose | Example |
 |---|---|---|
-| `feature/` | New functionality | `feature/supplier-returns-ui` |
-| `fix/` | Bug fixes | `fix/cart-reservation-race` |
-| `chore/` | Tooling, dependencies, config | `chore/bump-ruff-1.0` |
-| `docs/` | Documentation only | `docs/deployment-guide` |
+| `feature/` | New functionality | `feature/42-add-search` |
+| `fix/` | Bug fixes | `fix/17-cart-reservation-race` |
+| `chore/` | Tooling, dependencies, config | `chore/88-bump-ruff` |
+| `docs/` | Documentation only | `docs/5-deployment-guide` |
+
+**Branch name format:** `<type>/<issue-number>-<short-description>`
+
+The issue number is required. The short description uses lowercase kebab-case. This is enforced in two places:
+- The `branch-name` pre-push hook (blocks the push locally before it reaches GitHub)
+- The `Branch name check` CI job on every pull request
 
 **Rules:**
+- Open a GitHub Issue first; use its number in the branch name
 - Branch from `main`; merge back to `main` via pull request
 - Delete the branch after merging
 - Never commit directly to `main`
@@ -38,6 +57,18 @@ Bump ruff to v0.15 for improved B-series rules
 - `Fix bug` (which bug?)
 - `Update code` (what changed?)
 - `WIP` commits in pull requests (squash before opening a PR)
+
+---
+
+## Branch Protection
+
+`main` has branch protection rules configured that require:
+- A pull request (no direct pushes)
+- All four CI checks to pass: `Lint`, `Tests` (API), `Lint and type-check`, `Unit tests` (Web)
+- The branch to be up to date with `main` before merging
+- No force pushes or branch deletion
+
+> **Note:** Branch protection requires GitHub Pro for private repositories. If the protection is not active yet, the rules above still apply by convention — the pre-push hook and CI workflow enforce the same constraints locally and on the PR.
 
 ---
 

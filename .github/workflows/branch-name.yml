@@ -1,0 +1,31 @@
+name: Branch name check
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
+
+jobs:
+  check:
+    name: Validate branch name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch name matches convention
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          pattern='^(feature|fix|chore|docs)/[0-9]+-[a-z][a-z0-9-]*$'
+          if [[ ! "$BRANCH" =~ $pattern ]]; then
+            echo "Branch name '$BRANCH' does not match the required pattern."
+            echo ""
+            echo "Expected format: <type>/<issue-number>-<short-description>"
+            echo "Examples:"
+            echo "  feature/42-add-search"
+            echo "  fix/17-cart-reservation-race"
+            echo "  chore/88-bump-ruff"
+            echo "  docs/5-deployment-guide"
+            echo ""
+            echo "Allowed types: feature, fix, chore, docs"
+            exit 1
+          fi
+          echo "Branch name '$BRANCH' is valid."

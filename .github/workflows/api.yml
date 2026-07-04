@@ -3,14 +3,8 @@ name: API CI
 on:
   push:
     branches: [main]
-    paths:
-      - 'provena-api/**'
-      - '.github/workflows/api.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'provena-api/**'
-      - '.github/workflows/api.yml'
 
 defaults:
   run:
