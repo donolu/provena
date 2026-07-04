@@ -74,7 +74,7 @@ class PaymentListView(generics.ListAPIView):
     @extend_schema(tags=["Payments (Buyer)"], summary="List own payments")
     def get_queryset(self):
         return (
-            Payment.objects.filter(order__buyer=self.request.user)
+            Payment.objects.filter(order__buyer=self.request.user)  # type: ignore[misc]
             .select_related("order")
             .order_by("-created_at")
         )
@@ -146,7 +146,7 @@ class SupplierPayoutListView(generics.ListAPIView):
     )
     def get_queryset(self):
         qs = (
-            Payout.objects.filter(supplier=self.request.user.supplier)
+            Payout.objects.filter(supplier=self.request.user.supplier)  # type: ignore[union-attr]
             .select_related("sub_order__order", "supplier")
             .order_by("-created_at")
         )

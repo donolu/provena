@@ -201,7 +201,7 @@ class AdminReviewListView(generics.ListAPIView):
             qs = qs.filter(is_approved=approved.lower() == "true")
         variant_id = self.request.query_params.get("variant")
         if variant_id:
-            qs = qs.filter(variant_id=variant_id)
+            qs = qs.filter(variant_id=variant_id)  # type: ignore[misc]
         return qs
 
 

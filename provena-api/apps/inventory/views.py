@@ -25,7 +25,7 @@ def _own_variant(request: Request, variant_id) -> ProductVariant:
     return get_object_or_404(
         ProductVariant,
         id=variant_id,
-        product__supplier=request.user.supplier,
+        product__supplier=request.user.supplier,  # type: ignore[union-attr]
     )
 
 
@@ -46,7 +46,7 @@ class InventoryListView(APIView):
     )
     def get(self, request: Request) -> Response:
         qs = (
-            StockLevel.objects.filter(variant__product__supplier=request.user.supplier)
+            StockLevel.objects.filter(variant__product__supplier=request.user.supplier)  # type: ignore[union-attr]
             .select_related("variant__product")
             .order_by("variant__sku")
         )

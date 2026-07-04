@@ -28,7 +28,7 @@ from .serializers import (
 
 def _own_product(request: Request, slug: str) -> Product:
     """Return the product owned by the requesting supplier, or 404."""
-    return get_object_or_404(Product, slug=slug, supplier=request.user.supplier)
+    return get_object_or_404(Product, slug=slug, supplier=request.user.supplier)  # type: ignore[union-attr]
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +233,7 @@ class ProductListCreateView(PaginatedListMixin, APIView):
         s.is_valid(raise_exception=True)
         d = s.validated_data
         product = services.create_product(
-            supplier=request.user.supplier,
+            supplier=request.user.supplier,  # type: ignore[union-attr]
             name=d["name"],
             description=d.get("description", ""),
             category=d.get("category"),
@@ -267,7 +267,7 @@ class SupplierProductListView(PaginatedListMixin, APIView):
         responses={200: ProductSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:
-        qs = request.user.supplier.products.select_related("category").prefetch_related(
+        qs = request.user.supplier.products.select_related("category").prefetch_related(  # type: ignore[union-attr]
             "variants", "images"
         )
         if status_filter := request.query_params.get("status"):
@@ -592,9 +592,9 @@ class AdminProductFeatureView(APIView):
     def post(self, request: Request, slug: str) -> Response:
         product = get_object_or_404(Product, slug=slug)
         if product.is_featured:
-            product = services.unfeature_product(product, request.user)
+            product = services.unfeature_product(product, request.user)  # type: ignore[arg-type]
         else:
-            product = services.feature_product(product, request.user)
+            product = services.feature_product(product, request.user)  # type: ignore[arg-type]
         return Response(AdminProductSerializer(product).data)
 
 
