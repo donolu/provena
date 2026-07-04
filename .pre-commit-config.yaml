@@ -44,8 +44,8 @@ repos:
     hooks:
       - id: mypy
         name: mypy
-        language: system
-        entry: bash -c 'cd provena-api && mypy apps/'
+        language: script
+        entry: .github/scripts/run-mypy.sh
         pass_filenames: false
         files: ^provena-api/.*\.py$
         stages: [pre-push]
