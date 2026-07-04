@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -11,7 +11,7 @@ from apps.orders.models import OrderStatus
 from .models import RESERVATION_MINUTES, Cart, CartItem, CartReservation, Review, WishlistItem
 
 
-def _reservation_expiry() -> timezone.datetime:
+def _reservation_expiry() -> datetime:
     return timezone.now() + timedelta(minutes=RESERVATION_MINUTES)
 
 

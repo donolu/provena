@@ -27,14 +27,14 @@ class CategorySerializer(serializers.ModelSerializer):
 
     def get_children(self, obj) -> list:
         active = obj.children.filter(is_active=True)
-        return CategorySerializer(active, many=True).data
+        return CategorySerializer(active, many=True).data  # type: ignore[return-value]
 
     def get_product_count(self, obj) -> int:
-        return obj.products.filter(status="ACTIVE").count()
+        return int(obj.products.filter(status="ACTIVE").count())
 
 
 class CategoryWriteSerializer(serializers.ModelSerializer):
-    parent = serializers.SlugRelatedField(
+    parent: serializers.SlugRelatedField = serializers.SlugRelatedField(  # type: ignore[assignment]
         slug_field="slug",
         queryset=Category.objects.all(),
         required=False,

@@ -62,7 +62,7 @@ def create_product(
     category: Category | None = None,
 ) -> Product:
     return Product.objects.create(
-        supplier=supplier,  # type: ignore[arg-type]
+        supplier=supplier,  # type: ignore[misc]
         name=name,
         slug=_unique_product_slug(name),
         description=description,
@@ -129,7 +129,7 @@ def add_variant(
         product=product,
         name=name,
         sku=sku,
-        price=price,  # type: ignore[arg-type]
+        price=price,  # type: ignore[misc]
         compare_at_price=compare_at_price,
         weight_grams=weight_grams,
     )

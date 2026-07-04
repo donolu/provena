@@ -51,7 +51,7 @@ class InventoryListView(APIView):
             .order_by("variant__sku")
         )
         if request.query_params.get("low_stock") == "true":
-            qs = [s for s in qs if s.is_low_stock]
+            qs = [s for s in qs if s.is_low_stock]  # type: ignore[assignment]
         return Response(StockLevelSerializer(qs, many=True).data)
 
 
@@ -189,5 +189,5 @@ class AdminInventoryListView(APIView):
         if supplier_slug := request.query_params.get("supplier"):
             qs = qs.filter(variant__product__supplier__slug=supplier_slug)
         if request.query_params.get("low_stock") == "true":
-            qs = [s for s in qs if s.is_low_stock]
+            qs = [s for s in qs if s.is_low_stock]  # type: ignore[assignment]
         return Response(StockLevelSerializer(qs, many=True).data)

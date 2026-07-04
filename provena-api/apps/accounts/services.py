@@ -72,7 +72,7 @@ def unlock_user(user: User) -> None:
 
 
 def is_locked(user: User) -> bool:
-    return cache.get(_attempts_key(user.email), 0) >= MAX_LOGIN_ATTEMPTS
+    return bool(cache.get(_attempts_key(user.email), 0) >= MAX_LOGIN_ATTEMPTS)
 
 
 def suspend_user(user: User) -> None:

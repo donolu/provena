@@ -11,8 +11,8 @@ class Role(models.TextChoices):
     ADMIN = "ADMIN", "Admin"
 
 
-class UserManager(BaseUserManager):
-    def create_user(self, email, password=None, **extra):
+class UserManager(BaseUserManager["User"]):
+    def create_user(self, email: str, password: str | None = None, **extra: object) -> "User":
         if not email:
             raise ValueError("Email is required")
         email = email.lower()
@@ -21,7 +21,7 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, password=None, **extra):
+    def create_superuser(self, email: str, password: str | None = None, **extra: object) -> "User":
         extra.setdefault("role", Role.ADMIN)
         extra.setdefault("is_staff", True)
         extra.setdefault("is_superuser", True)

@@ -60,7 +60,7 @@ def update_supplier_profile(supplier: Supplier, **kwargs: object) -> Supplier:
     supplier.save()
 
     if address_data is not None:
-        SupplierAddress.objects.update_or_create(supplier=supplier, defaults=address_data)
+        SupplierAddress.objects.update_or_create(supplier=supplier, defaults=address_data)  # type: ignore[arg-type]
 
     return supplier
 
@@ -132,7 +132,7 @@ def create_stripe_connect_account(supplier: Supplier) -> str:
     )
     supplier.stripe_account_id = account["id"]
     supplier.save(update_fields=["stripe_account_id", "updated_at"])
-    return account["id"]
+    return str(account["id"])
 
 
 def get_stripe_connect_onboarding_url(supplier: Supplier, return_url: str, refresh_url: str) -> str:
@@ -150,7 +150,7 @@ def get_stripe_connect_onboarding_url(supplier: Supplier, return_url: str, refre
         return_url=return_url,
         type="account_onboarding",
     )
-    return link["url"]
+    return str(link["url"])
 
 
 def get_performance_stats(supplier: Supplier) -> dict:
