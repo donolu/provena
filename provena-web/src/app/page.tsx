@@ -1,8 +1,8 @@
-/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import { Nav } from '@/components/nav'
@@ -152,10 +152,12 @@ export default function Home() {
                 key={banner.id}
                 className="relative rounded-xl overflow-hidden aspect-[16/6] bg-stone-200"
               >
-                <img
+                <Image
                   src={banner.image_url}
                   alt={banner.title}
-                  className="absolute inset-0 w-full h-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 576px"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-forest/70 to-transparent" />
                 <div className="absolute bottom-0 left-0 p-4">

@@ -1,7 +1,7 @@
-/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import { useState } from 'react'
+import NextImage from 'next/image'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Image as ImageIcon, Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
 import { getBanners, createBanner, updateBanner, deleteBanner } from '@/lib/api/admin'
@@ -181,10 +181,12 @@ export default function AdminBannersPage() {
           {banners.map((banner) => (
             <div key={banner.id} className="bg-white border border-stone-200 rounded-xl p-4 flex items-center gap-4">
               {banner.image_url && (
-                <img
+                <NextImage
                   src={banner.image_url}
                   alt={banner.title}
-                  className="w-20 h-12 object-cover rounded-lg shrink-0"
+                  width={80}
+                  height={48}
+                  className="object-cover rounded-lg shrink-0"
                 />
               )}
               <div className="flex-1 min-w-0">

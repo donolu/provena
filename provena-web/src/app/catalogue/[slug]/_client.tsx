@@ -1,7 +1,7 @@
-/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import { use, useState } from 'react'
+import Image from 'next/image'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Heart, ShoppingBasket, Star } from 'lucide-react'
 import Link from 'next/link'
@@ -191,12 +191,14 @@ export default function ProductDetailPage({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           {/* Image gallery */}
           <div className="space-y-3">
-            <div className="aspect-square bg-mist rounded-xl overflow-hidden border border-hoarfrost flex items-center justify-center">
+            <div className="relative aspect-square bg-mist rounded-xl overflow-hidden border border-hoarfrost flex items-center justify-center">
               {primaryImage ? (
-                <img
+                <Image
                   src={primaryImage.url}
                   alt={primaryImage.alt_text || product.name}
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 1024px) 100vw, 50vw"
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-[#1E3D28] to-[#3D6B4F] flex items-center justify-center">
@@ -210,11 +212,11 @@ export default function ProductDetailPage({
                   <button
                     key={img.id}
                     onClick={() => setSelectedImage(idx)}
-                    className={`w-16 h-16 rounded-lg overflow-hidden border-2 flex-shrink-0 transition-colors ${
+                    className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 flex-shrink-0 transition-colors ${
                       idx === selectedImage ? 'border-forest' : 'border-hoarfrost'
                     }`}
                   >
-                    <img src={img.url} alt={img.alt_text || ''} className="w-full h-full object-cover" />
+                    <Image src={img.url} alt={img.alt_text || ''} fill className="object-cover" sizes="64px" />
                   </button>
                 ))}
               </div>
