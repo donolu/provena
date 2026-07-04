@@ -1,75 +1,74 @@
 # provena-web
 
-Next.js 14 frontend for the Provena supply chain and marketplace platform.
+Next.js frontend for the Provena multi-supplier marketplace platform.
 
-## Prerequisites
+This directory is part of the [Provena monorepo](../README.md). All operational documentation (setup, deployment, contributing) lives in [`docs/`](../docs/).
 
-- Node.js 20+
-- The `provena-api` running at `http://localhost:8000`
+## Quick Links
 
-## Getting started
+| Document | Description |
+|---|---|
+| [Developer Onboarding](../docs/onboarding.md) | Local setup, running tests, first change |
+| [Production Deployment](../docs/deployment.md) | Docker Compose, environment variables, Vercel |
+| [Contributing](../docs/contributing.md) | Branching, code standards, PR checklist |
 
-```bash
-# Install dependencies
-npm install
-
-# Copy environment config
-cp .env.example .env.local
-# Edit .env.local with your Stripe publishable key
-
-# Start development server
-npm run dev
-```
-
-Frontend available at `http://localhost:3000`.
-
-## Bootstrapping
-
-This project should be initialised with:
-
-```bash
-npx create-next-app@latest provena-web \
-  --typescript \
-  --tailwind \
-  --app \
-  --src-dir \
-  --import-alias "@/*"
-```
-
-Then add:
-
-```bash
-npm install @tanstack/react-query zustand react-hook-form zod axios @stripe/stripe-js @stripe/react-stripe-js
-npm install -D @types/node vitest @testing-library/react @testing-library/user-event @playwright/test
-npx shadcn@latest init
-```
-
-## Project structure
+## Project Structure
 
 ```
 src/
 ├── app/
-│   ├── (marketing)/     # Home, about, contact
-│   ├── (marketplace)/   # Products, catalogue, search
-│   ├── (checkout)/      # Cart, checkout, confirmation
-│   ├── (auth)/          # Login, register, password reset
-│   ├── (buyer)/         # Order history, profile, wishlist
-│   ├── (supplier)/      # Product management, orders, payouts
-│   └── (admin)/         # Platform admin dashboard
+│   ├── (auth)/          # Login
+│   ├── (checkout)/      # Cart and Stripe checkout
+│   ├── account/         # Buyer payments, notifications, 2FA security
+│   ├── admin/           # Platform admin (suppliers, orders, analytics, banners, audit)
+│   ├── catalogue/       # Product listing (SSR) and detail (SSR + ISR)
+│   ├── orders/          # Order detail
+│   ├── supplier/        # Supplier dashboard, products, inventory, payouts
+│   └── page.tsx         # Homepage
 ├── components/
-│   ├── ui/              # shadcn/ui primitives
-│   ├── layout/          # Header, footer, navigation
+│   ├── admin/           # Admin shell, admin-specific components
 │   ├── catalogue/       # ProductCard, ProductGrid, FilterPanel
 │   ├── checkout/        # CartDrawer, CheckoutForm, StripeWrapper
-│   └── shared/          # NotificationBell, Avatar, LoadingSpinner
+│   ├── supplier/        # Supplier shell, supplier-specific components
+│   ├── ui/              # Shared primitives
+│   └── layout/          # Header, footer, navigation
 ├── lib/
-│   ├── api/             # Axios client and typed API functions
-│   ├── auth/            # Token management and route guards
+│   ├── api/             # Axios client and typed API functions per domain
+│   ├── auth/            # Token management
 │   └── utils/           # formatPrice, formatDate, cn()
-└── types/
-    └── index.ts         # Shared TypeScript interfaces
+├── store/
+│   ├── auth.ts          # Zustand auth store (login, logout, setUser, TOTP cookies)
+│   └── cart.ts          # Zustand cart store
+└── middleware.ts         # Route protection by role and TOTP enrolment
 ```
 
-## Documentation
+## Scripts
 
-See `provena-api/docs/` for BRD, TRD, Architecture, and Compliance documents.
+```bash
+npm run dev          # Development server with HMR
+npm run build        # Production build
+npm start            # Production server
+npm run lint         # ESLint (zero warnings)
+npm run type-check   # TypeScript check
+npm run test:unit    # Vitest unit tests
+npm run test:e2e     # Playwright E2E tests (requires running API)
+```
+
+## Environment Variables
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+NEXT_PUBLIC_SENTRY_DSN=          # optional
+```
+
+See `.env.example` for the full list. Copy to `.env.local` for local development.
+
+## Rendering Strategy
+
+| Route | Strategy | Notes |
+|---|---|---|
+| `/catalogue/` | SSR + ISR (60s) | SEO-sensitive; revalidates every minute |
+| `/catalogue/[slug]/` | SSR + ISR + `generateStaticParams` | Pre-rendered for top products; dynamic fallback |
+| `/admin/*`, `/supplier/*` | CSR | Auth-gated; no SEO requirement |
+| `/` | SSR | Homepage fetches active banners and featured products server-side |

@@ -37,7 +37,7 @@ Stripe's 1.4% + 20p UK card fee applies to every transaction. If margins require
 ## ADR-003: Separate Frontend and Backend Repos
 
 **Date:** 2026-06-30
-**Status:** Accepted
+**Status:** Superseded by ADR-007
 
 **Context:**
 Django and Next.js have different deployment cycles, different languages, different CI requirements, and would be deployed to different services (Render for API, Vercel for frontend).
@@ -95,3 +95,19 @@ Render for API and Celery workers; Render managed PostgreSQL and Redis; Vercel f
 
 **Consequences:**
 Lower operational overhead. Render's pricing is higher per compute unit than raw AWS, but the engineering time saved at this stage is worth more. Migration path to AWS is documented in the TRD (infrastructure section) and does not require application code changes.
+
+---
+
+## ADR-007: Monorepo over Separate Repositories
+
+**Date:** 2026-07-04
+**Status:** Accepted (supersedes ADR-003)
+
+**Context:**
+ADR-003 assumed that `provena-api` and `provena-web` would have independent deployment cycles and separate CI pipelines, justifying separate repositories. In practice, both services are always deployed together: a backend change almost always has a corresponding frontend change, and a single developer owns both. The separate-repo model created real friction: deployment configuration (`docker-compose.yml`, Nginx, load tests, OWASP ZAP config) had nowhere to live and was left untracked on disk; pre-commit hooks could not be installed at the git root because there was no root git repo; CI workflows were duplicated. The first time a root-level `docker-compose.yml` was created, it could not be committed to either repository.
+
+**Decision:**
+Migrate to a single monorepo (`donolu/provena`) using `git subtree add` to preserve the complete commit history of both `provena-api` and `provena-web`. Deployment configuration lives at the repo root. CI workflows for each sub-project live in the single root `.github/workflows/` directory, gated by `paths:` filters. Pre-commit runs from the root with `files:` patterns scoping hooks to the correct subdirectory.
+
+**Consequences:**
+`donolu/provena-api` and `donolu/provena-web` are archived (read-only). Full commit history for both projects is navigable in the monorepo via `git log provena-api/` and `git log provena-web/`. The assumption in ADR-003 about independent deployment cadences is revisited: if a future hire takes ownership of one layer and the teams genuinely diverge, the sub-projects can be extracted using `git subtree split` with full history intact. OpenAPI client code generation (planned, see backlog) will run from the monorepo root, writing generated types into `provena-web/src/lib/api/generated/`.

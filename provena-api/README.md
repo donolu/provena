@@ -1,85 +1,35 @@
 # provena-api
 
-Django REST Framework API for the Provena supply chain and marketplace platform.
+Django REST Framework API for the Provena multi-supplier marketplace platform.
 
-## Documentation
+This directory is part of the [Provena monorepo](../README.md). All operational documentation (setup, deployment, contributing) lives in [`docs/`](../docs/).
+
+## Quick Links
 
 | Document | Description |
 |---|---|
+| [Developer Onboarding](../docs/onboarding.md) | Local setup, running tests, first change |
+| [Production Deployment](../docs/deployment.md) | Docker Compose, environment variables, Render/Vercel |
+| [Contributing](../docs/contributing.md) | Branching, code standards, PR checklist |
 | [BRD](docs/BRD.md) | Business requirements: features, user stories, success metrics |
 | [TRD](docs/TRD.md) | Technical requirements: stack, API design, data architecture |
 | [Architecture](docs/ARCHITECTURE.md) | System design, component diagram, domain structure |
 | [Compliance](docs/COMPLIANCE.md) | PCI DSS, UK GDPR, OWASP Top 10, accessibility |
-| [Decisions](docs/DECISIONS.md) | Architecture decision records |
+| [Decisions](docs/DECISIONS.md) | Architecture decision records (ADR-001 through ADR-007) |
 
-## Prerequisites
-
-- Docker and Docker Compose
-- Python 3.12 (for local development without Docker)
-
-## Getting started
-
-```bash
-# Clone the repo
-git clone https://github.com/donolu/provena-api.git
-cd provena-api
-
-# Copy environment config
-cp .env.example .env
-# Edit .env and add your Stripe test keys
-
-# Start all services
-docker compose up
-
-# In a second terminal, run migrations
-docker compose exec api python manage.py migrate
-
-# Create an admin user
-docker compose exec api python manage.py createsuperuser
-```
-
-API available at `http://localhost:8000/api/v1/`
-Admin panel at `http://localhost:8000/admin/`
-
-## Development
-
-```bash
-# Install dependencies locally
-pip install -e ".[dev]"
-
-# Install git hooks (run once per clone)
-pre-commit install
-
-# Run tests
-pytest
-
-# Lint and format
-ruff check .
-ruff format .
-
-# Type check
-mypy apps/
-
-# Security scan
-bandit -r apps/
-safety check
-```
-
-Pre-commit runs ruff, ruff-format, and bandit automatically on every `git commit`. CI runs the same checks via `pre-commit run --all-files`.
-
-## Project structure
+## Project Structure
 
 ```
 apps/
-├── accounts/      # Auth, users, roles, 2FA
-├── catalogue/     # Categories, products, variants, images
-├── inventory/     # Stock levels, lots, audit log
+├── accounts/      # Auth, users, roles, TOTP 2FA, rate limiting, audit log
+├── catalogue/     # Categories, products, variants, images, banners
+├── inventory/     # Stock levels, lots, expiry tracking, movement log
 ├── marketplace/   # Cart, wishlist, reviews
-├── notifications/ # In-app and email notifications
-├── orders/        # Order lifecycle, disputes
-├── payments/      # Stripe integration, payouts, refunds
-├── suppliers/     # Vendor onboarding, KYC, performance
-└── analytics/     # Reports and dashboards
+├── notifications/ # In-app and transactional email notifications
+├── orders/        # Order lifecycle, disputes, returns
+├── payments/      # Stripe integration, supplier payouts, refunds
+├── suppliers/     # Vendor onboarding, KYC document review
+└── analytics/     # Read-only reports and dashboards
 config/
 ├── settings/
 │   ├── base.py         # Shared settings
@@ -89,10 +39,21 @@ config/
 └── urls.py
 ```
 
-## Environment variables
+## API
 
-See `.env.example` for the full list with descriptions.
+- Base URL: `/api/v1/`
+- Authentication: JWT (access token 15 min, refresh token 30 days with rotation)
+- OpenAPI schema: `/api/schema/swagger-ui/`
+- All responses follow DRF's standard format; errors include a `detail` or field-level key
 
-## Deployment
+## Running Tests
 
-See `docs/TRD.md` (Infrastructure section) for deployment instructions for Render (initial) and AWS (scaled).
+```bash
+# From this directory, with the venv active
+pytest
+
+# With coverage report
+pytest --cov=apps --cov-report=term-missing
+```
+
+Minimum 80% coverage required. CI fails below this threshold.
