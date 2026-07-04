@@ -80,3 +80,59 @@ jobs:
           cache-dependency-path: provena-api/pyproject.toml
       - run: pip install -e ".[dev]"
       - run: pytest
+
+  generate-client:
+    name: Generate OpenAPI client
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_SECRET_KEY: ci-schema-key
+      DATABASE_URL: sqlite:////tmp/ci_schema.db
+      REDIS_URL: redis://localhost:6379/0
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: provena-api/pyproject.toml
+      - name: Install API dependencies
+        run: pip install -e ".[dev]"
+        working-directory: provena-api
+      - name: Export OpenAPI schema
+        run: python manage.py spectacular --file ../provena-web/schema.yaml
+        working-directory: provena-api
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: provena-web/package-lock.json
+      - run: npm ci
+        working-directory: provena-web
+      - name: Generate TypeScript types
+        run: npm run generate:types
+        working-directory: provena-web
+      - name: Check generated types are up to date
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        run: |
+          if ! git diff --exit-code provena-web/src/lib/api/generated/; then
+            echo "Generated types are out of date. Run 'npm run generate:types' locally after exporting the schema and commit the result."
+            exit 1
+          fi
+      - name: Commit updated types
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add provena-web/src/lib/api/generated/
+          git diff --staged --quiet || (git commit -m "chore: regenerate OpenAPI types [skip ci]" && git push)
