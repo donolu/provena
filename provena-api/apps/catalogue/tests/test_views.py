@@ -73,36 +73,36 @@ class TestProductListCreate:
     def test_public_list_shows_active_only(self, client, active_product, draft_product):
         response = client.get("/api/v1/catalogue/products/")
         assert response.status_code == 200
-        slugs = [p["slug"] for p in response.json()]
+        slugs = [p["slug"] for p in response.json()["results"]]
         assert "organic-carrots" in slugs
         assert "heritage-tomatoes" not in slugs
 
     def test_filter_by_category(self, client, active_product, category):
         response = client.get(f"/api/v1/catalogue/products/?category={category.slug}")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_filter_by_supplier(self, client, active_product, approved_supplier):
         response = client.get(f"/api/v1/catalogue/products/?supplier={approved_supplier.slug}")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_search_by_name(self, client, active_product):
         response = client.get("/api/v1/catalogue/products/?search=Carrot")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_search_no_match(self, client, active_product):
         response = client.get("/api/v1/catalogue/products/?search=Broccoli")
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json()["count"] == 0
 
     def test_featured_filter(self, client, active_product):
         active_product.is_featured = True
         active_product.save()
         response = client.get("/api/v1/catalogue/products/?featured=true")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_create_product_as_supplier(self, supplier_client, category):
         response = supplier_client.post(
@@ -186,14 +186,14 @@ class TestSupplierProductList:
     def test_list_own_products(self, supplier_client, active_product, draft_product):
         response = supplier_client.get("/api/v1/catalogue/products/me/")
         assert response.status_code == 200
-        slugs = [p["slug"] for p in response.json()]
+        slugs = [p["slug"] for p in response.json()["results"]]
         assert "organic-carrots" in slugs
         assert "heritage-tomatoes" in slugs
 
     def test_filter_by_status(self, supplier_client, active_product, draft_product):
         response = supplier_client.get("/api/v1/catalogue/products/me/?status=DRAFT")
         assert response.status_code == 200
-        assert all(p["status"] == "DRAFT" for p in response.json())
+        assert all(p["status"] == "DRAFT" for p in response.json()["results"])
 
     def test_requires_approved_supplier(self, buyer_client):
         response = buyer_client.get("/api/v1/catalogue/products/me/")

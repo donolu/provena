@@ -202,11 +202,15 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
+        "apps.accounts.throttling.BuyerRateThrottle",
+        "apps.accounts.throttling.SupplierRateThrottle",
+        "apps.accounts.throttling.AdminRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/hour",
         "user": "1000/hour",
+        "supplier": "2000/hour",
+        "admin": "10000/hour",
     },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
@@ -237,6 +241,15 @@ CELERY_BEAT_SCHEDULE = {
     "release-expired-cart-reservations": {
         "task": "apps.marketplace.tasks.release_expired_cart_reservations",
         "schedule": 300,  # every 5 minutes
+    },
+    "check-low-stock-levels": {
+        "task": "apps.inventory.tasks.check_low_stock_levels",
+        "schedule": 86400,  # daily
+    },
+    "check-lot-expiry": {
+        "task": "apps.inventory.tasks.check_lot_expiry",
+        "schedule": 86400,  # daily
+        "kwargs": {"days_ahead": 3},
     },
 }
 

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Order, OrderDispute, OrderItem, SubOrder
+from .models import Order, OrderDispute, OrderItem, OrderReturn, SubOrder
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -17,6 +17,32 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "unit_price",
             "total_price",
         ]
+
+
+class OrderReturnSerializer(serializers.ModelSerializer):
+    raised_by_email = serializers.SerializerMethodField()
+    sub_order_id = serializers.UUIDField(source="sub_order.id", read_only=True)
+    order_reference = serializers.CharField(source="sub_order.order.reference", read_only=True)
+    supplier_name = serializers.CharField(source="sub_order.supplier.business_name", read_only=True)
+
+    class Meta:
+        model = OrderReturn
+        fields = [
+            "id",
+            "sub_order_id",
+            "order_reference",
+            "supplier_name",
+            "reason",
+            "status",
+            "supplier_notes",
+            "refund_amount",
+            "raised_by_email",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_raised_by_email(self, obj) -> str | None:
+        return obj.raised_by.email if obj.raised_by else None
 
 
 class DisputeSerializer(serializers.ModelSerializer):
@@ -45,6 +71,7 @@ class SubOrderSerializer(serializers.ModelSerializer):
     supplier_slug = serializers.SlugField(source="supplier.slug", read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
     disputes = DisputeSerializer(many=True, read_only=True)
+    returns = OrderReturnSerializer(many=True, read_only=True)
 
     class Meta:
         model = SubOrder
@@ -58,6 +85,7 @@ class SubOrderSerializer(serializers.ModelSerializer):
             "delivered_at",
             "items",
             "disputes",
+            "returns",
             "created_at",
             "updated_at",
         ]
@@ -165,3 +193,17 @@ class DisputeCreateSerializer(serializers.Serializer):
 
 class ResolveDisputeSerializer(serializers.Serializer):
     resolution = serializers.CharField()
+
+
+class ReturnCreateSerializer(serializers.Serializer):
+    reason = serializers.CharField()
+
+
+class ReturnActionSerializer(serializers.Serializer):
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class ReturnRefundSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(
+        max_digits=12, decimal_places=2, required=False, allow_null=True
+    )

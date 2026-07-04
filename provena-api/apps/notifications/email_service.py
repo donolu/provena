@@ -327,6 +327,49 @@ def send_shipping_update(sub_order) -> None:
     )
 
 
+def send_delivery_confirmation(sub_order) -> None:
+    """Notify the buyer that a sub-order has been delivered."""
+    if not _prefs_allow(sub_order.order.buyer, "email_order_dispatched"):
+        logger.debug("Skipping delivery email: user %s opted out", sub_order.order.buyer.email)
+        return
+    from django.conf import settings
+
+    frontend = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+    order = sub_order.order
+    order_url = f"{frontend}/orders/{order.reference}"
+    supplier_name = sub_order.supplier.business_name
+
+    body = (
+        _h1("Your order has been delivered")
+        + _p(f"Your items from {supplier_name} have been marked as delivered.")
+        + _divider()
+        + _label("Order reference")
+        + _value(order.reference)
+        + _label("Supplier")
+        + _value(supplier_name)
+        + _divider()
+        + _button("View order", order_url)
+        + _p(
+            "If there is a problem with your order you can raise a dispute or request a return "
+            "from the order detail page.",
+            muted=True,
+        )
+    )
+
+    html = _base(f"Order delivered · {order.reference}", body)
+    plain = (
+        f"Your order {order.reference} from {supplier_name} has been delivered.\n"
+        f"\nView order: {order_url}"
+    )
+
+    _send(
+        subject=f"Order delivered · {order.reference}",
+        plain=plain,
+        html=html,
+        to=[order.buyer.email],
+    )
+
+
 def send_payout_received(payout) -> None:
     """Notify a supplier their payout has been processed."""
     if not _prefs_allow(payout.supplier.user, "email_payout_received"):

@@ -22,4 +22,5 @@ urlpatterns = [
         views.SupplierPayoutsSummaryView.as_view(),
         name="analytics-supplier-own-payouts",
     ),
+    path("export/csv/", views.AnalyticsExportView.as_view(), name="analytics-export-csv"),
 ]

@@ -9,11 +9,14 @@ from apps.catalogue.models import ProductVariant
 from apps.inventory import services as inventory_services
 
 from .models import (
+    RETURN_WINDOW_DAYS,
     DisputeStatus,
     Order,
     OrderDispute,
     OrderItem,
+    OrderReturn,
     OrderStatus,
+    ReturnStatus,
     SubOrder,
     _generate_order_reference,
 )
@@ -194,7 +197,31 @@ def deliver_sub_order(sub_order: SubOrder) -> SubOrder:
     sub_order.delivered_at = timezone.now()
     sub_order.save(update_fields=["status", "delivered_at", "updated_at"])
     _sync_order_status(sub_order.order)
+    _trigger_sub_order_payout(sub_order)
+    try:
+        from apps.notifications.email_service import send_delivery_confirmation
+
+        send_delivery_confirmation(sub_order)
+    except Exception:
+        logger.exception(
+            "Failed to send delivery confirmation email for sub_order %s", sub_order.id
+        )
     return sub_order
+
+
+def _trigger_sub_order_payout(sub_order: SubOrder) -> None:
+    """Queue a payout transfer for the sub-order's Payout record if one exists."""
+    from apps.payments.models import Payout, PayoutStatus
+    from apps.payments.tasks import trigger_payout
+
+    try:
+        payout = Payout.objects.get(sub_order=sub_order, status=PayoutStatus.PENDING)
+        trigger_payout.delay(str(payout.id))
+        logger.info("Queued payout task for sub_order %s, payout %s", sub_order.id, payout.id)
+    except Payout.DoesNotExist:
+        logger.warning("No pending payout found for sub_order %s", sub_order.id)
+    except Exception:
+        logger.exception("Failed to queue payout task for sub_order %s", sub_order.id)
 
 
 @transaction.atomic
@@ -222,6 +249,64 @@ def cancel_order(order: Order) -> Order:
         cancel_sub_order(sub)
     order.refresh_from_db()
     return order
+
+
+@transaction.atomic
+def request_return(sub_order: SubOrder, raised_by, reason: str) -> OrderReturn:
+    if sub_order.status != OrderStatus.DELIVERED:
+        raise ValueError("Returns can only be requested for delivered sub-orders.")
+    if not sub_order.delivered_at or timezone.now() > sub_order.delivered_at + timedelta(
+        days=RETURN_WINDOW_DAYS
+    ):
+        raise ValueError(f"Returns must be requested within {RETURN_WINDOW_DAYS} days of delivery.")
+    return OrderReturn.objects.create(sub_order=sub_order, raised_by=raised_by, reason=reason)
+
+
+@transaction.atomic
+def approve_return(return_obj: OrderReturn, notes: str = "") -> OrderReturn:
+    if return_obj.status != ReturnStatus.REQUESTED:
+        raise ValueError("Can only approve a requested return.")
+    return_obj.status = ReturnStatus.APPROVED
+    return_obj.supplier_notes = notes
+    return_obj.save(update_fields=["status", "supplier_notes", "updated_at"])
+    return return_obj
+
+
+@transaction.atomic
+def reject_return(return_obj: OrderReturn, notes: str = "") -> OrderReturn:
+    if return_obj.status != ReturnStatus.REQUESTED:
+        raise ValueError("Can only reject a requested return.")
+    return_obj.status = ReturnStatus.REJECTED
+    return_obj.supplier_notes = notes
+    return_obj.save(update_fields=["status", "supplier_notes", "updated_at"])
+    return return_obj
+
+
+@transaction.atomic
+def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderReturn:
+    if return_obj.status != ReturnStatus.APPROVED:
+        raise ValueError("Can only refund an approved return.")
+    from decimal import Decimal
+
+    from apps.payments import services as payment_services
+
+    payment = getattr(return_obj.sub_order.order, "payment", None)
+    if payment is None:
+        raise ValueError("No payment found for this order.")
+    amount = Decimal(str(refund_amount)) if refund_amount is not None else None
+    payment_services.initiate_refund(payment, amount=amount)
+    for item in return_obj.sub_order.items.select_related("variant"):
+        from apps.inventory import services as inventory_services
+
+        inventory_services.return_stock(
+            item.variant,
+            item.quantity,
+            notes=f"Return {return_obj.id}",
+        )
+    return_obj.status = ReturnStatus.REFUNDED
+    return_obj.refund_amount = amount or payment.amount
+    return_obj.save(update_fields=["status", "refund_amount", "updated_at"])
+    return return_obj
 
 
 @transaction.atomic

@@ -1,10 +1,13 @@
 from django.urls import path
 
 from .views import (
+    AdminBannerDetailView,
+    AdminBannerListCreateView,
     AdminCategoryDetailView,
     AdminCategoryListCreateView,
     AdminProductFeatureView,
     AdminProductListView,
+    BannerListView,
     CategoryDetailView,
     CategoryListView,
     ProductArchiveView,
@@ -19,6 +22,11 @@ from .views import (
 )
 
 urlpatterns = [
+    # Banners (public)
+    path("banners/", BannerListView.as_view(), name="banner-list"),
+    # Admin: banners
+    path("admin/banners/", AdminBannerListCreateView.as_view(), name="admin-banner-list"),
+    path("admin/banners/<uuid:pk>/", AdminBannerDetailView.as_view(), name="admin-banner-detail"),
     # Categories (public)
     path("categories/", CategoryListView.as_view(), name="category-list"),
     path("categories/<slug:slug>/", CategoryDetailView.as_view(), name="category-detail"),

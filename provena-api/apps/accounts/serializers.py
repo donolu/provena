@@ -87,3 +87,25 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    actor_email = serializers.SerializerMethodField()
+
+    def get_actor_email(self, obj) -> str | None:
+        return obj.actor.email if obj.actor else None
+
+    class Meta:
+        from apps.accounts.models import AuditLog
+
+        model = AuditLog
+        fields = [
+            "id",
+            "actor_email",
+            "action",
+            "target_type",
+            "target_id",
+            "metadata",
+            "created_at",
+        ]
+        read_only_fields = fields

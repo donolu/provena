@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from .models import Category, Product, ProductImage, ProductVariant
+from .models import Banner, Category, Product, ProductImage, ProductVariant
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -118,6 +118,24 @@ class ProductSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True, allow_null=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
+    average_rating = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
+
+    def get_average_rating(self, obj) -> float | None:
+        from django.db.models import Avg
+
+        from apps.marketplace.models import Review
+
+        result = Review.objects.filter(variant__product=obj, is_approved=True).aggregate(
+            avg=Avg("rating")
+        )
+        avg = result["avg"]
+        return round(avg, 1) if avg is not None else None
+
+    def get_review_count(self, obj) -> int:
+        from apps.marketplace.models import Review
+
+        return Review.objects.filter(variant__product=obj, is_approved=True).count()
 
     class Meta:
         model = Product
@@ -132,6 +150,8 @@ class ProductSerializer(serializers.ModelSerializer):
             "supplier_name",
             "category_slug",
             "category_name",
+            "average_rating",
+            "review_count",
             "variants",
             "images",
             "created_at",
@@ -146,6 +166,8 @@ class ProductSerializer(serializers.ModelSerializer):
             "supplier_name",
             "category_slug",
             "category_name",
+            "average_rating",
+            "review_count",
             "variants",
             "images",
             "created_at",
@@ -195,3 +217,25 @@ class AdminProductSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+class BannerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Banner
+        fields = [
+            "id",
+            "title",
+            "subtitle",
+            "image_url",
+            "link",
+            "is_active",
+            "position",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class BannerWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Banner
+        fields = ["title", "subtitle", "image_url", "link", "is_active", "position"]

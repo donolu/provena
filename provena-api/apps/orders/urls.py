@@ -5,6 +5,17 @@ from . import views
 urlpatterns = [
     # Supplier (must be before <str:reference>)
     path("supplier/", views.SupplierSubOrderListView.as_view(), name="supplier-suborder-list"),
+    path("supplier/returns/", views.SupplierReturnListView.as_view(), name="supplier-return-list"),
+    path(
+        "supplier/returns/<uuid:pk>/approve/",
+        views.SupplierApproveReturnView.as_view(),
+        name="supplier-approve-return",
+    ),
+    path(
+        "supplier/returns/<uuid:pk>/reject/",
+        views.SupplierRejectReturnView.as_view(),
+        name="supplier-reject-return",
+    ),
     path(
         "supplier/<uuid:pk>/",
         views.SupplierSubOrderDetailView.as_view(),
@@ -37,6 +48,13 @@ urlpatterns = [
         views.AdminRejectDisputeView.as_view(),
         name="admin-reject-dispute",
     ),
+    # Admin returns
+    path("admin/returns/", views.AdminReturnListView.as_view(), name="admin-return-list"),
+    path(
+        "admin/returns/<uuid:pk>/refund/",
+        views.AdminProcessReturnRefundView.as_view(),
+        name="admin-process-return-refund",
+    ),
     # Admin orders (must be before <str:reference>)
     path("admin/", views.AdminOrderListView.as_view(), name="admin-order-list"),
     path(
@@ -50,6 +68,11 @@ urlpatterns = [
         "<str:reference>/cancel/",
         views.OrderCancelView.as_view(),
         name="order-cancel",
+    ),
+    path(
+        "<str:reference>/sub-orders/<uuid:pk>/return/",
+        views.RequestReturnView.as_view(),
+        name="request-return",
     ),
     path(
         "<str:reference>/sub-orders/<uuid:pk>/dispute/",

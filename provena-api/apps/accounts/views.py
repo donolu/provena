@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.accounts.audit import audit_action
 from apps.pagination import PaginatedListMixin
 
 from . import services
@@ -379,6 +380,9 @@ class AdminSuspendUserView(APIView):
         summary="Suspend a user account",
         responses={200: AdminUserSerializer},
     )
+    @audit_action(
+        "user.suspended", target_type="User", get_target_id=lambda req, kw: kw.get("user_id")
+    )
     def post(self, request: Request, user_id: str) -> Response:
         user = get_object_or_404(User, id=user_id)
         if user == request.user:
@@ -400,6 +404,9 @@ class AdminActivateUserView(APIView):
         tags=["Admin: Users"],
         summary="Re-activate a suspended user account",
         responses={200: AdminUserSerializer},
+    )
+    @audit_action(
+        "user.activated", target_type="User", get_target_id=lambda req, kw: kw.get("user_id")
     )
     def post(self, request: Request, user_id: str) -> Response:
         user = get_object_or_404(User, id=user_id)
@@ -427,3 +434,22 @@ class AdminDeleteUserView(APIView):
             )
         services.delete_user(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminAuditLogView(PaginatedListMixin, APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        tags=["Admin: Users"],
+        summary="Admin audit log",
+        description="Paginated list of admin actions (approve, suspend, refund, etc.) ordered newest first.",
+    )
+    def get(self, request: Request) -> Response:
+        from apps.accounts.models import AuditLog
+        from apps.accounts.serializers import AuditLogSerializer
+
+        qs = AuditLog.objects.select_related("actor").order_by("-created_at")
+        action_filter = request.query_params.get("action")
+        if action_filter:
+            qs = qs.filter(action__icontains=action_filter)
+        return self.paginate(qs, AuditLogSerializer, request)

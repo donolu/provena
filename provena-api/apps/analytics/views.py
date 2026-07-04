@@ -1,5 +1,8 @@
+import csv
+import io
 from datetime import date
 
+from django.http import StreamingHttpResponse
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
@@ -169,3 +172,58 @@ class SupplierPayoutsSummaryView(APIView):
     )
     def get(self, request):
         return Response(services.payouts_summary(supplier=request.user.supplier))
+
+
+class AnalyticsExportView(APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        parameters=_DATE_PARAMS,
+        tags=["Admin: Analytics"],
+        summary="Export analytics as CSV",
+        description=(
+            "Streams a multi-sheet CSV zip containing: revenue_over_time, top_products, "
+            "and supplier_performance for the given date range."
+        ),
+        responses={200: None},
+        exclude=False,
+    )
+    def get(self, request):
+        from_date, to_date = _parse_dates(request)
+
+        sections = [
+            (
+                "revenue_over_time",
+                ["period", "revenue", "order_count"],
+                services.revenue_over_time(from_date, to_date),
+            ),
+            (
+                "top_products",
+                ["variant_sku", "product_name", "units_sold", "revenue"],
+                services.top_products(from_date, to_date, limit=100),
+            ),
+            (
+                "supplier_performance",
+                ["supplier_name", "sub_order_count", "revenue"],
+                services.supplier_performance(from_date, to_date),
+            ),
+        ]
+
+        def rows():
+            for section_name, headers, data in sections:
+                buf = io.StringIO()
+                writer = csv.DictWriter(buf, fieldnames=headers, extrasaction="ignore")
+                buf.write(f"# {section_name}\n")
+                writer.writeheader()
+                for row in data:
+                    writer.writerow(row)
+                buf.write("\n")
+                yield buf.getvalue()
+
+        from_label = from_date.isoformat() if from_date else "all"
+        to_label = to_date.isoformat() if to_date else "today"
+        filename = f"provena_analytics_{from_label}_to_{to_label}.csv"
+
+        response = StreamingHttpResponse(rows(), content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response

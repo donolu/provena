@@ -146,7 +146,7 @@ class TestPasswordReset:
             token_hash=hashlib.sha256(raw_token.encode()).hexdigest(),
             expires_at=timezone.now() + timezone.timedelta(hours=1),
         )
-        success, error = confirm_password_reset(raw_token, "NewSecurepass456!")
+        success, _error = confirm_password_reset(raw_token, "NewSecurepass456!")
         assert success is True
         buyer.refresh_from_db()
         assert buyer.check_password("NewSecurepass456!")
