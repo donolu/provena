@@ -152,3 +152,56 @@ class TestSupplierPayoutsSummaryView:
     def test_requires_approved_supplier(self, admin_client):
         response = admin_client.get("/api/v1/analytics/me/payouts/")
         assert response.status_code == 403
+
+
+class TestAnalyticsExportView:
+    def test_returns_csv_content_type(self, admin_client):
+        response = admin_client.get("/api/v1/analytics/export/csv/")
+        assert response.status_code == 200
+        assert "text/csv" in response["Content-Type"]
+
+    def test_csv_contains_all_sections(self, admin_client, placed_order):
+        response = admin_client.get("/api/v1/analytics/export/csv/")
+        content = b"".join(response.streaming_content).decode()
+        assert "# revenue_over_time" in content
+        assert "# top_products" in content
+        assert "# supplier_performance" in content
+
+    def test_csv_headers_present(self, admin_client):
+        response = admin_client.get("/api/v1/analytics/export/csv/")
+        content = b"".join(response.streaming_content).decode()
+        assert "period,revenue,order_count" in content
+        assert "variant_sku,product_name,units_sold,revenue" in content
+
+    def test_filename_contains_date_range(self, admin_client):
+        response = admin_client.get(
+            "/api/v1/analytics/export/csv/?from_date=2024-01-01&to_date=2024-01-31"
+        )
+        assert response.status_code == 200
+        disposition = response["Content-Disposition"]
+        assert "2024-01-01" in disposition
+        assert "2024-01-31" in disposition
+
+    def test_requires_admin(self, supplier_client):
+        response = supplier_client.get("/api/v1/analytics/export/csv/")
+        assert response.status_code == 403
+
+    def test_unauthenticated(self):
+        response = APIClient().get("/api/v1/analytics/export/csv/")
+        assert response.status_code == 401
+
+
+class TestParseDatesInvalidInput:
+    def test_invalid_from_date_falls_back_to_default(self, admin_client):
+        response = admin_client.get(
+            "/api/v1/analytics/sales/summary/?from_date=not-a-date&to_date=also-bad"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "from_date" in data
+        assert "to_date" in data
+
+    def test_invalid_date_on_revenue_endpoint(self, admin_client):
+        response = admin_client.get("/api/v1/analytics/sales/over-time/?from_date=baddate")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)

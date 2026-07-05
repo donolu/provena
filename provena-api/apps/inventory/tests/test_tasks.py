@@ -1,6 +1,5 @@
-import datetime
-
 import pytest
+from django.utils.timezone import localdate
 
 from apps.inventory.tasks import check_lot_expiry
 from apps.notifications.models import Notification
@@ -8,23 +7,27 @@ from apps.notifications.models import Notification
 
 @pytest.fixture
 def stock_lot(variant, approved_supplier, db):
+    from datetime import timedelta
+
     from apps.inventory.models import StockLot
 
-    today = datetime.date.today()
+    today = localdate()
     return StockLot.objects.create(
         variant=variant,
         lot_number="LOT-001",
         quantity_received=50,
         quantity_remaining=50,
-        expires_at=today + datetime.timedelta(days=2),
+        expires_at=today + timedelta(days=2),
     )
 
 
 @pytest.fixture
 def expired_lot(variant, db):
+    from datetime import timedelta
+
     from apps.inventory.models import StockLot
 
-    yesterday = datetime.date.today() - datetime.timedelta(days=1)
+    yesterday = localdate() - timedelta(days=1)
     return StockLot.objects.create(
         variant=variant,
         lot_number="LOT-OLD",
@@ -36,9 +39,11 @@ def expired_lot(variant, db):
 
 @pytest.fixture
 def far_future_lot(variant, db):
+    from datetime import timedelta
+
     from apps.inventory.models import StockLot
 
-    future = datetime.date.today() + datetime.timedelta(days=30)
+    future = localdate() + timedelta(days=30)
     return StockLot.objects.create(
         variant=variant,
         lot_number="LOT-FUTURE",
@@ -72,15 +77,16 @@ class TestCheckLotExpiry:
         assert Notification.objects.filter(recipient=approved_supplier.user).count() == 1
 
     def test_ignores_lots_with_no_remaining_stock(self, variant, approved_supplier, db):
+        from datetime import timedelta
+
         from apps.inventory.models import StockLot
 
-        today = datetime.date.today()
         StockLot.objects.create(
             variant=variant,
             lot_number="LOT-EMPTY",
             quantity_received=10,
             quantity_remaining=0,
-            expires_at=today + datetime.timedelta(days=1),
+            expires_at=localdate() + timedelta(days=1),
         )
 
         count = check_lot_expiry(days_ahead=3)

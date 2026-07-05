@@ -110,6 +110,8 @@ Use this when you want faster iteration on a single layer.
 cd provena-api
 
 # Create and activate a virtual environment
+# If python3.12 is not on your PATH but you have it via pyenv:
+#   PYENV_VERSION=3.12.13 pyenv exec python -m venv venv
 python3.12 -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
 
