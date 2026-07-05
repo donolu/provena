@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Order, OrderDispute, OrderItem, SubOrder
+from .models import Order, OrderItem, SubOrder
 
 
 class SubOrderInline(admin.TabularInline):
@@ -56,11 +56,3 @@ class SubOrderAdmin(admin.ModelAdmin):
     search_fields = ["order__reference", "supplier__business_name", "tracking_number"]
     readonly_fields = ["id", "order", "supplier", "subtotal", "created_at", "updated_at"]
     inlines = [OrderItemInline]
-
-
-@admin.register(OrderDispute)
-class OrderDisputeAdmin(admin.ModelAdmin):
-    list_display = ["id", "sub_order", "raised_by", "status", "created_at"]
-    list_filter = ["status", "created_at"]
-    search_fields = ["sub_order__order__reference", "raised_by__email"]
-    readonly_fields = ["id", "sub_order", "raised_by", "created_at", "updated_at"]

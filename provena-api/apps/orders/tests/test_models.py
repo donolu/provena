@@ -1,6 +1,4 @@
 from apps.orders.models import (
-    DisputeStatus,
-    OrderDispute,
     OrderStatus,
     _generate_order_reference,
 )
@@ -58,17 +56,3 @@ class TestOrderItem:
         assert item.variant_name == "1kg bag"
         assert item.sku == "CARR-1KG"
         assert item.unit_price == variant.price
-
-
-class TestOrderDispute:
-    def test_str(self, dispatched_sub_order, buyer):
-        dispute = OrderDispute.objects.create(
-            sub_order=dispatched_sub_order, raised_by=buyer, reason="Wrong item"
-        )
-        assert "OPEN" in str(dispute)
-
-    def test_default_status(self, dispatched_sub_order, buyer):
-        dispute = OrderDispute.objects.create(
-            sub_order=dispatched_sub_order, raised_by=buyer, reason="Damaged"
-        )
-        assert dispute.status == DisputeStatus.OPEN

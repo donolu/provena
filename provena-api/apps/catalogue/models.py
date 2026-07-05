@@ -1,6 +1,7 @@
 import uuid
 from decimal import Decimal
 
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.text import slugify
 
@@ -46,6 +47,10 @@ class Category(models.Model):
     )
     position = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    dispute_window_days = models.PositiveSmallIntegerField(
+        default=3,
+        validators=[MinValueValidator(1), MaxValueValidator(7)],
+    )
 
     class Meta:
         ordering = ["position", "name"]

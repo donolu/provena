@@ -15,12 +15,6 @@ class OrderStatus(models.TextChoices):
     CANCELLED = "CANCELLED", "Cancelled"
 
 
-class DisputeStatus(models.TextChoices):
-    OPEN = "OPEN", "Open"
-    RESOLVED = "RESOLVED", "Resolved"
-    REJECTED = "REJECTED", "Rejected"
-
-
 def _generate_order_reference() -> str:
     date_part = timezone.now().strftime("%Y%m%d")
     suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))  # noqa: S311  # nosec B311
@@ -134,28 +128,3 @@ class OrderReturn(models.Model):
 
     def __str__(self) -> str:
         return f"Return on {self.sub_order} ({self.status})"
-
-
-class OrderDispute(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    sub_order = models.ForeignKey(SubOrder, on_delete=models.CASCADE, related_name="disputes")
-    raised_by = models.ForeignKey(
-        "accounts.User",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="raised_disputes",
-    )
-    reason = models.TextField()
-    status = models.CharField(
-        max_length=10, choices=DisputeStatus.choices, default=DisputeStatus.OPEN
-    )
-    resolution = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self) -> str:
-        return f"Dispute on {self.sub_order} ({self.status})"

@@ -11,15 +11,12 @@ from apps.pagination import PaginatedListMixin
 from apps.suppliers.permissions import IsApprovedSupplier
 
 from . import services
-from .models import Order, OrderDispute, OrderReturn, OrderStatus, SubOrder
+from .models import Order, OrderReturn, OrderStatus, SubOrder
 from .serializers import (
     DispatchSerializer,
-    DisputeCreateSerializer,
-    DisputeSerializer,
     OrderReturnSerializer,
     OrderSerializer,
     PlaceOrderSerializer,
-    ResolveDisputeSerializer,
     ReturnActionSerializer,
     ReturnCreateSerializer,
     ReturnRefundSerializer,
@@ -179,30 +176,6 @@ class RequestReturnView(APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(OrderReturnSerializer(ret).data, status=status.HTTP_201_CREATED)
-
-
-@extend_schema(tags=["Orders (Buyer)"])
-class RaiseDisputeView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    @extend_schema(
-        summary="Raise a dispute on a sub-order",
-        request=DisputeCreateSerializer,
-        responses={
-            201: DisputeSerializer,
-            400: OpenApiResponse(description="Sub-order not in disputable state"),
-        },
-    )
-    def post(self, request: Request, reference: str, pk) -> Response:
-        order = get_object_or_404(Order, reference=reference, buyer=request.user)
-        sub_order = get_object_or_404(SubOrder, id=pk, order=order)
-        ser = DisputeCreateSerializer(data=request.data)
-        ser.is_valid(raise_exception=True)
-        try:
-            dispute = services.raise_dispute(sub_order, request.user, ser.validated_data["reason"])
-        except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(DisputeSerializer(dispute).data, status=status.HTTP_201_CREATED)
 
 
 # ---------------------------------------------------------------------------
@@ -433,74 +406,6 @@ class AdminOrderDetailView(APIView):
             reference=reference,
         )
         return Response(OrderSerializer(order).data)
-
-
-@extend_schema(tags=["Admin: Orders"])
-class AdminDisputeListView(APIView):
-    permission_classes = [IsAdminUser]
-
-    @extend_schema(
-        summary="List all disputes",
-        parameters=[
-            OpenApiParameter(
-                "status",
-                description="Filter by dispute status (OPEN/RESOLVED/REJECTED)",
-                required=False,
-            ),
-        ],
-        responses={200: DisputeSerializer(many=True)},
-    )
-    def get(self, request: Request) -> Response:
-        qs = OrderDispute.objects.select_related("raised_by", "sub_order__order")
-        if status_filter := request.query_params.get("status"):
-            qs = qs.filter(status=status_filter)
-        return Response(DisputeSerializer(qs, many=True).data)
-
-
-@extend_schema(tags=["Admin: Orders"])
-class AdminResolveDisputeView(APIView):
-    permission_classes = [IsAdminUser]
-
-    @extend_schema(
-        summary="Resolve a dispute",
-        request=ResolveDisputeSerializer,
-        responses={
-            200: DisputeSerializer,
-            400: OpenApiResponse(description="Dispute is not open"),
-        },
-    )
-    def post(self, request: Request, pk) -> Response:
-        dispute = get_object_or_404(OrderDispute, id=pk)
-        ser = ResolveDisputeSerializer(data=request.data)
-        ser.is_valid(raise_exception=True)
-        try:
-            dispute = services.resolve_dispute(dispute, ser.validated_data["resolution"])
-        except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(DisputeSerializer(dispute).data)
-
-
-@extend_schema(tags=["Admin: Orders"])
-class AdminRejectDisputeView(APIView):
-    permission_classes = [IsAdminUser]
-
-    @extend_schema(
-        summary="Reject a dispute",
-        request=ResolveDisputeSerializer,
-        responses={
-            200: DisputeSerializer,
-            400: OpenApiResponse(description="Dispute is not open"),
-        },
-    )
-    def post(self, request: Request, pk) -> Response:
-        dispute = get_object_or_404(OrderDispute, id=pk)
-        ser = ResolveDisputeSerializer(data=request.data)
-        ser.is_valid(raise_exception=True)
-        try:
-            dispute = services.reject_dispute(dispute, ser.validated_data["resolution"])
-        except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(DisputeSerializer(dispute).data)
 
 
 @extend_schema(tags=["Admin: Orders"])
