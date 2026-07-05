@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       api: ${{ steps.check.outputs.api }}
+      client: ${{ steps.check.outputs.client }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -30,12 +31,19 @@ jobs:
           fi
           if [[ -z "$base" || "$base" == "0000000000000000000000000000000000000000" ]]; then
             echo "api=true" >> "$GITHUB_OUTPUT"
+            echo "client=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if git diff --name-only "$base" "${{ github.sha }}" | grep -qE '^(provena-api/|\.github/workflows/api\.yml$)'; then
+          changed=$(git diff --name-only "$base" "${{ github.sha }}")
+          if echo "$changed" | grep -qE '^(provena-api/|\.github/workflows/api\.yml$)'; then
             echo "api=true" >> "$GITHUB_OUTPUT"
           else
             echo "api=false" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$changed" | grep -qE '^(provena-api/|provena-web/package\.json$|provena-web/package-lock\.json$|\.github/workflows/api\.yml$)'; then
+            echo "client=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "client=false" >> "$GITHUB_OUTPUT"
           fi
 
   lint:
@@ -140,7 +148,7 @@ jobs:
   generate-client:
     name: Generate OpenAPI client
     needs: [changes, test]
-    if: needs.changes.outputs.api == 'true'
+    if: needs.changes.outputs.client == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
