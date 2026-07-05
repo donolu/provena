@@ -15,6 +15,8 @@ import {
 import { Nav } from '@/components/nav'
 import { getCart, clearCart } from '@/lib/api/cart'
 import { placeOrder, createPaymentIntent } from '@/lib/api/orders'
+import { getAddresses } from '@/lib/api/addresses'
+import type { Address } from '@/lib/api/addresses'
 import { useAuthStore } from '@/store/auth'
 import type { Order } from '@/lib/api/types'
 
@@ -154,10 +156,17 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null)
   const [order, setOrder] = useState<Order | null>(null)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
 
   const { data: cart, isPending: cartLoading } = useQuery({
     queryKey: ['cart'],
     queryFn: getCart,
+    enabled: !!user,
+  })
+
+  const { data: savedAddresses = [] } = useQuery({
+    queryKey: ['addresses'],
+    queryFn: getAddresses,
     enabled: !!user,
   })
 
@@ -265,32 +274,106 @@ export default function CheckoutPage() {
               <form onSubmit={handleSubmit} className="space-y-5">
                 <h2 className="text-sm font-sans font-semibold text-forest">Shipping address</h2>
 
-                <Field label="Full name" name="name" value={form.name} onChange={set('name')} placeholder="Alex Johnson" />
-                <Field label="Address line 1" name="line1" value={form.line1} onChange={set('line1')} placeholder="12 Market Street" />
-                <Field label="Address line 2" name="line2" value={form.line2} onChange={set('line2')} required={false} placeholder="Flat 2 (optional)" />
+                {savedAddresses.length > 0 && (
+                  <div className="space-y-2">
+                    {savedAddresses.map((addr: Address) => (
+                      <label
+                        key={addr.id}
+                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          selectedAddressId === addr.id
+                            ? 'border-forest bg-forest/5'
+                            : 'border-hoarfrost hover:border-forest/40'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="saved_address"
+                          value={addr.id}
+                          checked={selectedAddressId === addr.id}
+                          onChange={() => {
+                            setSelectedAddressId(addr.id)
+                            setForm({
+                              name: addr.full_name,
+                              line1: addr.line1,
+                              line2: addr.line2,
+                              city: addr.city,
+                              postcode: addr.postcode,
+                              country: addr.country,
+                              notes: form.notes,
+                            })
+                          }}
+                          className="mt-0.5 accent-forest"
+                        />
+                        <div>
+                          <p className="text-sm font-sans font-medium text-forest">
+                            {addr.full_name}
+                            {addr.label && (
+                              <span className="ml-2 text-[10px] font-sans bg-hoarfrost text-soil rounded px-1.5 py-0.5 align-middle">
+                                {addr.label}
+                              </span>
+                            )}
+                            {addr.is_default && (
+                              <span className="ml-2 text-[10px] font-sans bg-meadow/15 text-[#245C38] rounded px-1.5 py-0.5 font-medium align-middle">
+                                Default
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs font-sans text-soil mt-0.5">
+                            {addr.line1}{addr.line2 ? `, ${addr.line2}` : ''}, {addr.city}, {addr.postcode}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                    <label
+                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        selectedAddressId === null
+                          ? 'border-forest bg-forest/5'
+                          : 'border-hoarfrost hover:border-forest/40'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="saved_address"
+                        value=""
+                        checked={selectedAddressId === null}
+                        onChange={() => { setSelectedAddressId(null); setForm(EMPTY) }}
+                        className="accent-forest"
+                      />
+                      <span className="text-sm font-sans text-soil">Enter a different address</span>
+                    </label>
+                  </div>
+                )}
 
-                <div className="grid sm:grid-cols-2 gap-5">
-                  <Field label="City" name="city" value={form.city} onChange={set('city')} placeholder="London" />
-                  <Field label="Postcode" name="postcode" value={form.postcode} onChange={set('postcode')} placeholder="SW1A 1AA" />
-                </div>
+                {(savedAddresses.length === 0 || selectedAddressId === null) && (
+                  <>
+                    <Field label="Full name" name="name" value={form.name} onChange={set('name')} placeholder="Alex Johnson" />
+                    <Field label="Address line 1" name="line1" value={form.line1} onChange={set('line1')} placeholder="12 Market Street" />
+                    <Field label="Address line 2" name="line2" value={form.line2} onChange={set('line2')} required={false} placeholder="Flat 2 (optional)" />
 
-                <div>
-                  <label className="block text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium mb-1.5">
-                    Country<span className="text-terracotta ml-0.5">*</span>
-                  </label>
-                  <select
-                    value={form.country}
-                    onChange={(e) => set('country')(e.target.value)}
-                    required
-                    className="w-full border border-hoarfrost rounded px-3 py-2.5 text-sm font-sans text-forest bg-white focus:outline-none focus:border-forest transition-colors duration-150"
-                  >
-                    <option value="GB">United Kingdom</option>
-                    <option value="IE">Ireland</option>
-                    <option value="FR">France</option>
-                    <option value="DE">Germany</option>
-                    <option value="NL">Netherlands</option>
-                  </select>
-                </div>
+                    <div className="grid sm:grid-cols-2 gap-5">
+                      <Field label="City" name="city" value={form.city} onChange={set('city')} placeholder="London" />
+                      <Field label="Postcode" name="postcode" value={form.postcode} onChange={set('postcode')} placeholder="SW1A 1AA" />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium mb-1.5">
+                        Country<span className="text-terracotta ml-0.5">*</span>
+                      </label>
+                      <select
+                        value={form.country}
+                        onChange={(e) => set('country')(e.target.value)}
+                        required
+                        className="w-full border border-hoarfrost rounded px-3 py-2.5 text-sm font-sans text-forest bg-white focus:outline-none focus:border-forest transition-colors duration-150"
+                      >
+                        <option value="GB">United Kingdom</option>
+                        <option value="IE">Ireland</option>
+                        <option value="FR">France</option>
+                        <option value="DE">Germany</option>
+                        <option value="NL">Netherlands</option>
+                      </select>
+                    </div>
+                  </>
+                )}
 
                 <div>
                   <label className="block text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium mb-1.5">
