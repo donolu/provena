@@ -11,8 +11,37 @@ defaults:
     working-directory: provena-api
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.check.outputs.api }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: check
+        working-directory: .
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if [[ -z "$base" || "$base" == "0000000000000000000000000000000000000000" ]]; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$base" "${{ github.sha }}" | grep -qE '^(provena-api/|\.github/workflows/api\.yml$)'; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "api=false" >> "$GITHUB_OUTPUT"
+          fi
+
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     env:
       DJANGO_SETTINGS_MODULE: config.settings.development
@@ -33,12 +62,13 @@ jobs:
       - run: ruff check apps/
       - run: ruff format --check apps/
       - run: bandit -r apps/ -c pyproject.toml
-      - run: safety check
+      - run: pip-audit
       - run: mypy apps/
 
   test:
     name: Tests
-    needs: lint
+    needs: [changes, lint]
+    if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -109,7 +139,8 @@ jobs:
 
   generate-client:
     name: Generate OpenAPI client
-    needs: test
+    needs: [changes, test]
+    if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -162,3 +193,17 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add provena-web/src/lib/api/generated/
           git diff --staged --quiet || (git commit -m "chore: regenerate OpenAPI types [skip ci]" && git push)
+
+  api-ci:
+    name: API CI
+    needs: [lint, test, generate-client]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more API CI jobs failed."
+            exit 1
+          fi
+          echo "All API CI jobs passed or were skipped (no API changes)."
+        working-directory: ${{ runner.temp }}
