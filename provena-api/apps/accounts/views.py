@@ -452,7 +452,7 @@ class AddressListCreateView(APIView):
         responses={200: AddressSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:
-        qs = request.user.addresses.all()
+        qs = request.user.addresses.all()  # type: ignore[union-attr]
         return Response(AddressSerializer(qs, many=True).data)
 
     @extend_schema(

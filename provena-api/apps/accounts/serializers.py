@@ -109,7 +109,7 @@ class AddressSerializer(serializers.ModelSerializer):
 
 
 class AddressWriteSerializer(serializers.Serializer):
-    label = serializers.CharField(max_length=100, allow_blank=True, default="")
+    label = serializers.CharField(max_length=100, allow_blank=True, default="")  # type: ignore[assignment]
     full_name = serializers.CharField(max_length=200)
     line1 = serializers.CharField(max_length=200)
     line2 = serializers.CharField(max_length=200, allow_blank=True, default="")
