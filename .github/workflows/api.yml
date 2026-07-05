@@ -79,20 +79,33 @@ jobs:
           cache: pip
           cache-dependency-path: provena-api/pyproject.toml
       - run: pip install -e ".[dev]"
-      - run: pytest
+      - run: pytest --cov-report=json:coverage.json
       - name: Per-app coverage floor (80%)
         run: |
-          failed=0
-          for app in accounts analytics catalogue inventory marketplace notifications orders payments suppliers; do
-            echo "--- $app ---"
-            python -m pytest apps/$app/ \
-              --cov=apps/$app \
-              --cov-fail-under=80 \
-              --no-header -q \
-              --cov-report=term-missing:skip-covered \
-              --no-cov-on-fail || failed=1
-          done
-          exit $failed
+          python - << 'PYEOF'
+          import json, sys
+          with open("coverage.json") as f:
+              cov = json.load(f)
+          apps = [
+              "accounts", "analytics", "catalogue", "inventory",
+              "marketplace", "notifications", "orders", "payments", "suppliers",
+          ]
+          failed = []
+          for app in apps:
+              files = {k: v for k, v in cov["files"].items() if f"apps/{app}/" in k}
+              if not files:
+                  continue
+              total = sum(v["summary"]["num_statements"] for v in files.values())
+              covered = sum(v["summary"]["covered_lines"] for v in files.values())
+              pct = (covered / total * 100) if total else 100.0
+              status = "OK  " if pct >= 80 else "FAIL"
+              print(f"{status}  {app}: {pct:.1f}%  ({covered}/{total} statements)")
+              if pct < 80:
+                  failed.append(app)
+          if failed:
+              print(f"\nApps below 80%: {', '.join(failed)}", file=sys.stderr)
+              sys.exit(1)
+          PYEOF
 
   generate-client:
     name: Generate OpenAPI client

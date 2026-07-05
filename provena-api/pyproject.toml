@@ -51,6 +51,22 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "--cov=apps --cov-report=term-missing --cov-fail-under=80"
 
+[tool.coverage.run]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "manage.py",
+    "config/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
