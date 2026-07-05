@@ -206,6 +206,18 @@ pytest apps/orders/tests/test_services.py::TestDeliverSubOrder::test_payout_trig
 
 6. **Frontend API function** — add `getOrderTimeline(id: string)` to `provena-web/src/lib/api/orders.ts`
 
+7. **Regenerate TypeScript types** — the generated type file must be updated whenever the API schema changes. Run these two commands from the repo root and commit the result:
+
+   ```bash
+   cd provena-api
+   python manage.py spectacular --file ../provena-web/schema.yaml
+
+   cd ../provena-web
+   npm run generate:types
+   ```
+
+   This regenerates `provena-web/src/lib/api/generated/schema.d.ts`. Commit it alongside your API changes. The `Generate OpenAPI client` CI job will fail on your PR if you forget — it exports the schema from your branch and checks whether the committed `schema.d.ts` matches.
+
 The OpenAPI schema (`/api/schema/`) is auto-generated from the views by `drf-spectacular`. Add `@extend_schema` decorators to views for richer schema output.
 
 ---

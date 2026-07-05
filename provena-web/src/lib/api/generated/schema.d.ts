@@ -833,6 +833,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalogue/admin/products/bulk/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk product actions
+         * @description Apply an action to multiple products at once. Actions: `set_status` (requires `status`), `set_category` (requires `category` slug or null to clear), `set_featured` (requires `is_featured` bool). Returns the count of updated products.
+         */
+        post: operations["catalogue_admin_products_bulk_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/catalogue/admin/products/{slug}/feature/": {
         parameters: {
             query?: never;
@@ -2153,6 +2173,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description * `set_status` - set_status
+         *     * `set_category` - set_category
+         *     * `set_featured` - set_featured
+         * @enum {string}
+         */
+        ActionEnum: "set_status" | "set_category" | "set_featured";
         AddToCartRequest: {
             /** Format: uuid */
             variant_id: string;
@@ -2224,6 +2251,20 @@ export interface components {
             /** Format: date-time */
             readonly created_at: string;
         };
+        BulkProductActionRequest: {
+            slugs: string[];
+            action: components["schemas"]["ActionEnum"];
+            status?: (components["schemas"]["BulkProductActionStatusEnum"] | components["schemas"]["NullEnum"]) | null;
+            category?: string | null;
+            is_featured?: boolean | null;
+        };
+        /**
+         * @description * `DRAFT` - DRAFT
+         *     * `ACTIVE` - ACTIVE
+         *     * `ARCHIVED` - ARCHIVED
+         * @enum {string}
+         */
+        BulkProductActionStatusEnum: "DRAFT" | "ACTIVE" | "ARCHIVED";
         Cart: {
             /** Format: uuid */
             readonly id: string;
@@ -2389,6 +2430,8 @@ export interface components {
          * @enum {string}
          */
         NotificationTypeEnum: "LOW_STOCK" | "ORDER_PLACED" | "ORDER_DISPATCHED" | "ORDER_DELIVERED" | "PAYMENT_SUCCEEDED" | "GENERAL";
+        /** @enum {unknown} */
+        NullEnum: null;
         Order: {
             /** Format: uuid */
             readonly id: string;
@@ -4352,6 +4395,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AdminProduct"][];
                 };
+            };
+        };
+    };
+    catalogue_admin_products_bulk_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkProductActionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["BulkProductActionRequest"];
+                "multipart/form-data": components["schemas"]["BulkProductActionRequest"];
+            };
+        };
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

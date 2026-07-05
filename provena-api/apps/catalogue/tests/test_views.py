@@ -323,3 +323,116 @@ class TestAdminProductViews:
     def test_admin_product_list_requires_admin(self, supplier_client):
         response = supplier_client.get("/api/v1/catalogue/admin/products/")
         assert response.status_code == 403
+
+
+class TestAdminProductBulkAction:
+    URL = "/api/v1/catalogue/admin/products/bulk/"
+
+    def test_bulk_set_status(self, admin_client, active_product, draft_product):
+        response = admin_client.post(
+            self.URL,
+            {
+                "slugs": [active_product.slug, draft_product.slug],
+                "action": "set_status",
+                "status": "ARCHIVED",
+            },
+            format="json",
+        )
+        assert response.status_code == 200
+        assert response.json()["updated"] == 2
+        active_product.refresh_from_db()
+        draft_product.refresh_from_db()
+        assert active_product.status == "ARCHIVED"
+        assert draft_product.status == "ARCHIVED"
+
+    def test_bulk_set_featured(self, admin_client, active_product, draft_product):
+        response = admin_client.post(
+            self.URL,
+            {
+                "slugs": [active_product.slug, draft_product.slug],
+                "action": "set_featured",
+                "is_featured": True,
+            },
+            format="json",
+        )
+        assert response.status_code == 200
+        assert response.json()["updated"] == 2
+        active_product.refresh_from_db()
+        assert active_product.is_featured is True
+
+    def test_bulk_unfeature(self, admin_client, active_product):
+        active_product.is_featured = True
+        active_product.save()
+        response = admin_client.post(
+            self.URL,
+            {"slugs": [active_product.slug], "action": "set_featured", "is_featured": False},
+            format="json",
+        )
+        assert response.status_code == 200
+        active_product.refresh_from_db()
+        assert active_product.is_featured is False
+
+    def test_bulk_set_category(self, admin_client, active_product, subcategory):
+        response = admin_client.post(
+            self.URL,
+            {
+                "slugs": [active_product.slug],
+                "action": "set_category",
+                "category": subcategory.slug,
+            },
+            format="json",
+        )
+        assert response.status_code == 200
+        active_product.refresh_from_db()
+        assert active_product.category_id == subcategory.id
+
+    def test_bulk_clear_category(self, admin_client, active_product):
+        response = admin_client.post(
+            self.URL,
+            {"slugs": [active_product.slug], "action": "set_category", "category": None},
+            format="json",
+        )
+        assert response.status_code == 200
+        active_product.refresh_from_db()
+        assert active_product.category is None
+
+    def test_missing_status_for_set_status(self, admin_client, active_product):
+        response = admin_client.post(
+            self.URL,
+            {"slugs": [active_product.slug], "action": "set_status"},
+            format="json",
+        )
+        assert response.status_code == 400
+
+    def test_missing_is_featured_for_set_featured(self, admin_client, active_product):
+        response = admin_client.post(
+            self.URL,
+            {"slugs": [active_product.slug], "action": "set_featured"},
+            format="json",
+        )
+        assert response.status_code == 400
+
+    def test_empty_slugs_rejected(self, admin_client):
+        response = admin_client.post(
+            self.URL,
+            {"slugs": [], "action": "set_status", "status": "ACTIVE"},
+            format="json",
+        )
+        assert response.status_code == 400
+
+    def test_unknown_slugs_update_zero(self, admin_client):
+        response = admin_client.post(
+            self.URL,
+            {"slugs": ["does-not-exist"], "action": "set_status", "status": "ACTIVE"},
+            format="json",
+        )
+        assert response.status_code == 200
+        assert response.json()["updated"] == 0
+
+    def test_requires_admin(self, supplier_client, active_product):
+        response = supplier_client.post(
+            self.URL,
+            {"slugs": [active_product.slug], "action": "set_status", "status": "ACTIVE"},
+            format="json",
+        )
+        assert response.status_code == 403

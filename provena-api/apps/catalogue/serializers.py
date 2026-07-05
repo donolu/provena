@@ -219,6 +219,35 @@ class AdminProductSerializer(serializers.ModelSerializer):
         ]
 
 
+class BulkProductActionSerializer(serializers.Serializer):
+    ACTIONS = ("set_status", "set_category", "set_featured")
+
+    slugs = serializers.ListField(
+        child=serializers.SlugField(),
+        min_length=1,
+        max_length=100,
+    )
+    action = serializers.ChoiceField(choices=ACTIONS)
+    status = serializers.ChoiceField(
+        choices=["DRAFT", "ACTIVE", "ARCHIVED"], required=False, allow_null=True
+    )
+    category = serializers.SlugRelatedField(
+        slug_field="slug",
+        queryset=Category.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    is_featured = serializers.BooleanField(required=False, allow_null=True)
+
+    def validate(self, data: dict) -> dict:
+        action = data["action"]
+        if action == "set_status" and not data.get("status"):
+            raise serializers.ValidationError({"status": "Required for set_status action."})
+        if action == "set_featured" and data.get("is_featured") is None:
+            raise serializers.ValidationError({"is_featured": "Required for set_featured action."})
+        return data
+
+
 class BannerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Banner

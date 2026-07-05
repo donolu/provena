@@ -5,6 +5,7 @@ from .views import (
     AdminBannerListCreateView,
     AdminCategoryDetailView,
     AdminCategoryListCreateView,
+    AdminProductBulkActionView,
     AdminProductFeatureView,
     AdminProductListView,
     BannerListView,
@@ -39,6 +40,7 @@ urlpatterns = [
     ),
     # Admin: products
     path("admin/products/", AdminProductListView.as_view(), name="admin-product-list"),
+    path("admin/products/bulk/", AdminProductBulkActionView.as_view(), name="admin-product-bulk"),
     path(
         "admin/products/<slug:slug>/feature/",
         AdminProductFeatureView.as_view(),

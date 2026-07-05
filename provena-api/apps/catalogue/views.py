@@ -15,6 +15,7 @@ from . import services
 from .models import Banner, Category, Product, ProductImage, ProductStatus, ProductVariant
 from .serializers import (
     AdminProductSerializer,
+    BulkProductActionSerializer,
     CategorySerializer,
     CategoryWriteSerializer,
     ProductImageSerializer,
@@ -596,6 +597,39 @@ class AdminProductFeatureView(APIView):
         else:
             product = services.feature_product(product, request.user)  # type: ignore[arg-type]
         return Response(AdminProductSerializer(product).data)
+
+
+class AdminProductBulkActionView(APIView):
+    permission_classes = [IsAdmin]
+
+    @extend_schema(
+        tags=["Admin: Products"],
+        summary="Bulk product actions",
+        description=(
+            "Apply an action to multiple products at once. "
+            "Actions: `set_status` (requires `status`), "
+            "`set_category` (requires `category` slug or null to clear), "
+            "`set_featured` (requires `is_featured` bool). "
+            "Returns the count of updated products."
+        ),
+        request=BulkProductActionSerializer,
+        responses={
+            200: None,
+            400: OpenApiResponse(description="Validation error"),
+        },
+    )
+    def post(self, request: Request) -> Response:
+        s = BulkProductActionSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        d = s.validated_data
+        updated = services.bulk_update_products(
+            slugs=d["slugs"],
+            action=d["action"],
+            status=d.get("status"),
+            category=d.get("category"),
+            is_featured=d.get("is_featured"),
+        )
+        return Response({"updated": updated})
 
 
 class BannerListView(APIView):

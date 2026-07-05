@@ -78,6 +78,21 @@ export async function adminToggleFeature(slug: string): Promise<Product> {
   return data
 }
 
+export type BulkProductAction =
+  | { action: 'set_status'; slugs: string[]; status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED' }
+  | { action: 'set_category'; slugs: string[]; category: string | null }
+  | { action: 'set_featured'; slugs: string[]; is_featured: boolean }
+
+export async function adminBulkProductAction(
+  payload: BulkProductAction,
+): Promise<{ updated: number }> {
+  const { data } = await apiClient.post<{ updated: number }>(
+    '/catalogue/admin/products/bulk/',
+    payload,
+  )
+  return data
+}
+
 // ── Admin Users ───────────────────────────────────────────────────────────────
 
 export async function getAdminUsers(params?: {
