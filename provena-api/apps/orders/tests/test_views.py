@@ -227,36 +227,6 @@ class TestSupplierDeliverView:
         assert response.status_code == 400
 
 
-class TestRaiseDisputeView:
-    def test_raise_dispute_on_dispatched(self, buyer_client, placed_order, dispatched_sub_order):
-        response = buyer_client.post(
-            f"/api/v1/orders/{placed_order.reference}/sub-orders/{dispatched_sub_order.id}/dispute/",
-            {"reason": "Item arrived broken"},
-            format="json",
-        )
-        assert response.status_code == 201
-        assert response.json()["status"] == "OPEN"
-        assert response.json()["reason"] == "Item arrived broken"
-
-    def test_cannot_raise_dispute_on_pending(self, buyer_client, placed_order, sub_order):
-        response = buyer_client.post(
-            f"/api/v1/orders/{placed_order.reference}/sub-orders/{sub_order.id}/dispute/",
-            {"reason": "Too early"},
-            format="json",
-        )
-        assert response.status_code == 400
-
-    def test_cannot_raise_dispute_on_other_order(
-        self, supplier_client, placed_order, dispatched_sub_order
-    ):
-        response = supplier_client.post(
-            f"/api/v1/orders/{placed_order.reference}/sub-orders/{dispatched_sub_order.id}/dispute/",
-            {"reason": "Hack"},
-            format="json",
-        )
-        assert response.status_code == 404
-
-
 class TestAdminOrderViews:
     def test_list_all_orders(self, admin_client, placed_order):
         response = admin_client.get("/api/v1/orders/admin/")
@@ -277,64 +247,3 @@ class TestAdminOrderViews:
     def test_requires_admin(self, buyer_client):
         response = buyer_client.get("/api/v1/orders/admin/")
         assert response.status_code == 403
-
-
-class TestAdminDisputeViews:
-    def test_list_disputes(self, admin_client, placed_order, dispatched_sub_order, buyer):
-        from apps.orders import services
-
-        services.raise_dispute(dispatched_sub_order, buyer, "Issue")
-        response = admin_client.get("/api/v1/orders/admin/disputes/")
-        assert response.status_code == 200
-        assert len(response.json()) == 1
-
-    def test_filter_disputes_by_status(
-        self, admin_client, placed_order, dispatched_sub_order, buyer
-    ):
-        from apps.orders import services
-
-        dispute = services.raise_dispute(dispatched_sub_order, buyer, "Issue")
-        services.resolve_dispute(dispute, "Refund sent")
-        response = admin_client.get("/api/v1/orders/admin/disputes/?status=OPEN")
-        assert response.json() == []
-        response2 = admin_client.get("/api/v1/orders/admin/disputes/?status=RESOLVED")
-        assert len(response2.json()) == 1
-
-    def test_resolve_dispute(self, admin_client, placed_order, dispatched_sub_order, buyer):
-        from apps.orders import services
-
-        dispute = services.raise_dispute(dispatched_sub_order, buyer, "Issue")
-        response = admin_client.post(
-            f"/api/v1/orders/admin/disputes/{dispute.id}/resolve/",
-            {"resolution": "Refund processed"},
-            format="json",
-        )
-        assert response.status_code == 200
-        assert response.json()["status"] == "RESOLVED"
-        assert response.json()["resolution"] == "Refund processed"
-
-    def test_reject_dispute(self, admin_client, placed_order, dispatched_sub_order, buyer):
-        from apps.orders import services
-
-        dispute = services.raise_dispute(dispatched_sub_order, buyer, "Issue")
-        response = admin_client.post(
-            f"/api/v1/orders/admin/disputes/{dispute.id}/reject/",
-            {"resolution": "No evidence provided"},
-            format="json",
-        )
-        assert response.status_code == 200
-        assert response.json()["status"] == "REJECTED"
-
-    def test_resolve_already_closed_returns_400(
-        self, admin_client, placed_order, dispatched_sub_order, buyer
-    ):
-        from apps.orders import services
-
-        dispute = services.raise_dispute(dispatched_sub_order, buyer, "Issue")
-        services.resolve_dispute(dispute, "Done")
-        response = admin_client.post(
-            f"/api/v1/orders/admin/disputes/{dispute.id}/resolve/",
-            {"resolution": "Again"},
-            format="json",
-        )
-        assert response.status_code == 400

@@ -260,7 +260,7 @@ class TestDisputeDetailView:
         assert data["status"] == "OPEN"
         assert len(data["events"]) == 1
 
-    def test_non_party_cannot_view(self, admin_client, buyer, supplier, dispatched_sub_order):
+    def test_non_party_cannot_view(self, api_client, db, buyer, supplier, dispatched_sub_order):
         dispute = services.open_dispute(
             sub_order=dispatched_sub_order,
             opened_by=buyer,
@@ -269,7 +269,13 @@ class TestDisputeDetailView:
             description="Item arrived broken.",
             resolution_requested="FULL_REFUND",
         )
-        res = admin_client.get(f"{BASE}{dispute.id}/")
+        from apps.accounts.models import Role, User
+
+        stranger = User.objects.create_user(
+            email="stranger@example.com", password="Securepass123!", role=Role.BUYER
+        )
+        api_client.force_authenticate(user=stranger)
+        res = api_client.get(f"{BASE}{dispute.id}/")
         assert res.status_code == 403
 
 
