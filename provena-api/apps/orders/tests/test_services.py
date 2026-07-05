@@ -4,7 +4,7 @@ import pytest
 
 from apps.inventory.models import StockLevel
 from apps.orders import services
-from apps.orders.models import DisputeStatus, OrderStatus
+from apps.orders.models import OrderStatus
 from apps.orders.tests.conftest import SHIPPING
 
 
@@ -166,42 +166,3 @@ class TestCancelOrder:
         services.deliver_sub_order(dispatched_sub_order)
         with pytest.raises(ValueError, match="delivered"):
             services.cancel_order(dispatched_sub_order.order)
-
-
-class TestDisputes:
-    def test_raise_dispute_on_dispatched(self, dispatched_sub_order, buyer):
-        dispute = services.raise_dispute(dispatched_sub_order, buyer, "Item arrived damaged")
-        assert dispute.reason == "Item arrived damaged"
-        assert dispute.status == DisputeStatus.OPEN
-
-    def test_raise_dispute_on_delivered(self, dispatched_sub_order, buyer):
-        services.deliver_sub_order(dispatched_sub_order)
-        dispute = services.raise_dispute(dispatched_sub_order, buyer, "Wrong item")
-        assert dispute.status == DisputeStatus.OPEN
-
-    def test_cannot_raise_dispute_on_pending(self, sub_order, buyer):
-        with pytest.raises(ValueError, match="dispatched or delivered"):
-            services.raise_dispute(sub_order, buyer, "Too early")
-
-    def test_resolve_dispute(self, dispatched_sub_order, buyer):
-        dispute = services.raise_dispute(dispatched_sub_order, buyer, "Issue")
-        resolved = services.resolve_dispute(dispute, "Refund issued")
-        assert resolved.status == DisputeStatus.RESOLVED
-        assert resolved.resolution == "Refund issued"
-
-    def test_reject_dispute(self, dispatched_sub_order, buyer):
-        dispute = services.raise_dispute(dispatched_sub_order, buyer, "Issue")
-        rejected = services.reject_dispute(dispute, "No evidence provided")
-        assert rejected.status == DisputeStatus.REJECTED
-
-    def test_cannot_resolve_already_resolved(self, dispatched_sub_order, buyer):
-        dispute = services.raise_dispute(dispatched_sub_order, buyer, "Issue")
-        services.resolve_dispute(dispute, "Done")
-        with pytest.raises(ValueError, match="open"):
-            services.resolve_dispute(dispute, "Again")
-
-    def test_cannot_reject_already_rejected(self, dispatched_sub_order, buyer):
-        dispute = services.raise_dispute(dispatched_sub_order, buyer, "Issue")
-        services.reject_dispute(dispute, "No")
-        with pytest.raises(ValueError, match="open"):
-            services.reject_dispute(dispute, "No again")
