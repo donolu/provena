@@ -103,6 +103,24 @@ def feature_product(product: Product, admin_user: User) -> Product:
     return product
 
 
+def bulk_update_products(
+    slugs: list[str],
+    action: str,
+    status: str | None = None,
+    category: "Category | None" = None,
+    is_featured: bool | None = None,
+) -> int:
+    qs = Product.objects.filter(slug__in=slugs)
+    if action == "set_status":
+        updated = qs.update(status=status)
+    elif action == "set_category":
+        updated = qs.update(category=category)
+    else:
+        updated = qs.update(is_featured=bool(is_featured))
+    logger.info("Bulk %s applied to %d products", action, updated)
+    return updated
+
+
 def unfeature_product(product: Product, admin_user: User) -> Product:
     product.is_featured = False
     product.save(update_fields=["is_featured", "updated_at"])
