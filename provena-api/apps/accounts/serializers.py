@@ -1,7 +1,7 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from .models import User
+from .models import Address, User
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -87,6 +87,55 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = [
+            "id",
+            "label",
+            "full_name",
+            "line1",
+            "line2",
+            "city",
+            "postcode",
+            "country",
+            "is_default",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "is_default", "created_at", "updated_at"]
+
+
+class AddressWriteSerializer(serializers.Serializer):
+    label = serializers.CharField(max_length=100, allow_blank=True, default="")
+    full_name = serializers.CharField(max_length=200)
+    line1 = serializers.CharField(max_length=200)
+    line2 = serializers.CharField(max_length=200, allow_blank=True, default="")
+    city = serializers.CharField(max_length=100)
+    postcode = serializers.CharField(max_length=20)
+    country = serializers.CharField(max_length=2, default="GB")
+
+    def validate_full_name(self, value: str) -> str:
+        if not value.strip():
+            raise serializers.ValidationError("Full name cannot be blank.")
+        return value.strip()
+
+    def validate_line1(self, value: str) -> str:
+        if not value.strip():
+            raise serializers.ValidationError("Address line 1 cannot be blank.")
+        return value.strip()
+
+    def validate_postcode(self, value: str) -> str:
+        if not value.strip():
+            raise serializers.ValidationError("Postcode cannot be blank.")
+        return value.strip().upper()
+
+    def validate_country(self, value: str) -> str:
+        if len(value) != 2:
+            raise serializers.ValidationError("Country must be a 2-letter ISO code.")
+        return value.upper()
 
 
 class AuditLogSerializer(serializers.ModelSerializer):

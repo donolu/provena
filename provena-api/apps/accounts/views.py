@@ -15,6 +15,8 @@ from apps.pagination import PaginatedListMixin
 from . import services
 from .models import User
 from .serializers import (
+    AddressSerializer,
+    AddressWriteSerializer,
     AdminUserSerializer,
     ChangePasswordSerializer,
     LoginSerializer,
@@ -434,6 +436,102 @@ class AdminDeleteUserView(APIView):
             )
         services.delete_user(user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Address book
+# ---------------------------------------------------------------------------
+
+
+class AddressListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Accounts: Addresses"],
+        summary="List saved addresses",
+        responses={200: AddressSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        qs = request.user.addresses.all()
+        return Response(AddressSerializer(qs, many=True).data)
+
+    @extend_schema(
+        tags=["Accounts: Addresses"],
+        summary="Save a new address",
+        request=AddressWriteSerializer,
+        responses={
+            201: AddressSerializer,
+            400: OpenApiResponse(description="Validation error"),
+        },
+    )
+    def post(self, request: Request) -> Response:
+        s = AddressWriteSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        make_default = request.data.get("is_default", False)
+        address = services.create_address(
+            user=request.user,  # type: ignore[arg-type]
+            make_default=bool(make_default),
+            **s.validated_data,
+        )
+        return Response(AddressSerializer(address).data, status=status.HTTP_201_CREATED)
+
+
+class AddressDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _own_address(self, request: Request, pk: str):
+        return get_object_or_404(
+            request.user.addresses,  # type: ignore[union-attr]
+            pk=pk,
+        )
+
+    @extend_schema(
+        tags=["Accounts: Addresses"],
+        summary="Update a saved address",
+        request=AddressWriteSerializer,
+        responses={
+            200: AddressSerializer,
+            400: OpenApiResponse(description="Validation error"),
+            404: OpenApiResponse(description="Not found"),
+        },
+    )
+    def patch(self, request: Request, pk: str) -> Response:
+        address = self._own_address(request, pk)
+        s = AddressWriteSerializer(address, data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        address = services.update_address(address, **s.validated_data)
+        return Response(AddressSerializer(address).data)
+
+    @extend_schema(
+        tags=["Accounts: Addresses"],
+        summary="Delete a saved address",
+        responses={
+            204: OpenApiResponse(description="Deleted"),
+            404: OpenApiResponse(description="Not found"),
+        },
+    )
+    def delete(self, request: Request, pk: str) -> Response:
+        address = self._own_address(request, pk)
+        services.delete_address(address)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AddressSetDefaultView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Accounts: Addresses"],
+        summary="Set address as default",
+        request=None,
+        responses={
+            200: AddressSerializer,
+            404: OpenApiResponse(description="Not found"),
+        },
+    )
+    def post(self, request: Request, pk: str) -> Response:
+        address = get_object_or_404(request.user.addresses, pk=pk)  # type: ignore[union-attr]
+        address = services.set_default_address(address)
+        return Response(AddressSerializer(address).data)
 
 
 class AdminAuditLogView(PaginatedListMixin, APIView):
