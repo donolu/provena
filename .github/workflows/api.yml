@@ -62,7 +62,7 @@ jobs:
       - run: ruff check apps/
       - run: ruff format --check apps/
       - run: bandit -r apps/ -c pyproject.toml
-      - run: safety check
+      - run: pip-audit
       - run: mypy apps/
 
   test:
