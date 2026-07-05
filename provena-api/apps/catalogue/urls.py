@@ -17,6 +17,9 @@ from .views import (
     ProductImageListCreateView,
     ProductListCreateView,
     ProductPublishView,
+    ProductUploadConfirmView,
+    ProductUploadPreviewView,
+    ProductUploadTemplateView,
     ProductVariantDetailView,
     ProductVariantListCreateView,
     SupplierProductListView,
@@ -45,6 +48,22 @@ urlpatterns = [
         "admin/products/<slug:slug>/feature/",
         AdminProductFeatureView.as_view(),
         name="admin-product-feature",
+    ),
+    # Products — supplier upload (must come before <slug:slug> routes)
+    path(
+        "products/upload/template/",
+        ProductUploadTemplateView.as_view(),
+        name="product-upload-template",
+    ),
+    path(
+        "products/upload/preview/",
+        ProductUploadPreviewView.as_view(),
+        name="product-upload-preview",
+    ),
+    path(
+        "products/upload/confirm/",
+        ProductUploadConfirmView.as_view(),
+        name="product-upload-confirm",
     ),
     # Products — supplier-specific MUST come before <slug:slug> to prevent "me" matching
     path("products/me/", SupplierProductListView.as_view(), name="supplier-product-list"),

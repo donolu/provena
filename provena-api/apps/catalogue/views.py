@@ -1,7 +1,9 @@
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -11,8 +13,16 @@ from apps.accounts.permissions import IsAdmin
 from apps.pagination import PaginatedListMixin
 from apps.suppliers.permissions import IsApprovedSupplier
 
-from . import services
-from .models import Banner, Category, Product, ProductImage, ProductStatus, ProductVariant
+from . import bulk_upload, services
+from .models import (
+    Banner,
+    Category,
+    Product,
+    ProductImage,
+    ProductStatus,
+    ProductVariant,
+    _unique_product_slug,
+)
 from .serializers import (
     AdminProductSerializer,
     BulkProductActionSerializer,
@@ -688,3 +698,185 @@ class AdminBannerDetailView(APIView):
         banner = get_object_or_404(Banner, pk=pk)
         banner.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Supplier: bulk product upload
+# ---------------------------------------------------------------------------
+
+_TEMPLATE_HEADER = (
+    "product_name,variant_name,sku,price,description,"
+    "category,compare_at_price,weight_grams,image_url\r\n"
+)
+_TEMPLATE_EXAMPLE = (
+    "Organic Carrots,1kg bag,CARR-1KG,3.99,Fresh organic carrots.,"
+    "Fresh Produce,,1000,https://example.com/carrots.jpg\r\n"
+    "Organic Carrots,500g bag,CARR-500G,2.19,,,,,\r\n"
+)
+
+
+class ProductUploadTemplateView(APIView):
+    permission_classes = [IsApprovedSupplier]
+
+    @extend_schema(
+        tags=["Supplier: Products"],
+        summary="Download CSV upload template",
+        responses={200: OpenApiResponse(description="CSV file download")},
+    )
+    def get(self, request: Request) -> HttpResponse:
+        body = _TEMPLATE_HEADER + _TEMPLATE_EXAMPLE
+        response = HttpResponse(body, content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="provena_products_template.csv"'
+        return response
+
+
+class ProductUploadPreviewView(APIView):
+    permission_classes = [IsApprovedSupplier]
+    parser_classes = [MultiPartParser]
+
+    @extend_schema(
+        tags=["Supplier: Products"],
+        summary="Preview a product upload file",
+        description=(
+            "Parses and validates a CSV, XLSX, or XLS file. "
+            "Format is detected by magic bytes, not file extension. "
+            "Nothing is written to the database. Max 500 rows, 5 MB."
+        ),
+        responses={
+            200: OpenApiResponse(
+                description="Parsed products (valid=true) or validation errors (valid=false)"
+            ),
+            400: OpenApiResponse(description="File missing, too large, or unreadable"),
+        },
+    )
+    def post(self, request: Request) -> Response:
+        file_obj = request.FILES.get("file")
+        if not file_obj:
+            return Response({"detail": "No file uploaded."}, status=status.HTTP_400_BAD_REQUEST)
+
+        content = file_obj.read()
+        if len(content) > bulk_upload.MAX_SIZE_BYTES:
+            return Response(
+                {"detail": "File exceeds 5 MB limit."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            rows = bulk_upload.parse_upload(content)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not rows:
+            return Response({"detail": "File is empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(rows) > bulk_upload.MAX_ROWS:
+            return Response(
+                {"detail": f"File contains {len(rows)} rows; maximum is {bulk_upload.MAX_ROWS}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        existing_skus = set(ProductVariant.objects.values_list("sku", flat=True))
+        products, errors = bulk_upload.validate_and_group(rows, existing_skus)
+
+        if errors:
+            return Response({"valid": False, "errors": errors})
+
+        return Response(
+            {
+                "valid": True,
+                "products": products,
+                "row_count": len(rows),
+                "product_count": len(products),
+            }
+        )
+
+
+class ProductUploadConfirmView(APIView):
+    permission_classes = [IsApprovedSupplier]
+    parser_classes = [MultiPartParser]
+
+    @extend_schema(
+        tags=["Supplier: Products"],
+        summary="Confirm and commit a product upload",
+        description=(
+            "Accepts the same file as the preview endpoint. "
+            "Runs full validation again before writing. "
+            "All created products are in DRAFT status."
+        ),
+        responses={
+            201: OpenApiResponse(description="Products created"),
+            400: OpenApiResponse(description="File missing, too large, or unreadable"),
+            422: OpenApiResponse(
+                description="Validation errors — file has changed or new conflicts exist"
+            ),
+        },
+    )
+    def post(self, request: Request) -> Response:
+        file_obj = request.FILES.get("file")
+        if not file_obj:
+            return Response({"detail": "No file uploaded."}, status=status.HTTP_400_BAD_REQUEST)
+
+        content = file_obj.read()
+        if len(content) > bulk_upload.MAX_SIZE_BYTES:
+            return Response(
+                {"detail": "File exceeds 5 MB limit."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            rows = bulk_upload.parse_upload(content)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not rows:
+            return Response({"detail": "File is empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(rows) > bulk_upload.MAX_ROWS:
+            return Response(
+                {"detail": f"File contains {len(rows)} rows; maximum is {bulk_upload.MAX_ROWS}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        existing_skus = set(ProductVariant.objects.values_list("sku", flat=True))
+        products, errors = bulk_upload.validate_and_group(rows, existing_skus)
+
+        if errors:
+            return Response(
+                {"valid": False, "errors": errors},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        supplier = request.user.supplier  # type: ignore[union-attr]
+        category_map = {c.name.lower(): c for c in Category.objects.filter(is_active=True)}
+
+        created_products = []
+        for product_data in products:
+            category = category_map.get((product_data["category"] or "").lower())
+            product = Product.objects.create(
+                supplier=supplier,
+                name=product_data["name"],
+                slug=_unique_product_slug(product_data["name"]),
+                description=product_data["description"],
+                category=category,
+                status=ProductStatus.DRAFT,
+            )
+            if product_data["image_url"]:
+                ProductImage.objects.create(
+                    product=product,
+                    url=product_data["image_url"],
+                    is_primary=True,
+                )
+            for v in product_data["variants"]:
+                ProductVariant.objects.create(
+                    product=product,
+                    name=v["name"],
+                    sku=v["sku"],
+                    price=v["price"],
+                    compare_at_price=v["compare_at_price"],
+                    weight_grams=v["weight_grams"],
+                )
+            created_products.append(product_data)
+
+        return Response(
+            {"created": len(created_products), "products": created_products},
+            status=status.HTTP_201_CREATED,
+        )
