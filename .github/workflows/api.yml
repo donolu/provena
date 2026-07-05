@@ -138,7 +138,7 @@ jobs:
         working-directory: provena-api
       - uses: actions/setup-node@v5
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
           cache-dependency-path: provena-web/package-lock.json
       - run: npm ci
