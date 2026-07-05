@@ -31,13 +31,13 @@ def check_lot_expiry(days_ahead: int = 3):
     """Daily task: create in-app notifications for lots expiring within `days_ahead` days."""
     from datetime import timedelta
 
-    from django.utils import timezone
+    from django.utils.timezone import localdate
 
     from apps.notifications.models import Notification, NotificationType
 
     from .models import StockLot
 
-    today = timezone.now().date()
+    today = localdate()
     cutoff = today + timedelta(days=days_ahead)
 
     lots = (
