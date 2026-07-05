@@ -1,5 +1,6 @@
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -16,6 +17,7 @@ from .serializers import (
     CloseDisputeSerializer,
     DisputeDetailSerializer,
     DisputeListSerializer,
+    DisputeRefundSerializer,
     EscalateDisputeSerializer,
     OpenDisputeSerializer,
     ResolveDisputeSerializer,
@@ -34,12 +36,14 @@ _SUPPLIER_ONLY_TYPES = {
 class DisputeListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses=DisputeListSerializer(many=True))
     def get(self, request: Request) -> Response:
         qs = Dispute.objects.filter(
             Q(opened_by=request.user) | Q(respondent=request.user)
         ).select_related("opened_by", "respondent", "sub_order")
         return Response(DisputeListSerializer(qs, many=True).data)
 
+    @extend_schema(request=OpenDisputeSerializer, responses={201: DisputeDetailSerializer})
     def post(self, request: Request) -> Response:
         ser = OpenDisputeSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
@@ -89,6 +93,7 @@ class DisputeDetailView(APIView):
         self.check_object_permissions(self.request, dispute)
         return dispute
 
+    @extend_schema(responses=DisputeDetailSerializer)
     def get(self, request: Request, pk) -> Response:
         return Response(DisputeDetailSerializer(self._get_dispute(pk)).data)
 
@@ -96,6 +101,7 @@ class DisputeDetailView(APIView):
 class DisputeRespondView(APIView):
     permission_classes = [IsAuthenticated, IsDisputePartyOrAdmin]
 
+    @extend_schema(request=RespondDisputeSerializer, responses=DisputeDetailSerializer)
     def post(self, request: Request, pk) -> Response:
         dispute = get_object_or_404(Dispute, pk=pk)
         self.check_object_permissions(request, dispute)
@@ -120,6 +126,7 @@ class DisputeRespondView(APIView):
 class DisputeEscalateView(APIView):
     permission_classes = [IsAuthenticated, IsDisputePartyOrAdmin]
 
+    @extend_schema(request=EscalateDisputeSerializer, responses=DisputeDetailSerializer)
     def post(self, request: Request, pk) -> Response:
         dispute = get_object_or_404(Dispute, pk=pk)
         self.check_object_permissions(request, dispute)
@@ -153,6 +160,7 @@ class DisputeEscalateView(APIView):
 class DisputeResolveView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
+    @extend_schema(request=ResolveDisputeSerializer, responses=DisputeDetailSerializer)
     def post(self, request: Request, pk) -> Response:
         dispute = get_object_or_404(Dispute, pk=pk)
 
@@ -178,6 +186,7 @@ class DisputeResolveView(APIView):
 class DisputeCloseView(APIView):
     permission_classes = [IsAuthenticated, IsDisputePartyOrAdmin]
 
+    @extend_schema(request=CloseDisputeSerializer, responses=DisputeDetailSerializer)
     def post(self, request: Request, pk) -> Response:
         dispute = get_object_or_404(Dispute, pk=pk)
         self.check_object_permissions(request, dispute)
@@ -209,6 +218,7 @@ class DisputeCloseView(APIView):
 class AdminDisputeListView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
+    @extend_schema(responses=DisputeListSerializer(many=True))
     def get(self, request: Request) -> Response:
         qs = Dispute.objects.select_related("opened_by", "respondent", "sub_order")
         status_filter = request.query_params.get("status")
@@ -225,6 +235,7 @@ class AdminDisputeListView(APIView):
 class AdminDisputeRefundView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
+    @extend_schema(request=TriggerRefundSerializer, responses={201: DisputeRefundSerializer})
     def post(self, request: Request, pk) -> Response:
 
         dispute = get_object_or_404(Dispute, pk=pk)
@@ -250,6 +261,4 @@ class AdminDisputeRefundView(APIView):
             stripe_refund_id=d["stripe_refund_id"],
             amount_pence=d["amount_pence"],
         )
-        from .serializers import DisputeRefundSerializer
-
         return Response(DisputeRefundSerializer(refund).data, status=status.HTTP_201_CREATED)
