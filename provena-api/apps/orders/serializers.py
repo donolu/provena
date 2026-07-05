@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Order, OrderDispute, OrderItem, OrderReturn, SubOrder
+from .models import Order, OrderItem, OrderReturn, SubOrder
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -45,32 +45,10 @@ class OrderReturnSerializer(serializers.ModelSerializer):
         return obj.raised_by.email if obj.raised_by else None
 
 
-class DisputeSerializer(serializers.ModelSerializer):
-    raised_by_email = serializers.SerializerMethodField()
-    sub_order_id = serializers.UUIDField(source="sub_order.id", read_only=True)
-
-    class Meta:
-        model = OrderDispute
-        fields = [
-            "id",
-            "sub_order_id",
-            "reason",
-            "status",
-            "resolution",
-            "raised_by_email",
-            "created_at",
-            "updated_at",
-        ]
-
-    def get_raised_by_email(self, obj) -> str | None:
-        return obj.raised_by.email if obj.raised_by else None
-
-
 class SubOrderSerializer(serializers.ModelSerializer):
     supplier_name = serializers.CharField(source="supplier.business_name", read_only=True)
     supplier_slug = serializers.SlugField(source="supplier.slug", read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
-    disputes = DisputeSerializer(many=True, read_only=True)
     returns = OrderReturnSerializer(many=True, read_only=True)
 
     class Meta:
@@ -84,7 +62,6 @@ class SubOrderSerializer(serializers.ModelSerializer):
             "tracking_number",
             "delivered_at",
             "items",
-            "disputes",
             "returns",
             "created_at",
             "updated_at",
@@ -185,14 +162,6 @@ class DispatchSerializer(serializers.Serializer):
     tracking_number = serializers.CharField(
         max_length=200, required=False, allow_blank=True, default=""
     )
-
-
-class DisputeCreateSerializer(serializers.Serializer):
-    reason = serializers.CharField()
-
-
-class ResolveDisputeSerializer(serializers.Serializer):
-    resolution = serializers.CharField()
 
 
 class ReturnCreateSerializer(serializers.Serializer):

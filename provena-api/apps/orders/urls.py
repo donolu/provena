@@ -36,18 +36,6 @@ urlpatterns = [
         views.SupplierDeliverView.as_view(),
         name="supplier-deliver",
     ),
-    # Admin disputes (must be before admin/<str:reference>)
-    path("admin/disputes/", views.AdminDisputeListView.as_view(), name="admin-dispute-list"),
-    path(
-        "admin/disputes/<uuid:pk>/resolve/",
-        views.AdminResolveDisputeView.as_view(),
-        name="admin-resolve-dispute",
-    ),
-    path(
-        "admin/disputes/<uuid:pk>/reject/",
-        views.AdminRejectDisputeView.as_view(),
-        name="admin-reject-dispute",
-    ),
     # Admin returns
     path("admin/returns/", views.AdminReturnListView.as_view(), name="admin-return-list"),
     path(
@@ -73,11 +61,6 @@ urlpatterns = [
         "<str:reference>/sub-orders/<uuid:pk>/return/",
         views.RequestReturnView.as_view(),
         name="request-return",
-    ),
-    path(
-        "<str:reference>/sub-orders/<uuid:pk>/dispute/",
-        views.RaiseDisputeView.as_view(),
-        name="raise-dispute",
     ),
     path("<str:reference>/", views.OrderDetailView.as_view(), name="order-detail"),
 ]

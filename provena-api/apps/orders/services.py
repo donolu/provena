@@ -10,9 +10,7 @@ from apps.inventory import services as inventory_services
 
 from .models import (
     RETURN_WINDOW_DAYS,
-    DisputeStatus,
     Order,
-    OrderDispute,
     OrderItem,
     OrderReturn,
     OrderStatus,
@@ -307,39 +305,3 @@ def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderR
     return_obj.refund_amount = amount or payment.amount
     return_obj.save(update_fields=["status", "refund_amount", "updated_at"])
     return return_obj
-
-
-@transaction.atomic
-def raise_dispute(sub_order: SubOrder, raised_by, reason: str) -> OrderDispute:
-    if sub_order.status not in (OrderStatus.DISPATCHED, OrderStatus.DELIVERED):
-        raise ValueError("Disputes can only be raised for dispatched or delivered sub-orders.")
-    if sub_order.status == OrderStatus.DELIVERED:
-        if not sub_order.delivered_at or timezone.now() > sub_order.delivered_at + timedelta(
-            days=7
-        ):
-            raise ValueError("Disputes must be raised within 7 days of delivery.")
-    return OrderDispute.objects.create(
-        sub_order=sub_order,
-        raised_by=raised_by,
-        reason=reason,
-    )
-
-
-@transaction.atomic
-def resolve_dispute(dispute: OrderDispute, resolution: str) -> OrderDispute:
-    if dispute.status != DisputeStatus.OPEN:
-        raise ValueError("Can only resolve an open dispute.")
-    dispute.status = DisputeStatus.RESOLVED
-    dispute.resolution = resolution
-    dispute.save(update_fields=["status", "resolution", "updated_at"])
-    return dispute
-
-
-@transaction.atomic
-def reject_dispute(dispute: OrderDispute, resolution: str) -> OrderDispute:
-    if dispute.status != DisputeStatus.OPEN:
-        raise ValueError("Can only reject an open dispute.")
-    dispute.status = DisputeStatus.REJECTED
-    dispute.resolution = resolution
-    dispute.save(update_fields=["status", "resolution", "updated_at"])
-    return dispute

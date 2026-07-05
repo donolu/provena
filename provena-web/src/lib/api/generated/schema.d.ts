@@ -1444,57 +1444,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/orders/admin/disputes/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all disputes */
-        get: operations["orders_admin_disputes_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/orders/admin/disputes/{id}/resolve/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Resolve a dispute */
-        post: operations["orders_admin_disputes_resolve_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/orders/admin/disputes/{id}/reject/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reject a dispute */
-        post: operations["orders_admin_disputes_reject_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/orders/admin/returns/": {
         parameters: {
             query?: never;
@@ -1645,23 +1594,6 @@ export interface paths {
         put?: never;
         /** Request a return on a sub-order */
         post: operations["orders_sub_orders_return_create"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/orders/{reference}/sub-orders/{id}/dispute/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Raise a dispute on a sub-order */
-        post: operations["orders_sub_orders_dispute_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2279,6 +2211,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/disputes/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["disputes_list"];
+        put?: never;
+        post: operations["disputes_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disputes/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["disputes_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disputes/{id}/respond/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["disputes_respond_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disputes/{id}/escalate/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["disputes_escalate_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disputes/{id}/resolve/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["disputes_resolve_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disputes/{id}/close/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["disputes_close_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disputes/admin/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["disputes_admin_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disputes/admin/{id}/refund/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["disputes_admin_refund_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2389,6 +2449,8 @@ export interface components {
             /** Format: date-time */
             readonly created_at: string;
         };
+        /** @enum {unknown} */
+        BlankEnum: "";
         BulkProductActionRequest: {
             slugs: string[];
             action: components["schemas"]["ActionEnum"];
@@ -2463,6 +2525,10 @@ export interface components {
             new_password: string;
             new_password_confirm: string;
         };
+        CloseDisputeRequest: {
+            /** @default  */
+            body: string;
+        };
         CreatePaymentIntentRequest: {
             order_reference: string;
         };
@@ -2475,30 +2541,91 @@ export interface components {
             /** @default  */
             tracking_number: string;
         };
-        Dispute: {
+        DisputeDetail: {
             /** Format: uuid */
             readonly id: string;
             /** Format: uuid */
-            readonly sub_order_id: string;
-            reason: string;
-            status?: components["schemas"]["DisputeStatusEnum"];
-            resolution?: string;
-            readonly raised_by_email: string | null;
+            sub_order: string;
+            dispute_type: components["schemas"]["DisputeTypeEnum"];
+            description: string;
+            resolution_requested: components["schemas"]["ResolutionRequestedEnum"];
+            status?: components["schemas"]["Status0e8Enum"];
+            outcome?: components["schemas"]["OutcomeEnum"] | components["schemas"]["BlankEnum"];
+            /** Format: int64 */
+            outcome_amount_pence?: number | null;
+            outcome_notes?: string;
+            /** Format: email */
+            readonly opened_by_email: string;
+            /** Format: email */
+            readonly respondent_email: string;
+            /** Format: date-time */
+            response_deadline: string;
+            payout_held?: boolean;
+            readonly is_overdue: boolean;
+            /** Format: date-time */
+            readonly opened_at: string;
+            /** Format: date-time */
+            resolved_at?: string | null;
+            readonly events: components["schemas"]["DisputeEvent"][];
+            readonly refunds: components["schemas"]["DisputeRefund"][];
+        };
+        DisputeEvent: {
+            /** Format: uuid */
+            readonly id: string;
+            event_type: components["schemas"]["EventTypeEnum"];
+            /** Format: email */
+            readonly author_email: string;
+            body?: string;
             /** Format: date-time */
             readonly created_at: string;
-            /** Format: date-time */
-            readonly updated_at: string;
         };
-        DisputeCreateRequest: {
-            reason: string;
+        DisputeList: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            sub_order: string;
+            dispute_type: components["schemas"]["DisputeTypeEnum"];
+            status?: components["schemas"]["Status0e8Enum"];
+            resolution_requested: components["schemas"]["ResolutionRequestedEnum"];
+            outcome?: components["schemas"]["OutcomeEnum"] | components["schemas"]["BlankEnum"];
+            /** Format: email */
+            readonly opened_by_email: string;
+            /** Format: email */
+            readonly respondent_email: string;
+            /** Format: date-time */
+            response_deadline: string;
+            readonly is_overdue: boolean;
+            /** Format: date-time */
+            readonly opened_at: string;
+        };
+        DisputeRefund: {
+            /** Format: uuid */
+            readonly id: string;
+            stripe_refund_id: string;
+            /** Format: int64 */
+            amount_pence: number;
+            status?: components["schemas"]["DisputeRefundStatusEnum"];
+            /** Format: date-time */
+            readonly created_at: string;
         };
         /**
-         * @description * `OPEN` - Open
-         *     * `RESOLVED` - Resolved
-         *     * `REJECTED` - Rejected
+         * @description * `PENDING` - Pending
+         *     * `SUCCEEDED` - Succeeded
+         *     * `FAILED` - Failed
          * @enum {string}
          */
-        DisputeStatusEnum: "OPEN" | "RESOLVED" | "REJECTED";
+        DisputeRefundStatusEnum: "PENDING" | "SUCCEEDED" | "FAILED";
+        /**
+         * @description * `NOT_RECEIVED` - Item not received
+         *     * `DAMAGED` - Item damaged or spoiled
+         *     * `WRONG_ITEM` - Wrong item received
+         *     * `PARTIAL_DELIVERY` - Partial delivery
+         *     * `FALSE_CLAIM` - False claim
+         *     * `DELIVERY_REFUSED` - Delivery refused by buyer
+         *     * `FRAUDULENT_CANCELLATION` - Fraudulent cancellation
+         * @enum {string}
+         */
+        DisputeTypeEnum: "NOT_RECEIVED" | "DAMAGED" | "WRONG_ITEM" | "PARTIAL_DELIVERY" | "FALSE_CLAIM" | "DELIVERY_REFUSED" | "FRAUDULENT_CANCELLATION";
         DocumentReviewRequest: {
             approved: boolean;
             /** @default  */
@@ -2520,6 +2647,20 @@ export interface components {
          * @enum {string}
          */
         DocumentTypeEnum: "IDENTITY" | "BUSINESS_REG" | "FOOD_HYGIENE" | "ORGANIC_CERT" | "OTHER";
+        EscalateDisputeRequest: {
+            /** @default  */
+            body: string;
+        };
+        /**
+         * @description * `OPENED` - Opened
+         *     * `RESPONDED` - Responded
+         *     * `ESCALATED` - Escalated
+         *     * `RESOLVED` - Resolved
+         *     * `CLOSED` - Closed
+         *     * `ADMIN_NOTE` - Admin note
+         * @enum {string}
+         */
+        EventTypeEnum: "OPENED" | "RESPONDED" | "ESCALATED" | "RESOLVED" | "CLOSED" | "ADMIN_NOTE";
         LoginRequest: {
             /** Format: email */
             email: string;
@@ -2570,6 +2711,13 @@ export interface components {
         NotificationTypeEnum: "LOW_STOCK" | "ORDER_PLACED" | "ORDER_DISPATCHED" | "ORDER_DELIVERED" | "PAYMENT_SUCCEEDED" | "GENERAL";
         /** @enum {unknown} */
         NullEnum: null;
+        OpenDisputeRequest: {
+            /** Format: uuid */
+            sub_order_id: string;
+            dispute_type: components["schemas"]["DisputeTypeEnum"];
+            description: string;
+            resolution_requested: components["schemas"]["ResolutionRequestedEnum"];
+        };
         Order: {
             /** Format: uuid */
             readonly id: string;
@@ -2639,6 +2787,15 @@ export interface components {
          * @enum {string}
          */
         OrderReturnStatusEnum: "REQUESTED" | "APPROVED" | "REJECTED" | "REFUNDED";
+        /**
+         * @description * `FULL_REFUND` - Full refund
+         *     * `PARTIAL_REFUND` - Partial refund
+         *     * `REPLACEMENT` - Replacement
+         *     * `REJECTED` - Rejected (in favour of respondent)
+         *     * `WITHDRAWN` - Withdrawn
+         * @enum {string}
+         */
+        OutcomeEnum: "FULL_REFUND" | "PARTIAL_REFUND" | "REPLACEMENT" | "REJECTED" | "WITHDRAWN";
         PaginatedAdminSupplierList: {
             /** @example 123 */
             count: number;
@@ -3028,8 +3185,22 @@ export interface components {
             /** @default  */
             last_name: string;
         };
+        /**
+         * @description * `FULL_REFUND` - Full refund
+         *     * `PARTIAL_REFUND` - Partial refund
+         *     * `REPLACEMENT` - Replacement
+         *     * `NO_ACTION` - No action
+         * @enum {string}
+         */
+        ResolutionRequestedEnum: "FULL_REFUND" | "PARTIAL_REFUND" | "REPLACEMENT" | "NO_ACTION";
         ResolveDisputeRequest: {
-            resolution: string;
+            outcome: components["schemas"]["OutcomeEnum"];
+            outcome_amount_pence?: number | null;
+            /** @default  */
+            outcome_notes: string;
+        };
+        RespondDisputeRequest: {
+            body: string;
         };
         ReturnActionRequest: {
             /** @default  */
@@ -3066,6 +3237,15 @@ export interface components {
          * @enum {string}
          */
         RoleEnum: "BUYER" | "SUPPLIER" | "ADMIN";
+        /**
+         * @description * `OPEN` - Open
+         *     * `RESPONDENT_REPLIED` - Respondent replied
+         *     * `ESCALATED` - Escalated to admin
+         *     * `RESOLVED` - Resolved
+         *     * `CLOSED` - Closed
+         * @enum {string}
+         */
+        Status0e8Enum: "OPEN" | "RESPONDENT_REPLIED" | "ESCALATED" | "RESOLVED" | "CLOSED";
         /**
          * @description * `DRAFT` - Draft
          *     * `ACTIVE` - Active
@@ -3134,7 +3314,6 @@ export interface components {
             /** Format: date-time */
             delivered_at?: string | null;
             readonly items: components["schemas"]["OrderItem"][];
-            readonly disputes: components["schemas"]["Dispute"][];
             readonly returns: components["schemas"]["OrderReturn"][];
             /** Format: date-time */
             readonly created_at: string;
@@ -3269,6 +3448,10 @@ export interface components {
         };
         TokenRefreshRequest: {
             refresh: string;
+        };
+        TriggerRefundRequest: {
+            stripe_refund_id: string;
+            amount_pence: number;
         };
         UploadDocumentRequest: {
             document_type: components["schemas"]["DocumentTypeEnum"];
@@ -5722,96 +5905,6 @@ export interface operations {
             };
         };
     };
-    orders_admin_disputes_list: {
-        parameters: {
-            query?: {
-                /** @description Filter by dispute status (OPEN/RESOLVED/REJECTED) */
-                status?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Dispute"][];
-                };
-            };
-        };
-    };
-    orders_admin_disputes_resolve_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ResolveDisputeRequest"];
-                "application/x-www-form-urlencoded": components["schemas"]["ResolveDisputeRequest"];
-                "multipart/form-data": components["schemas"]["ResolveDisputeRequest"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Dispute"];
-                };
-            };
-            /** @description Dispute is not open */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    orders_admin_disputes_reject_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ResolveDisputeRequest"];
-                "application/x-www-form-urlencoded": components["schemas"]["ResolveDisputeRequest"];
-                "multipart/form-data": components["schemas"]["ResolveDisputeRequest"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Dispute"];
-                };
-            };
-            /** @description Dispute is not open */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     orders_admin_returns_list: {
         parameters: {
             query?: {
@@ -6034,41 +6127,6 @@ export interface operations {
                 };
             };
             /** @description Sub-order not delivered or outside return window */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    orders_sub_orders_dispute_create: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                reference: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DisputeCreateRequest"];
-                "application/x-www-form-urlencoded": components["schemas"]["DisputeCreateRequest"];
-                "multipart/form-data": components["schemas"]["DisputeCreateRequest"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Dispute"];
-                };
-            };
-            /** @description Sub-order not in disputable state */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -6913,6 +6971,225 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    disputes_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeList"][];
+                };
+            };
+        };
+    };
+    disputes_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenDisputeRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["OpenDisputeRequest"];
+                "multipart/form-data": components["schemas"]["OpenDisputeRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeDetail"];
+                };
+            };
+        };
+    };
+    disputes_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeDetail"];
+                };
+            };
+        };
+    };
+    disputes_respond_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RespondDisputeRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["RespondDisputeRequest"];
+                "multipart/form-data": components["schemas"]["RespondDisputeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeDetail"];
+                };
+            };
+        };
+    };
+    disputes_escalate_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["EscalateDisputeRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["EscalateDisputeRequest"];
+                "multipart/form-data": components["schemas"]["EscalateDisputeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeDetail"];
+                };
+            };
+        };
+    };
+    disputes_resolve_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveDisputeRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ResolveDisputeRequest"];
+                "multipart/form-data": components["schemas"]["ResolveDisputeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeDetail"];
+                };
+            };
+        };
+    };
+    disputes_close_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CloseDisputeRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["CloseDisputeRequest"];
+                "multipart/form-data": components["schemas"]["CloseDisputeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeDetail"];
+                };
+            };
+        };
+    };
+    disputes_admin_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeList"][];
+                };
+            };
+        };
+    };
+    disputes_admin_refund_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerRefundRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["TriggerRefundRequest"];
+                "multipart/form-data": components["schemas"]["TriggerRefundRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeRefund"];
+                };
             };
         };
     };

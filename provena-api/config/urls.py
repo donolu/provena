@@ -12,6 +12,7 @@ api_v1 = [
     path("marketplace/", include("apps.marketplace.urls")),
     path("notifications/", include("apps.notifications.urls")),
     path("analytics/", include("apps.analytics.urls")),
+    path("disputes/", include("apps.disputes.urls")),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "schema/swagger-ui/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"
