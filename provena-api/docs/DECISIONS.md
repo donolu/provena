@@ -111,3 +111,32 @@ Migrate to a single monorepo (`donolu/provena`) using `git subtree add` to prese
 
 **Consequences:**
 `donolu/provena-api` and `donolu/provena-web` are archived (read-only). Full commit history for both projects is navigable in the monorepo via `git log provena-api/` and `git log provena-web/`. The assumption in ADR-003 about independent deployment cadences is revisited: if a future hire takes ownership of one layer and the teams genuinely diverge, the sub-projects can be extracted using `git subtree split` with full history intact. OpenAPI client code generation (planned, see backlog) will run from the monorepo root, writing generated types into `provena-web/src/lib/api/generated/`.
+
+---
+
+## ADR-008: Dispute Resolution Design
+
+**Date:** 2026-07-05
+**Status:** Accepted
+
+**Context:**
+Provena is a multi-supplier marketplace where a single buyer order may involve several suppliers. Disputes about order quality, non-delivery, or fraudulent claims can arise from either side. The design must balance three competing needs: fast resolution for time-sensitive goods (fresh produce can spoil within days), supplier protection against frivolous or fraudulent buyer claims, and a clear audit trail for financial reconciliation.
+
+**Decision:**
+
+**Bidirectional disputes.** Either the buyer or the supplier can open a dispute against a sub-order. This is a deliberate departure from the more common buyer-only model. Suppliers on a fresh-produce marketplace face real risk from delivery-refusal fraud and false claims; a system that only lets buyers complain would be asymmetric and undermine supplier trust.
+
+**Transparent event log.** All dispute events (opened, response, escalation, admin notes, resolution) are written to an append-only `DisputeEvent` table and are readable by both parties and admin. Neither party has a private channel. Transparency is the primary mechanism for deterring frivolous claims on both sides.
+
+**Category-scoped dispute window for condition claims.** The window within which a condition-based dispute (damaged, spoiled, wrong item, partial delivery) can be raised is stored on the `Category` model as `dispute_window_days` (integer, min 1, max 7). This means the window is configurable per product type without a code change: fresh produce might carry a 2-day window, dry goods a 7-day window. A fixed-code list of windows per product type was rejected because it would require a deploy whenever a new category was introduced. A global setting was rejected because it cannot distinguish between perishable and non-perishable goods. Non-delivery and supplier counter-claim disputes use a fixed 14-day window regardless of category, since perishability is not a factor.
+
+**Interim window start.** Until order fulfilment tracking (#21) provides a confirmed delivery timestamp, the dispute window starts from the order placement date plus `dispute_window_days`. This is acknowledged as an approximation; the dispute service will be updated to use the actual delivery timestamp once tracking is in place.
+
+**Admin-triggered refund, not automated.** When admin resolves a dispute with a refund outcome, the refund is not triggered automatically. Admin must explicitly call the refund endpoint, which calls Stripe and creates a `DisputeRefund` record. Automatic refund on resolution was rejected for v1 because: (a) Stripe Connect (#18) is not yet implemented, so refunds flow from the platform account and the accounting between platform and supplier must be manually verified; (b) partial refund amounts require a human judgement step; (c) the risk of an automated code path issuing unintended refunds outweighs the convenience saving at current dispute volumes.
+
+**Payout hold on open disputes.** When a dispute is opened against a sub-order, that sub-order's payout to the supplier is held and excluded from the next payout run. This eliminates the need for clawbacks in the common case where disputes are raised before the supplier's payout settles. If a dispute is raised after a payout has already processed, a clawback record is created against the supplier's next payout run.
+
+**Commission reversal.** The platform commission on a refunded sub-order is reversed for the refunded portion. The `DisputeRefund` record carries the sub-order FK and amount, which is sufficient for the payout service to calculate and subtract the commission portion from the platform revenue ledger.
+
+**Consequences:**
+The bidirectional model requires the dispute type taxonomy to cover both buyer and supplier grievances, adding some UI and API complexity compared to a buyer-only flow. The category-scoped window requires `dispute_window_days` to be set correctly when new categories are created; an omission (defaulting to 3 days) is a safe fallback rather than a breaking state. The manual refund step adds latency for buyers waiting on a refund decision; this is an acceptable trade-off at launch volumes and will be revisited when Stripe Connect is implemented. The payout hold approach assumes disputes are typically raised before payout; if payout cycles become very short (e.g. daily), the clawback path will be exercised more frequently and may need its own tooling.

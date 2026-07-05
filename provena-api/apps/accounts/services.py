@@ -8,7 +8,7 @@ from django.contrib.auth import authenticate
 from django.core.cache import cache
 from django.utils import timezone
 
-from .models import PasswordResetToken, Role, User
+from .models import Address, PasswordResetToken, Role, User
 
 logger = logging.getLogger(__name__)
 
@@ -194,3 +194,41 @@ def confirm_password_reset(raw_token: str, new_password: str) -> tuple[bool, str
     token_obj.used_at = timezone.now()
     token_obj.save(update_fields=["used_at"])
     return True, ""
+
+
+# ---------------------------------------------------------------------------
+# Address book
+# ---------------------------------------------------------------------------
+
+
+def create_address(user: User, make_default: bool = False, **kwargs: object) -> Address:
+    if make_default or not user.addresses.exists():
+        user.addresses.filter(is_default=True).update(is_default=False)
+        kwargs["is_default"] = True
+    return Address.objects.create(user=user, **kwargs)
+
+
+def update_address(address: Address, **kwargs: object) -> Address:
+    allowed = {"label", "full_name", "line1", "line2", "city", "postcode", "country"}
+    for field, value in kwargs.items():
+        if field in allowed:
+            setattr(address, field, value)
+    address.save()
+    return address
+
+
+def set_default_address(address: Address) -> Address:
+    address.user.addresses.filter(is_default=True).update(is_default=False)
+    address.is_default = True
+    address.save(update_fields=["is_default", "updated_at"])
+    return address
+
+
+def delete_address(address: Address) -> None:
+    was_default = address.is_default
+    address.delete()
+    if was_default:
+        next_address = address.user.addresses.first()
+        if next_address:
+            next_address.is_default = True
+            next_address.save(update_fields=["is_default", "updated_at"])

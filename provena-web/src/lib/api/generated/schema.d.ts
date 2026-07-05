@@ -245,6 +245,59 @@ export interface paths {
         patch: operations["auth_me_partial_update"];
         trace?: never;
     };
+    "/api/v1/auth/addresses/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List saved addresses */
+        get: operations["auth_addresses_list"];
+        put?: never;
+        /** Save a new address */
+        post: operations["auth_addresses_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/addresses/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a saved address */
+        delete: operations["auth_addresses_destroy"];
+        options?: never;
+        head?: never;
+        /** Update a saved address */
+        patch: operations["auth_addresses_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/auth/addresses/{id}/default/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set address as default */
+        post: operations["auth_addresses_default_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/admin/users/": {
         parameters: {
             query?: never;
@@ -2246,6 +2299,34 @@ export interface components {
             /** Format: uuid */
             variant_id: string;
         };
+        Address: {
+            /** Format: uuid */
+            readonly id: string;
+            label?: string;
+            full_name: string;
+            line1: string;
+            line2?: string;
+            city: string;
+            postcode: string;
+            country?: string;
+            readonly is_default: boolean;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        AddressWriteRequest: {
+            /** @default  */
+            label: string;
+            full_name: string;
+            line1: string;
+            /** @default  */
+            line2: string;
+            city: string;
+            postcode: string;
+            /** @default GB */
+            country: string;
+        };
         AdjustStockRequest: {
             delta: number;
             notes: string;
@@ -2686,6 +2767,18 @@ export interface components {
         PasswordResetRequestRequest: {
             /** Format: email */
             email: string;
+        };
+        PatchedAddressWriteRequest: {
+            /** @default  */
+            label: string;
+            full_name?: string;
+            line1?: string;
+            /** @default  */
+            line2: string;
+            city?: string;
+            postcode?: string;
+            /** @default GB */
+            country: string;
         };
         PatchedAdminSupplierRequest: {
             business_name?: string;
@@ -3569,6 +3662,153 @@ export interface operations {
             };
             /** @description Validation error */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_addresses_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Address"][];
+                };
+            };
+        };
+    };
+    auth_addresses_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddressWriteRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AddressWriteRequest"];
+                "multipart/form-data": components["schemas"]["AddressWriteRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Address"];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_addresses_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_addresses_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedAddressWriteRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedAddressWriteRequest"];
+                "multipart/form-data": components["schemas"]["PatchedAddressWriteRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Address"];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_addresses_default_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Address"];
+                };
+            };
+            /** @description Not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
