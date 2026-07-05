@@ -81,3 +81,4 @@ jobs:
             exit 1
           fi
           echo "All Web CI jobs passed or were skipped (no web changes)."
+        working-directory: ${{ runner.temp }}
