@@ -110,6 +110,7 @@ The two tiers communicate exclusively through the versioned REST API. They are d
 | Users | `/api/v1/users/me/` | GET, PATCH, DELETE |
 | Suppliers | `/api/v1/suppliers/` | GET, POST |
 | Supplier detail | `/api/v1/suppliers/{id}/` | GET, PATCH, DELETE |
+| Stripe Connect onboarding | `/api/v1/suppliers/me/stripe-connect/` | GET (returns redirect URL) |
 | Categories | `/api/v1/catalogue/categories/` | GET |
 | Products | `/api/v1/catalogue/products/` | GET, POST |
 | Product detail | `/api/v1/catalogue/products/{id}/` | GET, PATCH, DELETE |
@@ -120,6 +121,14 @@ The two tiers communicate exclusively through the versioned REST API. They are d
 | Cart items | `/api/v1/cart/items/{id}/` | PATCH, DELETE |
 | Orders | `/api/v1/orders/` | GET, POST |
 | Order detail | `/api/v1/orders/{id}/` | GET, PATCH |
+| Disputes | `/api/v1/disputes/` | GET, POST |
+| Dispute detail | `/api/v1/disputes/{id}/` | GET |
+| Dispute respond | `/api/v1/disputes/{id}/respond/` | POST |
+| Dispute escalate | `/api/v1/disputes/{id}/escalate/` | POST |
+| Dispute resolve | `/api/v1/disputes/{id}/resolve/` | POST (admin) |
+| Dispute close | `/api/v1/disputes/{id}/close/` | POST |
+| Admin dispute list | `/api/v1/disputes/admin/` | GET (admin) |
+| Admin dispute refund | `/api/v1/disputes/admin/{id}/refund/` | POST (admin) |
 | Payments | `/api/v1/payments/checkout/` | POST (creates Stripe session) |
 | Stripe webhook | `/api/v1/payments/webhook/` | POST |
 | Notifications | `/api/v1/notifications/` | GET |
@@ -161,11 +170,11 @@ UUID primary keys on all user-facing resources (prevents enumeration attacks). S
 - `User` - extends `AbstractBaseUser`; fields: id (UUID), email, role (BUYER/SUPPLIER/ADMIN), is_active, totp_enabled, created_at
 
 **suppliers:**
-- `Supplier` - id, user (FK), business_name, status (PENDING/APPROVED/SUSPENDED), commission_rate, stripe_account_id
+- `Supplier` - id, user (FK), business_name, status (PENDING/APPROVED/SUSPENDED), commission_rate, stripe_account_id, stripe_onboarding_complete
 - `SupplierDocument` - id, supplier (FK), document_type, file_url, uploaded_at
 
 **catalogue:**
-- `Category` - id, name, slug, parent (self-referential FK), is_active
+- `Category` - id, name, slug, parent (self-referential FK), is_active, dispute_window_days (1-7, default 3)
 - `Product` - id, supplier (FK), category (FK), name, slug, description, status, created_at
 - `ProductVariant` - id, product (FK), label, price, weight_grams, sku, is_active
 - `ProductImage` - id, product (FK), url, order, is_primary
@@ -183,6 +192,11 @@ UUID primary keys on all user-facing resources (prevents enumeration attacks). S
 **payments:**
 - `Payment` - id, order (FK), stripe_payment_intent_id, amount, currency, status, created_at
 - `Payout` - id, sub_order (FK), supplier (FK), gross_amount, commission, net_amount, stripe_transfer_id, status
+
+**disputes:**
+- `Dispute` - id (UUID), sub_order (FK), opened_by (FK), respondent (FK), dispute_type, description, resolution_requested, status (OPEN/RESPONDENT_REPLIED/ESCALATED/RESOLVED/CLOSED), outcome, outcome_amount_pence, outcome_notes, response_deadline, payout_held, opened_at, resolved_at
+- `DisputeEvent` - id, dispute (FK), author (FK), event_type, body, created_at (append-only log)
+- `DisputeRefund` - id, dispute (FK), sub_order (FK), stripe_refund_id, amount_pence, status (PENDING/SUCCEEDED/FAILED)
 
 **notifications:**
 - `Notification` - id, user (FK), type, title, body, is_read, created_at

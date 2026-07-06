@@ -153,6 +153,30 @@ def get_stripe_connect_onboarding_url(supplier: Supplier, return_url: str, refre
     return str(link["url"])
 
 
+def handle_connect_account_updated(stripe_account_id: str) -> None:
+    """Mark onboarding complete when Stripe confirms the account can accept transfers."""
+    try:
+        supplier = Supplier.objects.get(stripe_account_id=stripe_account_id)
+    except Supplier.DoesNotExist:
+        logger.warning("account.updated for unknown Stripe account %s", stripe_account_id)
+        return
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    account = stripe.Account.retrieve(stripe_account_id)
+    is_complete = bool(account.get("charges_enabled") and account.get("payouts_enabled"))
+
+    if is_complete and not supplier.stripe_onboarding_complete:
+        supplier.stripe_onboarding_complete = True
+        supplier.save(update_fields=["stripe_onboarding_complete", "updated_at"])
+        logger.info("Stripe Connect onboarding complete for supplier %s", supplier.business_name)
+    elif not is_complete and supplier.stripe_onboarding_complete:
+        supplier.stripe_onboarding_complete = False
+        supplier.save(update_fields=["stripe_onboarding_complete", "updated_at"])
+        logger.warning(
+            "Stripe Connect account %s lost charges/payouts capability", stripe_account_id
+        )
+
+
 def get_performance_stats(supplier: Supplier) -> dict:
     from decimal import ROUND_HALF_UP, Decimal
 

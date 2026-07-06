@@ -214,8 +214,11 @@ class StripeConnectView(APIView):
         },
     )
     def get(self, request: Request) -> Response:
-        return_url = f"{request.build_absolute_uri('/api/v1/suppliers/me/')}"
-        refresh_url = f"{request.build_absolute_uri('/api/v1/suppliers/me/stripe-connect/')}"
+        from django.conf import settings as django_settings
+
+        frontend_url = getattr(django_settings, "FRONTEND_URL", "http://localhost:3000")
+        return_url = f"{frontend_url}/supplier/payouts/?connected=1"
+        refresh_url = request.build_absolute_uri("/api/v1/suppliers/me/stripe-connect/")
         url = services.get_stripe_connect_onboarding_url(
             request.user.supplier,  # type: ignore[union-attr]
             return_url=return_url,
