@@ -163,7 +163,9 @@ def handle_connect_account_updated(stripe_account_id: str) -> None:
 
     stripe.api_key = settings.STRIPE_SECRET_KEY
     account = stripe.Account.retrieve(stripe_account_id)
-    is_complete = bool(account.get("charges_enabled") and account.get("payouts_enabled"))
+    is_complete = bool(
+        getattr(account, "charges_enabled", False) and getattr(account, "payouts_enabled", False)
+    )
 
     if is_complete and not supplier.stripe_onboarding_complete:
         supplier.stripe_onboarding_complete = True
