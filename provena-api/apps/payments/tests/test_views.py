@@ -221,7 +221,9 @@ class TestStripeWebhookView:
         }
         mock_stripe_views.Webhook.construct_event.return_value = event
 
-        fake_account = {"charges_enabled": True, "payouts_enabled": True}
+        fake_account = MagicMock()
+        fake_account.charges_enabled = True
+        fake_account.payouts_enabled = True
         with patch("apps.suppliers.services.stripe") as mock_supplier_stripe:
             mock_supplier_stripe.Account.retrieve.return_value = fake_account
             response = APIClient().post(
