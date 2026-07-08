@@ -107,3 +107,15 @@ def dispatched_sub_order(sub_order):
     order_services.dispatch_sub_order(sub_order, tracking_number="TRACK-001")
     sub_order.refresh_from_db()
     return sub_order
+
+
+@pytest.fixture
+def payment(db, placed_order):
+    from apps.payments.models import Payment, PaymentStatus
+
+    return Payment.objects.create(
+        order=placed_order,
+        stripe_payment_intent_id="pi_test_dispute123",
+        amount=placed_order.total_amount,
+        status=PaymentStatus.SUCCEEDED,
+    )

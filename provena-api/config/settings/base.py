@@ -252,6 +252,10 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": 86400,  # daily
         "kwargs": {"days_ahead": 3},
     },
+    "auto-escalate-overdue-disputes": {
+        "task": "apps.disputes.tasks.auto_escalate_overdue_disputes",
+        "schedule": 3600,  # hourly
+    },
 }
 
 # Cache
@@ -267,6 +271,14 @@ STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")
 STRIPE_PUBLISHABLE_KEY = env("STRIPE_PUBLISHABLE_KEY", default="")
 STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
 PLATFORM_FEE_PERCENT = env("PLATFORM_FEE_PERCENT", default="10")
+
+# S3 / Cloudflare R2 (overridden in production.py with real credentials)
+AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
+AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
+AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="")
+AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="eu-west-2")
+AWS_S3_FILE_OVERWRITE = False
+AWS_DEFAULT_ACL = "private"
 
 # Frontend
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")

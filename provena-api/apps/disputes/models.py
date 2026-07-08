@@ -43,9 +43,11 @@ class DisputeEventType(models.TextChoices):
     OPENED = "OPENED", "Opened"
     RESPONDED = "RESPONDED", "Responded"
     ESCALATED = "ESCALATED", "Escalated"
+    AUTO_ESCALATED = "AUTO_ESCALATED", "Auto-escalated"
     RESOLVED = "RESOLVED", "Resolved"
     CLOSED = "CLOSED", "Closed"
     ADMIN_NOTE = "ADMIN_NOTE", "Admin note"
+    ATTACHMENT = "ATTACHMENT", "Attachment added"
 
 
 # Types that always use a fixed 14-day window regardless of category setting.
@@ -116,6 +118,53 @@ class DisputeRefundStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
     SUCCEEDED = "SUCCEEDED", "Succeeded"
     FAILED = "FAILED", "Failed"
+
+
+ALLOWED_ATTACHMENT_TYPES = frozenset(
+    [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+        "application/pdf",
+    ]
+)
+ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+class DisputeMessage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    dispute = models.ForeignKey(Dispute, on_delete=models.CASCADE, related_name="messages")
+    author = models.ForeignKey(
+        "accounts.User", on_delete=models.PROTECT, related_name="dispute_messages"
+    )
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        return f"Message on {self.dispute_id} by {self.author_id}"
+
+
+class DisputeAttachment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    dispute = models.ForeignKey(Dispute, on_delete=models.CASCADE, related_name="attachments")
+    uploaded_by = models.ForeignKey(
+        "accounts.User", on_delete=models.PROTECT, related_name="dispute_attachments"
+    )
+    filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100)
+    file_key = models.CharField(max_length=500)
+    size_bytes = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.filename} on dispute {self.dispute_id}"
 
 
 class DisputeRefund(models.Model):

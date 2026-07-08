@@ -15,17 +15,20 @@ from .models import Dispute, DisputeStatus, DisputeType
 from .permissions import IsAdmin, IsDisputePartyOrAdmin
 from .serializers import (
     CloseDisputeSerializer,
+    DisputeAttachmentSerializer,
     DisputeDetailSerializer,
     DisputeListSerializer,
+    DisputeMessageSerializer,
     DisputeRefundSerializer,
     EscalateDisputeSerializer,
     OpenDisputeSerializer,
+    PostMessageSerializer,
+    RequestAttachmentUploadSerializer,
     ResolveDisputeSerializer,
     RespondDisputeSerializer,
     TriggerRefundSerializer,
 )
 
-# Dispute types that may only be opened by a supplier.
 _SUPPLIER_ONLY_TYPES = {
     DisputeType.FALSE_CLAIM,
     DisputeType.DELIVERY_REFUSED,
@@ -51,7 +54,6 @@ class DisputeListCreateView(APIView):
 
         sub_order = get_object_or_404(SubOrder, id=data["sub_order_id"])
 
-        # Validate the opener is a party to this sub-order.
         user = request.user
         buyer = sub_order.order.buyer
         supplier_user = sub_order.supplier.user
@@ -62,7 +64,6 @@ class DisputeListCreateView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Supplier-only dispute types
         if data["dispute_type"] in _SUPPLIER_ONLY_TYPES and user.id != supplier_user.id:
             return Response(
                 {"detail": "This dispute type may only be raised by the supplier."},
@@ -87,7 +88,9 @@ class DisputeDetailView(APIView):
 
     def _get_dispute(self, pk):
         dispute = get_object_or_404(
-            Dispute.objects.prefetch_related("events__author", "refunds"),
+            Dispute.objects.prefetch_related(
+                "events__author", "messages__author", "attachments__uploaded_by", "refunds"
+            ),
             pk=pk,
         )
         self.check_object_permissions(self.request, dispute)
@@ -143,11 +146,9 @@ class DisputeEscalateView(APIView):
             dispute, request.user, ser.validated_data.get("body", "")
         )
 
-        # Notify all admins.
-        admin_qs = User.objects.filter(role=Role.ADMIN)
         from apps.notifications.services import notify
 
-        for admin in admin_qs:
+        for admin in User.objects.filter(role=Role.ADMIN):
             notify(
                 recipient=admin,
                 title="Dispute escalated",
@@ -162,7 +163,10 @@ class DisputeResolveView(APIView):
 
     @extend_schema(request=ResolveDisputeSerializer, responses=DisputeDetailSerializer)
     def post(self, request: Request, pk) -> Response:
-        dispute = get_object_or_404(Dispute, pk=pk)
+        dispute = get_object_or_404(
+            Dispute.objects.select_related("sub_order__order__payment", "sub_order__supplier"),
+            pk=pk,
+        )
 
         if dispute.status != DisputeStatus.ESCALATED:
             return Response(
@@ -173,13 +177,20 @@ class DisputeResolveView(APIView):
         ser = ResolveDisputeSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         d = ser.validated_data
-        dispute = services.resolve_dispute(
-            dispute=dispute,
-            admin=request.user,
-            outcome=d["outcome"],
-            outcome_amount_pence=d.get("outcome_amount_pence"),
-            outcome_notes=d.get("outcome_notes", ""),
-        )
+
+        try:
+            dispute = services.resolve_dispute(
+                dispute=dispute,
+                admin=request.user,
+                outcome=d["outcome"],
+                outcome_amount_pence=d.get("outcome_amount_pence"),
+                outcome_notes=d.get("outcome_notes", ""),
+            )
+        except Exception as exc:
+            return Response(
+                {"detail": f"Failed to process refund: {exc}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
         return Response(DisputeDetailSerializer(dispute).data)
 
 
@@ -197,7 +208,6 @@ class DisputeCloseView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        # Only opener or admin may close.
         if request.user.role != Role.ADMIN and request.user.id != dispute.opened_by_id:  # type: ignore[union-attr]
             return Response(
                 {"detail": "Only the opener or an admin can close a dispute."},
@@ -208,6 +218,108 @@ class DisputeCloseView(APIView):
         ser.is_valid(raise_exception=True)
         dispute = services.close_dispute(dispute, request.user, ser.validated_data.get("body", ""))
         return Response(DisputeDetailSerializer(dispute).data)
+
+
+# ---------------------------------------------------------------------------
+# Message thread (#38)
+# ---------------------------------------------------------------------------
+
+
+class DisputeMessageView(APIView):
+    permission_classes = [IsAuthenticated, IsDisputePartyOrAdmin]
+
+    def _get_dispute(self, pk, request):
+        dispute = get_object_or_404(Dispute, pk=pk)
+        self.check_object_permissions(request, dispute)
+        return dispute
+
+    @extend_schema(responses=DisputeMessageSerializer(many=True))
+    def get(self, request: Request, pk) -> Response:
+        dispute = self._get_dispute(pk, request)
+        return Response(
+            DisputeMessageSerializer(
+                dispute.messages.select_related("author").all(), many=True
+            ).data
+        )
+
+    @extend_schema(request=PostMessageSerializer, responses={201: DisputeMessageSerializer})
+    def post(self, request: Request, pk) -> Response:
+        dispute = self._get_dispute(pk, request)
+
+        is_admin = request.user.role == Role.ADMIN  # type: ignore[union-attr]
+        if not is_admin and dispute.status in (DisputeStatus.RESOLVED, DisputeStatus.CLOSED):
+            return Response(
+                {"detail": "Messaging is closed on resolved or closed disputes."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        ser = PostMessageSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        message = services.post_message(dispute, request.user, ser.validated_data["body"])
+        return Response(DisputeMessageSerializer(message).data, status=status.HTTP_201_CREATED)
+
+
+# ---------------------------------------------------------------------------
+# File evidence uploads (#37)
+# ---------------------------------------------------------------------------
+
+
+class DisputeAttachmentView(APIView):
+    permission_classes = [IsAuthenticated, IsDisputePartyOrAdmin]
+
+    def _get_dispute(self, pk, request):
+        dispute = get_object_or_404(Dispute, pk=pk)
+        self.check_object_permissions(request, dispute)
+        return dispute
+
+    @extend_schema(
+        request=RequestAttachmentUploadSerializer,
+        responses={
+            201: {
+                "type": "object",
+                "properties": {
+                    "attachment": {"$ref": "#/components/schemas/DisputeAttachment"},
+                    "upload_url": {"type": "string"},
+                },
+            }
+        },
+    )
+    def post(self, request: Request, pk) -> Response:
+        dispute = self._get_dispute(pk, request)
+
+        if dispute.status in (DisputeStatus.RESOLVED, DisputeStatus.CLOSED):
+            return Response(
+                {"detail": "Cannot add attachments to resolved or closed disputes."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        ser = RequestAttachmentUploadSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        d = ser.validated_data
+
+        try:
+            attachment, upload_url = services.generate_attachment_upload_url(
+                dispute=dispute,
+                uploaded_by=request.user,
+                filename=d["filename"],
+                content_type=d["content_type"],
+                size_bytes=d["size_bytes"],
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            return Response(
+                {"detail": f"Could not generate upload URL: {exc}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response(
+            {
+                "attachment": DisputeAttachmentSerializer(attachment).data,
+                "upload_url": upload_url,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +349,6 @@ class AdminDisputeRefundView(APIView):
 
     @extend_schema(request=TriggerRefundSerializer, responses={201: DisputeRefundSerializer})
     def post(self, request: Request, pk) -> Response:
-
         dispute = get_object_or_404(Dispute, pk=pk)
 
         if dispute.status != DisputeStatus.RESOLVED:
