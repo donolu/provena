@@ -23,6 +23,8 @@ from .views import (
     ProductVariantDetailView,
     ProductVariantListCreateView,
     SupplierProductListView,
+    VariantImageDetailView,
+    VariantImageListCreateView,
 )
 
 urlpatterns = [
@@ -90,5 +92,15 @@ urlpatterns = [
         "products/<slug:slug>/images/<uuid:pk>/",
         ProductImageDetailView.as_view(),
         name="image-detail",
+    ),
+    path(
+        "products/<slug:slug>/variants/<uuid:pk>/images/",
+        VariantImageListCreateView.as_view(),
+        name="variant-image-list-create",
+    ),
+    path(
+        "products/<slug:slug>/variants/<uuid:pk>/images/<uuid:img_pk>/",
+        VariantImageDetailView.as_view(),
+        name="variant-image-detail",
     ),
 ]
