@@ -363,8 +363,9 @@ def attachment_public_url(attachment: DisputeAttachment) -> str:
         aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
         endpoint_url=getattr(settings, "AWS_S3_ENDPOINT_URL", None),
     )
-    return s3.generate_presigned_url(
+    url: str = s3.generate_presigned_url(
         "get_object",
         Params={"Bucket": settings.AWS_STORAGE_BUCKET_NAME, "Key": attachment.file_key},
         ExpiresIn=3600,
     )
+    return url
