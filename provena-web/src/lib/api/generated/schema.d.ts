@@ -1170,6 +1170,47 @@ export interface paths {
         patch: operations["catalogue_products_images_partial_update"];
         trace?: never;
     };
+    "/api/v1/catalogue/products/{slug}/variants/{id}/images/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add image to variant
+         * @description Registers an image URL for a specific product variant. Upload to S3 via a presigned URL first, then pass the resulting URL here. Setting `is_primary: true` clears the primary flag from all other images for this variant.
+         */
+        post: operations["catalogue_products_variants_images_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalogue/products/{slug}/variants/{id}/images/{img_pk}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete variant image */
+        delete: operations["catalogue_products_variants_images_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * Update variant image
+         * @description Update URL, alt text, position, or primary status. Setting `is_primary: true` automatically clears the primary flag from other images for this variant.
+         */
+        patch: operations["catalogue_products_variants_images_partial_update"];
+        trace?: never;
+    };
     "/api/v1/inventory/admin/": {
         parameters: {
             query?: never;
@@ -3068,6 +3109,15 @@ export interface components {
             first_name?: string;
             last_name?: string;
         };
+        PatchedVariantImageWriteRequest: {
+            /** Format: uri */
+            url?: string;
+            /** @default  */
+            alt_text: string;
+            position?: number | null;
+            /** @default false */
+            is_primary: boolean;
+        };
         Payment: {
             /** Format: uuid */
             readonly id: string;
@@ -3203,6 +3253,7 @@ export interface components {
             readonly on_sale: boolean;
             /** Format: decimal */
             readonly discount_percent: string | null;
+            readonly images: components["schemas"]["VariantImage"][];
         };
         ProductVariantWriteRequest: {
             name: string;
@@ -3523,6 +3574,25 @@ export interface components {
             readonly totp_enabled: boolean;
             /** Format: date-time */
             readonly created_at: string;
+        };
+        VariantImage: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uri */
+            url: string;
+            alt_text?: string;
+            /** Format: int64 */
+            position?: number;
+            is_primary?: boolean;
+        };
+        VariantImageWriteRequest: {
+            /** Format: uri */
+            url: string;
+            /** @default  */
+            alt_text: string;
+            position?: number | null;
+            /** @default false */
+            is_primary: boolean;
         };
         WishlistItem: {
             /** Format: uuid */
@@ -5499,6 +5569,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductImage"];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not found or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    catalogue_products_variants_images_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VariantImageWriteRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["VariantImageWriteRequest"];
+                "multipart/form-data": components["schemas"]["VariantImageWriteRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantImage"];
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Product or variant not found or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    catalogue_products_variants_images_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                img_pk: string;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not found or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    catalogue_products_variants_images_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                img_pk: string;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedVariantImageWriteRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedVariantImageWriteRequest"];
+                "multipart/form-data": components["schemas"]["PatchedVariantImageWriteRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantImage"];
                 };
             };
             /** @description Validation error */

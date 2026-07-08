@@ -21,6 +21,7 @@ from .models import (
     ProductImage,
     ProductStatus,
     ProductVariant,
+    VariantImage,
     _unique_product_slug,
 )
 from .serializers import (
@@ -34,6 +35,8 @@ from .serializers import (
     ProductVariantSerializer,
     ProductVariantWriteSerializer,
     ProductWriteSerializer,
+    VariantImageSerializer,
+    VariantImageWriteSerializer,
 )
 
 
@@ -206,7 +209,7 @@ class ProductListCreateView(PaginatedListMixin, APIView):
         qs = (
             Product.objects.filter(status=ProductStatus.ACTIVE)
             .select_related("supplier", "category")
-            .prefetch_related("variants", "images")
+            .prefetch_related("variants", "variants__images", "images")
         )
         if category_slug := request.query_params.get("category"):
             qs = qs.filter(category__slug=category_slug)
@@ -279,7 +282,7 @@ class SupplierProductListView(PaginatedListMixin, APIView):
     )
     def get(self, request: Request) -> Response:
         qs = request.user.supplier.products.select_related("category").prefetch_related(  # type: ignore[union-attr]
-            "variants", "images"
+            "variants", "variants__images", "images"
         )
         if status_filter := request.query_params.get("status"):
             qs = qs.filter(status=status_filter.upper())
@@ -311,7 +314,7 @@ class ProductDetailView(APIView):
     def get(self, request: Request, slug: str) -> Response:
         product = get_object_or_404(
             Product.objects.select_related("supplier", "category").prefetch_related(
-                "variants", "images"
+                "variants", "variants__images", "images"
             ),
             slug=slug,
             status=ProductStatus.ACTIVE,
@@ -550,6 +553,83 @@ class ProductImageDetailView(APIView):
 
 
 # ---------------------------------------------------------------------------
+# Variant images
+# ---------------------------------------------------------------------------
+
+
+class VariantImageListCreateView(APIView):
+    permission_classes = [IsApprovedSupplier]
+
+    @extend_schema(
+        tags=["Catalogue: Variants"],
+        summary="Add image to variant",
+        description="Registers an image URL for a specific product variant. "
+        "Upload to S3 via a presigned URL first, then pass the resulting URL here. "
+        "Setting `is_primary: true` clears the primary flag from all other images for this variant.",
+        request=VariantImageWriteSerializer,
+        responses={
+            201: VariantImageSerializer,
+            400: OpenApiResponse(description="Validation error"),
+            404: OpenApiResponse(description="Product or variant not found or not yours"),
+        },
+    )
+    def post(self, request: Request, slug: str, pk: str) -> Response:
+        product = _own_product(request, slug)
+        variant = get_object_or_404(ProductVariant, pk=pk, product=product)
+        s = VariantImageWriteSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        d = s.validated_data
+        image = services.add_variant_image(
+            variant=variant,
+            url=d["url"],
+            alt_text=d.get("alt_text", ""),
+            position=d.get("position"),
+            is_primary=d.get("is_primary", False),
+        )
+        return Response(VariantImageSerializer(image).data, status=status.HTTP_201_CREATED)
+
+
+class VariantImageDetailView(APIView):
+    permission_classes = [IsApprovedSupplier]
+
+    @extend_schema(
+        tags=["Catalogue: Variants"],
+        summary="Update variant image",
+        description="Update URL, alt text, position, or primary status. "
+        "Setting `is_primary: true` automatically clears the primary flag from other images for this variant.",
+        request=VariantImageWriteSerializer,
+        responses={
+            200: VariantImageSerializer,
+            400: OpenApiResponse(description="Validation error"),
+            404: OpenApiResponse(description="Not found or not yours"),
+        },
+    )
+    def patch(self, request: Request, slug: str, pk: str, img_pk: str) -> Response:
+        product = _own_product(request, slug)
+        variant = get_object_or_404(ProductVariant, pk=pk, product=product)
+        image = get_object_or_404(VariantImage, pk=img_pk, variant=variant)
+        s = VariantImageWriteSerializer(image, data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        image = services.update_variant_image(image, **s.validated_data)
+        return Response(VariantImageSerializer(image).data)
+
+    @extend_schema(
+        tags=["Catalogue: Variants"],
+        summary="Delete variant image",
+        responses={
+            204: OpenApiResponse(description="Deleted"),
+            404: OpenApiResponse(description="Not found or not yours"),
+        },
+    )
+    def delete(self, request: Request, slug: str, pk: str, img_pk: str) -> Response:
+        product = _own_product(request, slug)
+        variant = get_object_or_404(ProductVariant, pk=pk, product=product)
+        image = get_object_or_404(VariantImage, pk=img_pk, variant=variant)
+        services.remove_variant_image(image)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
 # Admin: products
 # ---------------------------------------------------------------------------
 
@@ -577,7 +657,7 @@ class AdminProductListView(APIView):
     )
     def get(self, request: Request) -> Response:
         qs = Product.objects.select_related("supplier", "category").prefetch_related(
-            "variants", "images"
+            "variants", "variants__images", "images"
         )
         if status_filter := request.query_params.get("status"):
             qs = qs.filter(status=status_filter.upper())

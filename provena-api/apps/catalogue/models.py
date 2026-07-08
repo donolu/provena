@@ -138,6 +138,21 @@ class ProductImage(models.Model):
         return f"{self.product.name} image ({self.position})"
 
 
+class VariantImage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name="images")
+    url = models.URLField()
+    alt_text = models.CharField(max_length=200, blank=True)
+    position = models.PositiveIntegerField(default=0)
+    is_primary = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["position"]
+
+    def __str__(self) -> str:
+        return f"{self.variant} image ({self.position})"
+
+
 class Banner(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=120)

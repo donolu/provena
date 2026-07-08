@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from .models import Banner, Category, Product, ProductImage, ProductVariant
+from .models import Banner, Category, Product, ProductImage, ProductVariant, VariantImage
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -51,11 +51,26 @@ class CategoryWriteSerializer(serializers.ModelSerializer):
         return value.strip()
 
 
+class VariantImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VariantImage
+        fields = ["id", "url", "alt_text", "position", "is_primary"]
+        read_only_fields = ["id"]
+
+
+class VariantImageWriteSerializer(serializers.Serializer):
+    url = serializers.URLField()
+    alt_text = serializers.CharField(max_length=200, allow_blank=True, default="")
+    position = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    is_primary = serializers.BooleanField(default=False)
+
+
 class ProductVariantSerializer(serializers.ModelSerializer):
     on_sale = serializers.BooleanField(read_only=True)
     discount_percent = serializers.DecimalField(
         max_digits=5, decimal_places=2, read_only=True, allow_null=True
     )
+    images = VariantImageSerializer(many=True, read_only=True)
 
     class Meta:
         model = ProductVariant
@@ -69,8 +84,9 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             "is_active",
             "on_sale",
             "discount_percent",
+            "images",
         ]
-        read_only_fields = ["id", "on_sale", "discount_percent"]
+        read_only_fields = ["id", "on_sale", "discount_percent", "images"]
 
 
 class ProductVariantWriteSerializer(serializers.Serializer):

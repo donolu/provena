@@ -8,6 +8,7 @@ from .models import (
     ProductImage,
     ProductStatus,
     ProductVariant,
+    VariantImage,
     _unique_category_slug,
     _unique_product_slug,
 )
@@ -209,4 +210,47 @@ def update_image(image: ProductImage, **kwargs: object) -> ProductImage:
 
 
 def remove_image(image: ProductImage) -> None:
+    image.delete()
+
+
+# ---------------------------------------------------------------------------
+# Variant images
+# ---------------------------------------------------------------------------
+
+
+def add_variant_image(
+    variant: ProductVariant,
+    url: str,
+    alt_text: str = "",
+    position: int | None = None,
+    is_primary: bool = False,
+) -> VariantImage:
+    if position is None:
+        last = variant.images.order_by("-position").first()
+        position = (last.position + 1) if last else 0
+
+    if is_primary:
+        variant.images.filter(is_primary=True).update(is_primary=False)
+
+    return VariantImage.objects.create(
+        variant=variant,
+        url=url,
+        alt_text=alt_text,
+        position=position,
+        is_primary=is_primary,
+    )
+
+
+def update_variant_image(image: VariantImage, **kwargs: object) -> VariantImage:
+    allowed = {"url", "alt_text", "position", "is_primary"}
+    if kwargs.get("is_primary"):
+        image.variant.images.filter(is_primary=True).exclude(pk=image.pk).update(is_primary=False)
+    for field, value in kwargs.items():
+        if field in allowed:
+            setattr(image, field, value)
+    image.save()
+    return image
+
+
+def remove_variant_image(image: VariantImage) -> None:
     image.delete()
