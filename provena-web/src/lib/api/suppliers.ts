@@ -28,6 +28,11 @@ export async function getMyPerformance(): Promise<SupplierPerformanceResponse> {
   return data
 }
 
+export async function getStripeConnectUrl(): Promise<string> {
+  const { data } = await apiClient.get<{ onboarding_url: string }>('/suppliers/me/stripe-connect/')
+  return data.onboarding_url
+}
+
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
 export async function getAdminSuppliers(params?: {

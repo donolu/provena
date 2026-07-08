@@ -56,12 +56,13 @@ provena-api/
 ├── apps/
 │   ├── accounts/          # User model, auth, roles, 2FA
 │   ├── catalogue/         # Categories, products, variants, images
+│   ├── disputes/          # Dispute lifecycle, events, admin resolution, refund tracking
 │   ├── inventory/         # Stock levels, lots, audit log
 │   ├── marketplace/       # Cart, wishlist, reviews, homepage curation
 │   ├── notifications/     # In-app and email notification delivery
-│   ├── orders/            # Order lifecycle, sub-orders, disputes
+│   ├── orders/            # Order lifecycle, sub-orders
 │   ├── payments/          # Stripe integration, payouts, refunds
-│   ├── suppliers/         # Supplier profile, KYC, performance
+│   ├── suppliers/         # Supplier profile, KYC, Stripe Connect onboarding
 │   └── analytics/         # Reports, aggregated metrics
 ├── config/
 │   ├── settings/
@@ -192,11 +193,12 @@ suppliers ◄──── catalogue
                     │
                     ▼
                 inventory ◄─── orders ◄─── payments
-                                │
-                                ▼
-                           marketplace
-                                │
-                                ▼
+                                │               │
+                                ▼               ▼
+                           marketplace       disputes
+                                │               │
+                                └───────┬───────┘
+                                        ▼
                           notifications ◄─── all domains (trigger points)
                                 │
                                 ▼

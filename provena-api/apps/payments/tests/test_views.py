@@ -205,6 +205,54 @@ class TestStripeWebhookView:
         )
         assert response.status_code == 200
 
+    def test_webhook_account_updated_marks_onboarding_complete(
+        self, db, mock_stripe_views, approved_supplier
+    ):
+        from unittest.mock import patch
+
+        from rest_framework.test import APIClient
+
+        approved_supplier.stripe_account_id = "acct_test123"
+        approved_supplier.save(update_fields=["stripe_account_id"])
+
+        event = {
+            "type": "account.updated",
+            "data": {"object": {"id": "acct_test123"}},
+        }
+        mock_stripe_views.Webhook.construct_event.return_value = event
+
+        fake_account = MagicMock()
+        fake_account.charges_enabled = True
+        fake_account.payouts_enabled = True
+        with patch("apps.suppliers.services.stripe") as mock_supplier_stripe:
+            mock_supplier_stripe.Account.retrieve.return_value = fake_account
+            response = APIClient().post(
+                "/api/v1/payments/webhook/",
+                data=json.dumps({}),
+                content_type="application/json",
+                HTTP_STRIPE_SIGNATURE="t=1,v1=fake",
+            )
+
+        assert response.status_code == 200
+        approved_supplier.refresh_from_db()
+        assert approved_supplier.stripe_onboarding_complete is True
+
+    def test_webhook_account_updated_unknown_account_ignored(self, db, mock_stripe_views):
+        from rest_framework.test import APIClient
+
+        event = {
+            "type": "account.updated",
+            "data": {"object": {"id": "acct_unknown"}},
+        }
+        mock_stripe_views.Webhook.construct_event.return_value = event
+        response = APIClient().post(
+            "/api/v1/payments/webhook/",
+            data=json.dumps({}),
+            content_type="application/json",
+            HTTP_STRIPE_SIGNATURE="t=1,v1=fake",
+        )
+        assert response.status_code == 200
+
 
 class TestSupplierPayoutListView:
     def test_lists_own_payouts(self, supplier_client, succeeded_payment, sub_order):

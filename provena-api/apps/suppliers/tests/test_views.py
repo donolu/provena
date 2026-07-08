@@ -186,3 +186,57 @@ class TestAdminSupplierViews:
         res = admin_client.get(ADMIN_DOCS_URL)
         assert res.status_code == status.HTTP_200_OK
         assert len(res.data) == 1
+
+
+STRIPE_CONNECT_URL = "/api/v1/suppliers/me/stripe-connect/"
+
+
+class TestStripeConnectView:
+    def test_returns_onboarding_url(self, supplier_user_client, pending_supplier):
+        from unittest.mock import patch
+
+        with patch("apps.suppliers.services.stripe") as mock_stripe:
+            mock_stripe.Account.create.return_value = {"id": "acct_new123"}
+            mock_stripe.AccountLink.create.return_value = {
+                "url": "https://connect.stripe.com/setup/e/acct_new123/abc"
+            }
+            response = supplier_user_client.get(STRIPE_CONNECT_URL)
+
+        assert response.status_code == 200
+        assert "onboarding_url" in response.json()
+        assert response.json()["onboarding_url"].startswith("https://connect.stripe.com")
+
+    def test_return_url_points_to_frontend(self, supplier_user_client, pending_supplier, settings):
+        from unittest.mock import patch
+
+        settings.FRONTEND_URL = "https://app.example.com"
+
+        with patch("apps.suppliers.services.stripe") as mock_stripe:
+            mock_stripe.Account.create.return_value = {"id": "acct_new123"}
+            mock_stripe.AccountLink.create.return_value = {"url": "https://connect.stripe.com/x"}
+            supplier_user_client.get(STRIPE_CONNECT_URL)
+
+        create_call = mock_stripe.AccountLink.create.call_args
+        assert (
+            create_call.kwargs["return_url"]
+            == "https://app.example.com/supplier/payouts/?connected=1"
+        )
+
+    def test_requires_supplier(self, buyer_client):
+        response = buyer_client.get(STRIPE_CONNECT_URL)
+        assert response.status_code == 403
+
+    def test_reuses_existing_stripe_account(self, supplier_user_client, pending_supplier):
+        from unittest.mock import patch
+
+        pending_supplier.stripe_account_id = "acct_existing"
+        pending_supplier.save(update_fields=["stripe_account_id"])
+
+        with patch("apps.suppliers.services.stripe") as mock_stripe:
+            mock_stripe.AccountLink.create.return_value = {
+                "url": "https://connect.stripe.com/resume"
+            }
+            response = supplier_user_client.get(STRIPE_CONNECT_URL)
+
+        mock_stripe.Account.create.assert_not_called()
+        assert response.status_code == 200

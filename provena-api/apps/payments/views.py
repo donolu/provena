@@ -125,6 +125,10 @@ class StripeWebhookView(APIView):
                         amount_refunded_pence=getattr(obj, "amount_refunded", None),
                         charge_amount_pence=getattr(obj, "amount", None),
                     )
+            elif event_type == "account.updated":
+                from apps.suppliers.services import handle_connect_account_updated
+
+                handle_connect_account_updated(obj["id"])
         except Payment.DoesNotExist:
             pass
         except Exception:
