@@ -2307,6 +2307,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/disputes/{id}/messages/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["disputes_messages_list"];
+        put?: never;
+        post: operations["disputes_messages_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/disputes/{id}/attachments/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["disputes_attachments_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/disputes/admin/": {
         parameters: {
             query?: never;
@@ -2525,6 +2557,15 @@ export interface components {
             /** @default  */
             body: string;
         };
+        /**
+         * @description * `application/pdf` - application/pdf
+         *     * `image/gif` - image/gif
+         *     * `image/jpeg` - image/jpeg
+         *     * `image/png` - image/png
+         *     * `image/webp` - image/webp
+         * @enum {string}
+         */
+        ContentTypeEnum: "application/pdf" | "image/gif" | "image/jpeg" | "image/png" | "image/webp";
         CreatePaymentIntentRequest: {
             order_reference: string;
         };
@@ -2536,6 +2577,19 @@ export interface components {
         DispatchRequest: {
             /** @default  */
             tracking_number: string;
+        };
+        DisputeAttachment: {
+            /** Format: uuid */
+            readonly id: string;
+            filename: string;
+            content_type: string;
+            /** Format: int64 */
+            size_bytes: number;
+            /** Format: email */
+            readonly uploaded_by_email: string;
+            readonly url: string;
+            /** Format: date-time */
+            readonly created_at: string;
         };
         DisputeDetail: {
             /** Format: uuid */
@@ -2563,6 +2617,8 @@ export interface components {
             /** Format: date-time */
             resolved_at?: string | null;
             readonly events: components["schemas"]["DisputeEvent"][];
+            readonly messages: components["schemas"]["DisputeMessage"][];
+            readonly attachments: components["schemas"]["DisputeAttachment"][];
             readonly refunds: components["schemas"]["DisputeRefund"][];
         };
         DisputeEvent: {
@@ -2593,6 +2649,15 @@ export interface components {
             readonly is_overdue: boolean;
             /** Format: date-time */
             readonly opened_at: string;
+        };
+        DisputeMessage: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: email */
+            readonly author_email: string;
+            body: string;
+            /** Format: date-time */
+            readonly created_at: string;
         };
         DisputeRefund: {
             /** Format: uuid */
@@ -2651,12 +2716,14 @@ export interface components {
          * @description * `OPENED` - Opened
          *     * `RESPONDED` - Responded
          *     * `ESCALATED` - Escalated
+         *     * `AUTO_ESCALATED` - Auto-escalated
          *     * `RESOLVED` - Resolved
          *     * `CLOSED` - Closed
          *     * `ADMIN_NOTE` - Admin note
+         *     * `ATTACHMENT` - Attachment added
          * @enum {string}
          */
-        EventTypeEnum: "OPENED" | "RESPONDED" | "ESCALATED" | "RESOLVED" | "CLOSED" | "ADMIN_NOTE";
+        EventTypeEnum: "OPENED" | "RESPONDED" | "ESCALATED" | "AUTO_ESCALATED" | "RESOLVED" | "CLOSED" | "ADMIN_NOTE" | "ATTACHMENT";
         LoginRequest: {
             /** Format: email */
             email: string;
@@ -3077,6 +3144,9 @@ export interface components {
             /** @default  */
             notes: string;
         };
+        PostMessageRequest: {
+            body: string;
+        };
         Product: {
             /** Format: uuid */
             readonly id: string;
@@ -3175,6 +3245,11 @@ export interface components {
             first_name: string;
             /** @default  */
             last_name: string;
+        };
+        RequestAttachmentUploadRequest: {
+            filename: string;
+            content_type: components["schemas"]["ContentTypeEnum"];
+            size_bytes: number;
         };
         /**
          * @description * `FULL_REFUND` - Full refund
@@ -7122,6 +7197,84 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DisputeDetail"];
+                };
+            };
+        };
+    };
+    disputes_messages_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeMessage"][];
+                };
+            };
+        };
+    };
+    disputes_messages_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostMessageRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PostMessageRequest"];
+                "multipart/form-data": components["schemas"]["PostMessageRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisputeMessage"];
+                };
+            };
+        };
+    };
+    disputes_attachments_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestAttachmentUploadRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["RequestAttachmentUploadRequest"];
+                "multipart/form-data": components["schemas"]["RequestAttachmentUploadRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        attachment?: components["schemas"]["DisputeAttachment"];
+                        upload_url?: string;
+                    };
                 };
             };
         };
