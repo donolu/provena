@@ -2418,9 +2418,7 @@ export interface components {
             business_name: string;
             readonly slug: string;
             description?: string;
-            /** Format: uri */
             logo_url?: string;
-            /** Format: uri */
             website?: string;
             phone?: string;
             status?: components["schemas"]["SupplierStatusEnum"];
@@ -2501,7 +2499,6 @@ export interface components {
             name: string;
             slug: string;
             description?: string;
-            /** Format: uri */
             image_url?: string;
             readonly parent_slug: string | null;
             readonly children: unknown[];
@@ -2513,7 +2510,6 @@ export interface components {
         CategoryWriteRequest: {
             name: string;
             description?: string;
-            /** Format: uri */
             image_url?: string;
             parent?: string | null;
             /** Format: int64 */
@@ -2940,9 +2936,7 @@ export interface components {
         PatchedAdminSupplierRequest: {
             business_name?: string;
             description?: string;
-            /** Format: uri */
             logo_url?: string;
-            /** Format: uri */
             website?: string;
             phone?: string;
             status?: components["schemas"]["SupplierStatusEnum"];
@@ -2952,7 +2946,6 @@ export interface components {
         PatchedCategoryWriteRequest: {
             name?: string;
             description?: string;
-            /** Format: uri */
             image_url?: string;
             parent?: string | null;
             /** Format: int64 */
@@ -2996,9 +2989,7 @@ export interface components {
         PatchedSupplierProfileRequest: {
             business_name?: string;
             description?: string;
-            /** Format: uri */
             logo_url?: string;
-            /** Format: uri */
             website?: string;
             phone?: string;
             address?: components["schemas"]["SupplierAddressRequest"];
@@ -3379,9 +3370,7 @@ export interface components {
             business_name: string;
             readonly slug: string;
             description?: string;
-            /** Format: uri */
             logo_url?: string;
-            /** Format: uri */
             website?: string;
             phone?: string;
             readonly status: components["schemas"]["SupplierStatusEnum"];
@@ -3399,9 +3388,7 @@ export interface components {
             business_name: string;
             slug: string;
             description?: string;
-            /** Format: uri */
             logo_url?: string;
-            /** Format: uri */
             website?: string;
             readonly address: components["schemas"]["SupplierAddress"];
         };
@@ -3411,16 +3398,8 @@ export interface components {
             description: string;
             /** @default  */
             phone: string;
-            /**
-             * Format: uri
-             * @default
-             */
-            website: string;
-            /**
-             * Format: uri
-             * @default
-             */
-            logo_url: string;
+            website?: string;
+            logo_url?: string;
             address?: components["schemas"]["SupplierAddressRequest"];
         };
         SupplierStatusActionRequest: {
