@@ -424,7 +424,7 @@ export interface paths {
         };
         /**
          * List approved suppliers
-         * @description Returns all suppliers with APPROVED status. No authentication required.
+         * @description Returns approved suppliers paginated (page_size=20). No authentication required.
          */
         get: operations["suppliers_list"];
         put?: never;
@@ -1218,7 +1218,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** All stock levels across all suppliers */
+        /**
+         * All stock levels across all suppliers
+         * @description Stock levels across all suppliers (admin only).
+         */
         get: operations["inventory_admin_list"];
         put?: never;
         post?: never;
@@ -1235,7 +1238,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List stock levels for own variants */
+        /**
+         * List stock levels for own variants
+         * @description Stock levels for the authenticated supplier's own variants.
+         */
         get: operations["inventory_list"];
         put?: never;
         post?: never;
@@ -3005,6 +3011,21 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["Product"][];
         };
+        PaginatedStockLevelList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["StockLevel"][];
+        };
         PaginatedSubOrderListList: {
             /** @example 123 */
             count: number;
@@ -3019,6 +3040,21 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["SubOrderList"][];
+        };
+        PaginatedSupplierPublicList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["SupplierPublic"][];
         };
         PasswordResetConfirmRequest: {
             token: string;
@@ -4240,7 +4276,12 @@ export interface operations {
     };
     suppliers_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4252,7 +4293,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SupplierPublic"][];
+                    "application/json": components["schemas"]["PaginatedSupplierPublicList"];
                 };
             };
         };
@@ -5704,6 +5745,10 @@ export interface operations {
             query?: {
                 /** @description Pass "true" to show only low-stock variants */
                 low_stock?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description Filter by supplier slug */
                 supplier?: string;
             };
@@ -5718,7 +5763,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StockLevel"][];
+                    "application/json": components["schemas"]["PaginatedStockLevelList"];
                 };
             };
         };
@@ -5728,6 +5773,10 @@ export interface operations {
             query?: {
                 /** @description Pass "true" to show only variants at or below threshold */
                 low_stock?: string;
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -5740,7 +5789,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StockLevel"][];
+                    "application/json": components["schemas"]["PaginatedStockLevelList"];
                 };
             };
         };

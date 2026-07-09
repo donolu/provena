@@ -33,6 +33,8 @@ def _own_variant(request: Request, variant_id) -> ProductVariant:
 
 @extend_schema(tags=["Inventory (Supplier)"])
 class InventoryListView(PaginatedListMixin, APIView):
+    """Stock levels for the authenticated supplier's own variants."""
+
     permission_classes = [IsApprovedSupplier]
 
     @extend_schema(
@@ -168,6 +170,8 @@ class StockLotListView(APIView):
 
 @extend_schema(tags=["Admin: Inventory"])
 class AdminInventoryListView(PaginatedListMixin, APIView):
+    """Stock levels across all suppliers (admin only)."""
+
     permission_classes = [IsAdminUser]
 
     @extend_schema(
