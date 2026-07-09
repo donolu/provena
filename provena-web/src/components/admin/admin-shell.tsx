@@ -26,6 +26,7 @@ import { getAdminSuppliers } from '@/lib/api/suppliers'
 import { getAdminDisputes, getAdminReturns } from '@/lib/api/orders'
 import { getAdminReviews } from '@/lib/api/admin'
 import { useAuthStore } from '@/store/auth'
+import { logout as apiLogout } from '@/lib/api/auth'
 import { useAuthGuard } from '@/hooks/use-auth-guard'
 
 const BASE_NAV = [
@@ -50,6 +51,7 @@ function AdminNav({ onLinkClick }: { onLinkClick?: () => void }) {
   const logout = useAuthStore((s) => s.logout)
 
   function handleLogout() {
+    apiLogout().catch(() => {})
     logout()
     router.push('/login')
   }

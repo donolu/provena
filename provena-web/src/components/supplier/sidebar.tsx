@@ -17,6 +17,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { getSupplierReturns } from '@/lib/api/orders'
 import { useAuthStore } from '@/store/auth'
+import { logout as apiLogout } from '@/lib/api/auth'
 import { useAuthGuard } from '@/hooks/use-auth-guard'
 
 const BASE_NAV = [
@@ -46,6 +47,7 @@ function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
   }))
 
   function handleLogout() {
+    apiLogout().catch(() => {})
     logout()
     router.push('/login')
   }

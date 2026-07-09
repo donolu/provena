@@ -21,6 +21,7 @@ import Link from 'next/link'
 import { useRouter as useNextRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/store/auth'
+import { logout as apiLogout } from '@/lib/api/auth'
 import {
   getNotifications,
   markNotificationRead,
@@ -200,6 +201,7 @@ export function Nav({ cartCount, onCartClick }: NavProps) {
 
   function handleLogout() {
     setOpen(false)
+    apiLogout().catch(() => {})
     logout()
     router.push('/login')
   }
