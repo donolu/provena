@@ -2,18 +2,20 @@ import { apiClient } from './client'
 import type { LoginResponse, TOTPLoginRequired, UserProfile } from './types'
 
 export async function login(email: string, password: string) {
-  const { data } = await apiClient.post<LoginResponse | TOTPLoginRequired>('/auth/login/', {
-    email,
-    password,
-  })
+  const { data } = await apiClient.post<LoginResponse | TOTPLoginRequired>(
+    '/auth/login/',
+    { email, password },
+    { withCredentials: true },
+  )
   return data
 }
 
 export async function loginTotp(totpSessionToken: string, totpCode: string) {
-  const { data } = await apiClient.post<LoginResponse>('/auth/login/totp/', {
-    totp_session_token: totpSessionToken,
-    totp_code: totpCode,
-  })
+  const { data } = await apiClient.post<LoginResponse>(
+    '/auth/login/totp/',
+    { totp_session_token: totpSessionToken, totp_code: totpCode },
+    { withCredentials: true },
+  )
   return data
 }
 
@@ -50,7 +52,9 @@ export async function register(payload: {
   first_name?: string
   last_name?: string
 }) {
-  const { data } = await apiClient.post<UserProfile>('/auth/register/', payload)
+  const { data } = await apiClient.post<UserProfile>('/auth/register/', payload, {
+    withCredentials: true,
+  })
   return data
 }
 
