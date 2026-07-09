@@ -74,7 +74,7 @@ function AdminNav({ onLinkClick }: { onLinkClick?: () => void }) {
   const pendingCount = suppliersData?.results.filter((s) => s.status === 'PENDING').length ?? 0
   const openDisputeCount = openDisputes?.length ?? 0
   const approvedReturnCount = approvedReturns?.count ?? 0
-  const pendingReviewCount = pendingReviews?.length ?? 0
+  const pendingReviewCount = pendingReviews?.count ?? 0
 
   const NAV = BASE_NAV.map((item) => {
     if (item.href === '/admin/suppliers') return { ...item, badge: pendingCount }

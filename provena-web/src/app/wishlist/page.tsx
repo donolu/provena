@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Heart, ShoppingBasket, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -15,12 +15,21 @@ export default function WishlistPage() {
   const router = useRouter()
   const qc = useQueryClient()
   const [cartOpen, setCartOpen] = useState(false)
+  const [loadedPages, setLoadedPages] = useState([1])
 
-  const { data: wishlist = [], isPending } = useQuery({
-    queryKey: ['wishlist'],
-    queryFn: getWishlist,
-    enabled: !!user,
+  const pageResults = useQueries({
+    queries: loadedPages.map((p) => ({
+      queryKey: ['wishlist', p],
+      queryFn: () => getWishlist(p),
+      enabled: !!user,
+    })),
   })
+
+  const lastResult = pageResults[pageResults.length - 1]
+  const isPending = pageResults.some((r) => r.isPending)
+  const allItems = pageResults.flatMap((r) => r.data?.results ?? [])
+  const totalCount = pageResults[0]?.data?.count ?? allItems.length
+  const hasMore = !!lastResult?.data?.next
 
   const { data: cart } = useQuery({
     queryKey: ['cart'],
@@ -30,7 +39,10 @@ export default function WishlistPage() {
 
   const removeMutation = useMutation({
     mutationFn: (id: string) => removeFromWishlist(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['wishlist'] }),
+    onSuccess: () => {
+      setLoadedPages([1])
+      qc.invalidateQueries({ queryKey: ['wishlist'] })
+    },
   })
 
   const addToCartMutation = useMutation<void, Error, string>({
@@ -70,15 +82,15 @@ export default function WishlistPage() {
             <h1 className="font-display italic text-2xl text-forest">Saved items</h1>
             {!isPending && (
               <p className="text-xs font-sans text-soil mt-0.5">
-                {wishlist.length} item{wishlist.length !== 1 ? 's' : ''}
+                {totalCount} item{totalCount !== 1 ? 's' : ''}
               </p>
             )}
           </div>
         </div>
 
-        {isPending ? (
+        {isPending && loadedPages.length === 1 ? (
           <p className="text-sm font-sans text-soil">Loading…</p>
-        ) : wishlist.length === 0 ? (
+        ) : allItems.length === 0 ? (
           <div className="text-center py-16">
             <Heart className="w-10 h-10 text-hoarfrost mx-auto mb-4" strokeWidth={1.5} />
             <p className="text-sm font-sans text-soil mb-4">Your wishlist is empty.</p>
@@ -91,7 +103,7 @@ export default function WishlistPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {wishlist.map((item) => {
+            {allItems.map((item) => {
               const cartItem = cart?.items.find((c) => c.variant === item.variant)
               return (
                 <div
@@ -170,6 +182,18 @@ export default function WishlistPage() {
                 </div>
               )
             })}
+
+            {hasMore && (
+              <div className="pt-2 text-center">
+                <button
+                  onClick={() => setLoadedPages((ps) => [...ps, ps.length + 1])}
+                  disabled={isPending}
+                  className="text-xs font-sans text-meadow hover:text-forest transition-colors disabled:opacity-40"
+                >
+                  {isPending ? 'Loading…' : 'Load more'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>

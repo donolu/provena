@@ -220,17 +220,19 @@ function ExpandedInventoryRow({ variantId }: { variantId: string }) {
     return d
   }, [])
 
-  const { data: lots = [], isLoading: lotsLoading } = useQuery({
+  const { data: lotsPage, isLoading: lotsLoading } = useQuery({
     queryKey: ['inventory-lots', variantId],
     queryFn: () => getStockLots(variantId),
     enabled: tab === 'lots',
   })
+  const lots = lotsPage?.results ?? []
 
-  const { data: movements = [], isLoading: movementsLoading } = useQuery({
+  const { data: movementsPage, isLoading: movementsLoading } = useQuery({
     queryKey: ['inventory-movements', variantId],
     queryFn: () => getStockMovements(variantId),
     enabled: tab === 'movements',
   })
+  const movements = movementsPage?.results ?? []
 
   return (
     <div className="bg-gray-50 border-t px-6 py-4">

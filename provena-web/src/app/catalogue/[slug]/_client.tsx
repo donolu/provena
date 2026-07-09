@@ -79,17 +79,20 @@ export default function ProductDetailPage({
     enabled: !!user,
   })
 
-  const { data: wishlist = [] } = useQuery({
+  const { data: wishlistData } = useQuery({
     queryKey: ['wishlist'],
-    queryFn: getWishlist,
+    queryFn: () => getWishlist(),
     enabled: !!user,
   })
 
-  const { data: reviews = [] } = useQuery({
-    queryKey: ['reviews', activeVariant?.id],
+  const { data: reviewsData } = useQuery({
+    queryKey: ['reviews', activeVariant?.id ?? ''],
     queryFn: () => getProductReviews(activeVariant!.id),
     enabled: !!activeVariant,
   })
+
+  const wishlist = wishlistData?.results ?? []
+  const reviews = reviewsData?.results ?? []
 
   const [selectedImage, setSelectedImage] = useState(0)
 

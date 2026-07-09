@@ -37,11 +37,12 @@ export async function getMyProducts(): Promise<PaginatedResponse<Product>> {
   return data
 }
 
-export async function getProductReviews(variantId: string): Promise<Review[]> {
+export async function getProductReviews(variantId: string, page = 1): Promise<PaginatedResponse<Review>> {
   const { data } = await apiClient.get<PaginatedResponse<Review>>(
     `/marketplace/products/${variantId}/reviews/`,
+    { params: { page } },
   )
-  return data.results
+  return data
 }
 
 export async function submitReview(
