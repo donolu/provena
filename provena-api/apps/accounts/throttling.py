@@ -37,7 +37,7 @@ class AdminRateThrottle(UserRateThrottle):
 
     scope = "admin"
 
-    def get_rate(self) -> None:  # type: ignore[override]
+    def get_rate(self) -> None:
         return None
 
     def allow_request(self, request, view) -> bool:
