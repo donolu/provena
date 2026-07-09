@@ -70,14 +70,22 @@ function NotificationBell({ user }: { user: { email: string; first_name: string 
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const { data: notifications = [] } = useQuery({
+  const { data: notifData } = useQuery({
     queryKey: ['notifications'],
     queryFn: () => getNotifications(),
     enabled: !!user,
     refetchInterval: 60_000,
   })
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length
+  const { data: unreadData } = useQuery({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: () => getNotifications(true),
+    enabled: !!user,
+    refetchInterval: 60_000,
+  })
+
+  const notifications = notifData?.results ?? []
+  const unreadCount = unreadData?.count ?? 0
 
   const markReadMutation = useMutation({
     mutationFn: (id: string) => markNotificationRead(id),

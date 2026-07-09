@@ -75,12 +75,21 @@ function ReviewRow({ review, onApprove, onDelete }: {
 
 export default function AdminReviewsPage() {
   const [tab, setTab] = useState<Tab>('PENDING')
+  const [page, setPage] = useState(1)
   const qc = useQueryClient()
 
-  const { data: reviews = [], isPending } = useQuery({
-    queryKey: ['admin', 'reviews', tab],
-    queryFn: () => getAdminReviews({ is_approved: tab === 'APPROVED' }),
+  function handleTabChange(t: Tab) {
+    setTab(t)
+    setPage(1)
+  }
+
+  const { data: reviewsPage, isPending } = useQuery({
+    queryKey: ['admin', 'reviews', tab, page],
+    queryFn: () => getAdminReviews({ is_approved: tab === 'APPROVED', page }),
   })
+
+  const reviews = reviewsPage?.results ?? []
+  const totalCount = reviewsPage?.count ?? 0
 
   const approveMutation = useMutation({
     mutationFn: (id: string) => adminApproveReview(id),
@@ -96,14 +105,14 @@ export default function AdminReviewsPage() {
     },
   })
 
-  const pendingCount = tab === 'PENDING' ? reviews.length : null
+  const pendingCount = tab === 'PENDING' ? totalCount : null
 
   return (
     <div className="px-6 py-8 max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="font-display italic text-2xl text-forest">Reviews</h1>
         <p className="text-sm text-soil font-sans mt-0.5">
-          {isPending ? 'Loading…' : `${reviews.length} review${reviews.length !== 1 ? 's' : ''}${pendingCount !== null ? ' awaiting approval' : ''}`}
+          {isPending ? 'Loading…' : `${totalCount} review${totalCount !== 1 ? 's' : ''}${pendingCount !== null ? ' awaiting approval' : ''}`}
         </p>
       </div>
 
@@ -111,7 +120,7 @@ export default function AdminReviewsPage() {
         {(['PENDING', 'APPROVED'] as Tab[]).map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => handleTabChange(t)}
             className={`px-3 py-1.5 text-xs font-sans rounded-full border transition-colors ${
               tab === t
                 ? 'bg-forest text-white border-forest'
@@ -130,16 +139,38 @@ export default function AdminReviewsPage() {
           {tab === 'PENDING' ? 'No reviews awaiting approval.' : 'No approved reviews.'}
         </p>
       ) : (
-        <div className="space-y-3">
-          {reviews.map((review) => (
-            <ReviewRow
-              key={review.id}
-              review={review}
-              onApprove={tab === 'PENDING' ? () => approveMutation.mutate(review.id) : undefined}
-              onDelete={() => deleteMutation.mutate(review.id)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="space-y-3">
+            {reviews.map((review) => (
+              <ReviewRow
+                key={review.id}
+                review={review}
+                onApprove={tab === 'PENDING' ? () => approveMutation.mutate(review.id) : undefined}
+                onDelete={() => deleteMutation.mutate(review.id)}
+              />
+            ))}
+          </div>
+
+          {(reviewsPage?.previous || reviewsPage?.next) && (
+            <div className="flex items-center justify-between mt-4">
+              <button
+                onClick={() => setPage((p) => p - 1)}
+                disabled={!reviewsPage?.previous || isPending}
+                className="text-xs font-sans text-meadow hover:text-forest disabled:opacity-40 transition-colors"
+              >
+                Previous
+              </button>
+              <span className="text-xs font-sans text-soil">{page}</span>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!reviewsPage?.next || isPending}
+                className="text-xs font-sans text-meadow hover:text-forest disabled:opacity-40 transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

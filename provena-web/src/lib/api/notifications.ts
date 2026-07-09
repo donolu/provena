@@ -1,12 +1,11 @@
 import { apiClient } from './client'
 import type { Notification, NotificationPreferences, PaginatedResponse } from './types'
 
-export async function getNotifications(unreadOnly?: boolean): Promise<Notification[]> {
-  const params = unreadOnly ? { unread: 'true' } : {}
-  const { data } = await apiClient.get<PaginatedResponse<Notification>>('/notifications/', {
-    params,
-  })
-  return data.results
+export async function getNotifications(unreadOnly?: boolean, page = 1): Promise<PaginatedResponse<Notification>> {
+  const params: Record<string, string | number> = { page }
+  if (unreadOnly) params.unread = 'true'
+  const { data } = await apiClient.get<PaginatedResponse<Notification>>('/notifications/', { params })
+  return data
 }
 
 export async function markNotificationRead(id: string): Promise<Notification> {
