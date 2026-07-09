@@ -232,7 +232,8 @@ def _trigger_sub_order_payout(sub_order: SubOrder) -> None:
 
     try:
         payout = Payout.objects.get(sub_order=sub_order, status=PayoutStatus.PENDING)
-        trigger_payout.delay(str(payout.id))
+        payout_id = str(payout.id)
+        transaction.on_commit(lambda: trigger_payout.delay(payout_id))
         logger.info("Queued payout task for sub_order %s, payout %s", sub_order.id, payout.id)
     except Payout.DoesNotExist:
         logger.warning("No pending payout found for sub_order %s", sub_order.id)

@@ -77,7 +77,7 @@ def update_cart_item(user, item_id, quantity: int) -> CartItem:
 
 @transaction.atomic
 def remove_from_cart(user, item_id) -> None:
-    item = get_object_or_404(CartItem, id=item_id, cart__buyer=user)
+    item = get_object_or_404(CartItem.objects.select_for_update(), id=item_id, cart__buyer=user)
     try:
         res = item.reservation
         inventory_services.release_reservation(
@@ -90,7 +90,11 @@ def remove_from_cart(user, item_id) -> None:
 
 @transaction.atomic
 def clear_cart(user) -> None:
-    items = CartItem.objects.filter(cart__buyer=user).select_related("reservation", "variant")
+    items = (
+        CartItem.objects.select_for_update()
+        .filter(cart__buyer=user)
+        .select_related("reservation", "variant")
+    )
     for item in items:
         try:
             res = item.reservation
