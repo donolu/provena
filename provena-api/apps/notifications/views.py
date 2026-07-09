@@ -4,12 +4,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.pagination import PaginatedListMixin
+
 from . import services
 from .models import Notification, NotificationPreference
 from .serializers import NotificationPreferenceSerializer, NotificationSerializer
 
 
-class NotificationListView(APIView):
+class NotificationListView(PaginatedListMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
@@ -22,7 +24,7 @@ class NotificationListView(APIView):
         qs = Notification.objects.filter(recipient=request.user)
         if request.query_params.get("unread", "").lower() == "true":
             qs = qs.filter(is_read=False)
-        return Response(NotificationSerializer(qs, many=True).data)
+        return self.paginate(qs, NotificationSerializer, request)
 
 
 class NotificationMarkReadView(APIView):

@@ -9,20 +9,20 @@ class TestNotificationListView:
         Notification.objects.create(recipient=buyer, title="T2", body="B2")
         response = buyer_client.get("/api/v1/notifications/")
         assert response.status_code == 200
-        assert len(response.json()) == 2
+        assert len(response.json()["results"]) == 2
 
     def test_filter_unread(self, buyer_client, buyer):
         Notification.objects.create(recipient=buyer, title="Read", body="B", is_read=True)
         Notification.objects.create(recipient=buyer, title="Unread", body="B", is_read=False)
         response = buyer_client.get("/api/v1/notifications/?unread=true")
         assert response.status_code == 200
-        assert len(response.json()) == 1
-        assert response.json()[0]["title"] == "Unread"
+        assert len(response.json()["results"]) == 1
+        assert response.json()["results"][0]["title"] == "Unread"
 
     def test_does_not_show_other_users_notifications(self, buyer_client, staff_user):
         Notification.objects.create(recipient=staff_user, title="T", body="B")
         response = buyer_client.get("/api/v1/notifications/")
-        assert response.json() == []
+        assert response.json()["results"] == []
 
     def test_unauthenticated(self):
         response = APIClient().get("/api/v1/notifications/")

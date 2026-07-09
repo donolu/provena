@@ -4,6 +4,8 @@ from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.pagination import PaginatedListMixin
+
 from . import services
 from .models import Cart, Review, WishlistItem
 from .serializers import (
@@ -98,7 +100,7 @@ class CartItemDetailView(APIView):
 # ---------------------------------------------------------------------------
 
 
-class WishlistView(APIView):
+class WishlistView(PaginatedListMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
@@ -108,7 +110,7 @@ class WishlistView(APIView):
     )
     def get(self, request):
         items = WishlistItem.objects.filter(buyer=request.user).select_related("variant__product")
-        return Response(WishlistItemSerializer(items, many=True).data)
+        return self.paginate(items, WishlistItemSerializer, request)
 
     @extend_schema(
         request=AddToWishlistSerializer,
@@ -142,7 +144,7 @@ class WishlistItemDeleteView(APIView):
 # ---------------------------------------------------------------------------
 
 
-class ProductReviewListCreateView(APIView):
+class ProductReviewListCreateView(PaginatedListMixin, APIView):
     def get_permissions(self):
         if self.request.method == "GET":
             return [AllowAny()]
@@ -157,7 +159,7 @@ class ProductReviewListCreateView(APIView):
         reviews = Review.objects.filter(variant_id=variant_id, is_approved=True).select_related(
             "variant", "reviewer"
         )
-        return Response(ReviewSerializer(reviews, many=True).data)
+        return self.paginate(reviews, ReviewSerializer, request)
 
     @extend_schema(
         request=CreateReviewSerializer,
@@ -187,7 +189,6 @@ class ProductReviewListCreateView(APIView):
 class AdminReviewListView(generics.ListAPIView):
     serializer_class = ReviewSerializer
     permission_classes = [IsAdminUser]
-    pagination_class = None
 
     @extend_schema(
         tags=["Admin: Marketplace"],

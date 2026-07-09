@@ -123,8 +123,11 @@ export async function deleteUser(userId: string): Promise<void> {
 export async function getAdminReviews(params?: {
   is_approved?: boolean
 }): Promise<Review[]> {
-  const { data } = await apiClient.get<Review[]>('/marketplace/admin/reviews/', { params })
-  return data
+  const { data } = await apiClient.get<PaginatedResponse<Review>>(
+    '/marketplace/admin/reviews/',
+    { params },
+  )
+  return data.results
 }
 
 export async function adminApproveReview(id: string): Promise<Review> {

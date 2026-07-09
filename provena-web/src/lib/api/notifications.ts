@@ -1,10 +1,12 @@
 import { apiClient } from './client'
-import type { Notification, NotificationPreferences } from './types'
+import type { Notification, NotificationPreferences, PaginatedResponse } from './types'
 
 export async function getNotifications(unreadOnly?: boolean): Promise<Notification[]> {
   const params = unreadOnly ? { unread: 'true' } : {}
-  const { data } = await apiClient.get<Notification[]>('/notifications/', { params })
-  return data
+  const { data } = await apiClient.get<PaginatedResponse<Notification>>('/notifications/', {
+    params,
+  })
+  return data.results
 }
 
 export async function markNotificationRead(id: string): Promise<Notification> {
