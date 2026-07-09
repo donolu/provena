@@ -134,24 +134,8 @@ class ProductSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True, allow_null=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
-    average_rating = serializers.SerializerMethodField()
-    review_count = serializers.SerializerMethodField()
-
-    def get_average_rating(self, obj) -> float | None:
-        from django.db.models import Avg
-
-        from apps.marketplace.models import Review
-
-        result = Review.objects.filter(variant__product=obj, is_approved=True).aggregate(
-            avg=Avg("rating")
-        )
-        avg = result["avg"]
-        return round(avg, 1) if avg is not None else None
-
-    def get_review_count(self, obj) -> int:
-        from apps.marketplace.models import Review
-
-        return Review.objects.filter(variant__product=obj, is_approved=True).count()
+    average_rating = serializers.FloatField(read_only=True, allow_null=True)
+    review_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Product

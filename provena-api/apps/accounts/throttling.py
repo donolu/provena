@@ -28,11 +28,11 @@ class SupplierRateThrottle(UserRateThrottle):
 
 
 class AdminRateThrottle(UserRateThrottle):
-    """Admins and staff are exempt from rate limiting."""
+    """Staff users are exempt from rate limiting; others fall back to the default rate."""
 
     scope = "admin"
 
     def allow_request(self, request, view):
         if request.user and request.user.is_authenticated and request.user.is_staff:
             return True
-        return True
+        return super().allow_request(request, view)
