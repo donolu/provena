@@ -17,8 +17,8 @@ export async function loginTotp(totpSessionToken: string, totpCode: string) {
   return data
 }
 
-export async function logout(refreshToken: string) {
-  await apiClient.post('/auth/logout/', { refresh: refreshToken })
+export async function logout() {
+  await apiClient.post('/auth/logout/', {}, { withCredentials: true })
 }
 
 export async function getMe() {

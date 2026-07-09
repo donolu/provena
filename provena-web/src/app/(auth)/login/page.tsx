@@ -35,8 +35,8 @@ export default function LoginPage() {
         setTotpToken((result as TOTPLoginRequired).totp_session_token)
         setTotpStep(true)
       } else {
-        const { access, refresh, user } = result as LoginResponse
-        storeLogin(user, access, refresh)
+        const { access, user } = result as LoginResponse
+        storeLogin(user, access)
         const next = searchParams.get('next')
         const dest = next ?? (user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue')
         router.push(dest)
@@ -56,8 +56,8 @@ export default function LoginPage() {
     setTotpLoading(true)
 
     try {
-      const { access, refresh, user } = await loginTotp(totpToken, totpCode)
-      storeLogin(user, access, refresh)
+      const { access, user } = await loginTotp(totpToken, totpCode)
+      storeLogin(user, access)
       const next = searchParams.get('next')
       const dest = next ?? (user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue')
       router.push(dest)
