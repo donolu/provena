@@ -317,15 +317,23 @@ def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderR
     # accepted the charge.
     payment_services.initiate_refund(payment, amount=amount)
     with transaction.atomic():
+        # Re-read with a row lock so a concurrent call that also passed the
+        # initial status check blocks here until we commit. If the locked row
+        # is already REFUNDED the concurrent caller won the race; bail out
+        # without touching stock a second time.
+        locked = OrderReturn.objects.select_for_update().get(pk=return_obj.pk)
+        if locked.status == ReturnStatus.REFUNDED:
+            return locked
+
         from apps.inventory import services as inventory_services
 
-        for item in return_obj.sub_order.items.select_related("variant"):
+        for item in locked.sub_order.items.select_related("variant"):
             inventory_services.return_stock(
                 item.variant,
                 item.quantity,
-                notes=f"Return {return_obj.id}",
+                notes=f"Return {locked.id}",
             )
-        return_obj.status = ReturnStatus.REFUNDED
-        return_obj.refund_amount = amount or payment.amount
-        return_obj.save(update_fields=["status", "refund_amount", "updated_at"])
-    return return_obj
+        locked.status = ReturnStatus.REFUNDED
+        locked.refund_amount = amount or payment.amount
+        locked.save(update_fields=["status", "refund_amount", "updated_at"])
+    return locked
