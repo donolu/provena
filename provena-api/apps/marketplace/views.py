@@ -52,7 +52,7 @@ def _set_cart_cookie(response: Response, identity: dict) -> None:
             services.CART_COOKIE,
             key,
             max_age=_CART_COOKIE_MAX_AGE,
-            httponly=False,
+            httponly=True,
             samesite="Lax",
             path="/",
             secure=getattr(settings, "CART_COOKIE_SECURE", False),
