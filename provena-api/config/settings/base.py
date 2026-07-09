@@ -205,13 +205,11 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "apps.accounts.throttling.BuyerRateThrottle",
         "apps.accounts.throttling.SupplierRateThrottle",
-        "apps.accounts.throttling.AdminRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/hour",
         "user": "1000/hour",
         "supplier": "2000/hour",
-        "admin": "10000/hour",
     },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
