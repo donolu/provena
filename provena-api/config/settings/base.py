@@ -300,6 +300,12 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="onboarding@resend.dev")
 
 # CORS - overridden in environment-specific settings
 CORS_ALLOWED_ORIGINS: list[str] = []
+CORS_ALLOW_CREDENTIALS = True
+
+# Refresh-token HttpOnly cookie
+REFRESH_COOKIE_NAME = "provena_rt"
+REFRESH_COOKIE_SAMESITE = "Lax"
+REFRESH_COOKIE_SECURE = False  # Overridden to True in production
 
 # Logging
 LOGGING = {

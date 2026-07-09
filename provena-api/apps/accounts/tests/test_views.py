@@ -1,5 +1,6 @@
 import pyotp
 import pytest
+from django.conf import settings
 from rest_framework import status
 
 from apps.accounts.services import enable_totp, setup_totp
@@ -8,6 +9,7 @@ REGISTER_URL = "/api/v1/auth/register/"
 LOGIN_URL = "/api/v1/auth/login/"
 TOTP_LOGIN_URL = "/api/v1/auth/login/totp/"
 LOGOUT_URL = "/api/v1/auth/logout/"
+REFRESH_URL = "/api/v1/auth/refresh/"
 ME_URL = "/api/v1/auth/me/"
 CHANGE_PASSWORD_URL = "/api/v1/auth/change-password/"
 PASSWORD_RESET_URL = "/api/v1/auth/password-reset/"
@@ -15,6 +17,7 @@ PASSWORD_RESET_CONFIRM_URL = "/api/v1/auth/password-reset/confirm/"
 TOTP_SETUP_URL = "/api/v1/auth/totp/setup/"
 TOTP_ENABLE_URL = "/api/v1/auth/totp/enable/"
 TOTP_DISABLE_URL = "/api/v1/auth/totp/disable/"
+COOKIE = settings.REFRESH_COOKIE_NAME
 
 
 @pytest.mark.django_db
@@ -32,7 +35,8 @@ class TestRegisterView:
         )
         assert res.status_code == status.HTTP_201_CREATED
         assert "access" in res.data
-        assert "refresh" in res.data
+        assert "refresh" not in res.data
+        assert COOKIE in res.cookies
         assert res.data["user"]["email"] == "newuser@example.com"
 
     def test_register_duplicate_email_returns_400(self, api_client, buyer):
@@ -82,7 +86,8 @@ class TestLoginView:
         )
         assert res.status_code == status.HTTP_200_OK
         assert "access" in res.data
-        assert "refresh" in res.data
+        assert "refresh" not in res.data
+        assert COOKIE in res.cookies
 
     def test_login_wrong_password_returns_401(self, api_client, buyer):
         res = api_client.post(LOGIN_URL, {"email": "buyer@example.com", "password": "wrongpass"})
@@ -148,6 +153,50 @@ class TestTOTPLoginView:
             },
         )
         assert res2.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.django_db
+class TestLogoutView:
+    def test_logout_clears_cookie(self, api_client, buyer):
+        res = api_client.post(
+            LOGIN_URL, {"email": "buyer@example.com", "password": "Securepass123!"}
+        )
+        api_client.cookies[COOKIE] = res.cookies[COOKIE].value
+
+        res2 = api_client.post(LOGOUT_URL)
+
+        assert res2.status_code == status.HTTP_204_NO_CONTENT
+        # The cookie is cleared by the server (max-age=0 or past expiry)
+        assert res2.cookies[COOKIE].value == ""
+
+    def test_logout_without_cookie_returns_204(self, api_client):
+        res = api_client.post(LOGOUT_URL)
+        assert res.status_code == status.HTTP_204_NO_CONTENT
+
+
+@pytest.mark.django_db
+class TestCookieTokenRefreshView:
+    def test_refresh_issues_new_access_token(self, api_client, buyer):
+        res = api_client.post(
+            LOGIN_URL, {"email": "buyer@example.com", "password": "Securepass123!"}
+        )
+        api_client.cookies[COOKIE] = res.cookies[COOKIE].value
+
+        res2 = api_client.post(REFRESH_URL)
+
+        assert res2.status_code == status.HTTP_200_OK
+        assert "access" in res2.data
+        assert "refresh" not in res2.data
+        assert COOKIE in res2.cookies
+
+    def test_refresh_without_cookie_returns_401(self, api_client):
+        res = api_client.post(REFRESH_URL)
+        assert res.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_refresh_with_invalid_cookie_returns_401(self, api_client):
+        api_client.cookies[COOKIE] = "notavalidtoken"
+        res = api_client.post(REFRESH_URL)
+        assert res.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.django_db

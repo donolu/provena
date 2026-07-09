@@ -75,7 +75,7 @@ export interface paths {
         put?: never;
         /**
          * Log out
-         * @description Blacklists the supplied refresh token so it cannot be used again. The short-lived access token will expire naturally after 15 minutes. Returns 204 regardless of whether the token was valid.
+         * @description Reads the refresh token from the `provena_rt` HttpOnly cookie, blacklists it so it cannot be used again, and clears the cookie. The short-lived access token expires naturally after 15 minutes. Returns 204 regardless of whether a cookie was present.
          */
         post: operations["auth_logout_create"];
         delete?: never;
@@ -94,8 +94,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * @description Takes a refresh type JSON web token and returns an access type JSON web
-         *     token if the refresh token is valid.
+         * Refresh access token
+         * @description Reads the refresh token from the `provena_rt` HttpOnly cookie, issues a new short-lived access token, and rotates the refresh token cookie.
          */
         post: operations["auth_refresh_create"];
         delete?: never;
@@ -2774,10 +2774,6 @@ export interface components {
             email: string;
             password: string;
         };
-        LogoutRequestRequest: {
-            /** @description The refresh token to blacklist */
-            refresh: string;
-        };
         /**
          * @description * `INBOUND` - Inbound Receipt
          *     * `OUTBOUND` - Outbound Dispatch
@@ -3555,13 +3551,6 @@ export interface components {
         TOTPVerifyRequest: {
             code: string;
         };
-        TokenRefresh: {
-            readonly access: string;
-            refresh: string;
-        };
-        TokenRefreshRequest: {
-            refresh: string;
-        };
         TriggerRefundRequest: {
             stripe_refund_id: string;
             amount_pence: number;
@@ -3725,13 +3714,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LogoutRequestRequest"];
-                "application/x-www-form-urlencoded": components["schemas"]["LogoutRequestRequest"];
-                "multipart/form-data": components["schemas"]["LogoutRequestRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Logged out */
             204: {
@@ -3749,21 +3732,21 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TokenRefreshRequest"];
-                "application/x-www-form-urlencoded": components["schemas"]["TokenRefreshRequest"];
-                "multipart/form-data": components["schemas"]["TokenRefreshRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
+            /** @description `{access: '...'}` */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["TokenRefresh"];
+                content?: never;
+            };
+            /** @description Cookie missing or token invalid/expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
                 };
+                content?: never;
             };
         };
     };

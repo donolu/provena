@@ -14,7 +14,6 @@ export interface UserProfile {
 
 export interface LoginResponse {
   access: string
-  refresh: string
   user: UserProfile
 }
 

@@ -1,12 +1,16 @@
+from datetime import timedelta
+from typing import cast
+
+from django.conf import settings
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
-from rest_framework import serializers as drf_serializers
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.audit import audit_action
@@ -28,14 +32,40 @@ from .serializers import (
     UserProfileSerializer,
 )
 
+_COOKIE_PATH = "/api/v1/auth/"
 
-def _issue_token_pair(user):
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    lifetime = cast(timedelta, settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"])
+    max_age = int(lifetime.total_seconds())
+    response.set_cookie(
+        key=settings.REFRESH_COOKIE_NAME,
+        value=token,
+        max_age=max_age,
+        path=_COOKIE_PATH,
+        httponly=True,
+        secure=settings.REFRESH_COOKIE_SECURE,
+        samesite=settings.REFRESH_COOKIE_SAMESITE,  # type: ignore[arg-type]
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=settings.REFRESH_COOKIE_NAME,
+        path=_COOKIE_PATH,
+        samesite=settings.REFRESH_COOKIE_SAMESITE,  # type: ignore[arg-type]
+    )
+
+
+def _auth_response(user: User, http_status: int = status.HTTP_200_OK) -> Response:
+    """Build a login/register response: access token in body, refresh token in HttpOnly cookie."""
     refresh = RefreshToken.for_user(user)
-    return {
-        "access": str(refresh.access_token),
-        "refresh": str(refresh),
-        "user": UserProfileSerializer(user).data,
-    }
+    response = Response(
+        {"access": str(refresh.access_token), "user": UserProfileSerializer(user).data},
+        status=http_status,
+    )
+    _set_refresh_cookie(response, str(refresh))
+    return response
 
 
 class RegisterView(APIView):
@@ -62,7 +92,7 @@ class RegisterView(APIView):
             first_name=d.get("first_name", ""),
             last_name=d.get("last_name", ""),
         )
-        return Response(_issue_token_pair(user), status=status.HTTP_201_CREATED)
+        return _auth_response(user, status.HTTP_201_CREATED)
 
 
 class LoginView(APIView):
@@ -101,7 +131,7 @@ class LoginView(APIView):
                 {"totp_required": True, "totp_session_token": session_token},
                 status=status.HTTP_200_OK,
             )
-        return Response(_issue_token_pair(user))
+        return _auth_response(user)  # type: ignore[arg-type]
 
 
 class TOTPLoginView(APIView):
@@ -132,33 +162,81 @@ class TOTPLoginView(APIView):
                 {"error": {"code": "TOTP_FAILED", "message": error}},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        return Response(_issue_token_pair(user))
+        return _auth_response(user)  # type: ignore[arg-type]
+
+
+class CookieTokenRefreshView(APIView):
+    """Refresh the access token using the HttpOnly refresh-token cookie."""
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["Authentication"],
+        summary="Refresh access token",
+        description="Reads the refresh token from the `provena_rt` HttpOnly cookie, "
+        "issues a new short-lived access token, and rotates the refresh token cookie.",
+        request=None,
+        responses={
+            200: OpenApiResponse(description="`{access: '...'}`"),
+            401: OpenApiResponse(description="Cookie missing or token invalid/expired"),
+        },
+    )
+    def post(self, request: Request) -> Response:
+        raw = request.COOKIES.get(settings.REFRESH_COOKIE_NAME)
+        if not raw:
+            return Response(
+                {"error": {"code": "NO_REFRESH_TOKEN", "message": "Refresh token not found."}},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        try:
+            refresh = RefreshToken(raw)  # type: ignore[arg-type]
+        except TokenError:
+            return Response(
+                {"error": {"code": "INVALID_TOKEN", "message": "Token is invalid or expired."}},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        new_access = str(refresh.access_token)
+        new_refresh = raw
+
+        if jwt_settings.ROTATE_REFRESH_TOKENS:
+            if jwt_settings.BLACKLIST_AFTER_ROTATION:
+                refresh.blacklist()
+            refresh.set_jti()
+            refresh.set_exp()
+            refresh.set_iat()
+            new_refresh = str(refresh)
+
+        response = Response({"access": new_access})
+        _set_refresh_cookie(response, new_refresh)
+        return response
 
 
 class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]
+    """Blacklist the refresh token cookie and clear it."""
+
+    permission_classes = [AllowAny]
 
     @extend_schema(
         tags=["Authentication"],
         summary="Log out",
-        description="Blacklists the supplied refresh token so it cannot be used again. "
-        "The short-lived access token will expire naturally after 15 minutes. "
-        "Returns 204 regardless of whether the token was valid.",
-        request=inline_serializer(
-            "LogoutRequest",
-            fields={
-                "refresh": drf_serializers.CharField(help_text="The refresh token to blacklist")
-            },
-        ),
+        description="Reads the refresh token from the `provena_rt` HttpOnly cookie, "
+        "blacklists it so it cannot be used again, and clears the cookie. "
+        "The short-lived access token expires naturally after 15 minutes. "
+        "Returns 204 regardless of whether a cookie was present.",
+        request=None,
         responses={204: OpenApiResponse(description="Logged out")},
     )
     def post(self, request: Request) -> Response:
-        try:
-            token = RefreshToken(request.data.get("refresh", ""))
-            token.blacklist()
-        except (TokenError, Exception):  # noqa: S110
-            pass  # Blacklisting is best-effort; short-lived access tokens expire naturally
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        raw = request.COOKIES.get(settings.REFRESH_COOKIE_NAME)
+        if raw:
+            try:
+                RefreshToken(raw).blacklist()  # type: ignore[arg-type]
+            except (TokenError, Exception):  # noqa: S110
+                pass  # Expired tokens don't need blacklisting
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        _clear_refresh_cookie(response)
+        return response
 
 
 class UserProfileView(APIView):

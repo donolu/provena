@@ -38,7 +38,8 @@ apiClient.interceptors.response.use(
   async (error) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
-    const isAuthEndpoint = original.url?.startsWith('/auth/login') || original.url?.startsWith('/auth/totp')
+    const isAuthEndpoint =
+      original.url?.startsWith('/auth/login') || original.url?.startsWith('/auth/totp')
     if (error.response?.status !== 401 || original._retry || isAuthEndpoint) {
       return Promise.reject(error)
     }
@@ -55,24 +56,14 @@ apiClient.interceptors.response.use(
     original._retry = true
     _refreshing = true
 
-    const storedRefresh =
-      typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null
-
-    if (!storedRefresh) {
-      _onLogout()
-      _refreshing = false
-      return Promise.reject(error)
-    }
-
     try {
-      const { data } = await axios.post(`${BASE_URL}/api/v1/auth/refresh/`, {
-        refresh: storedRefresh,
-      })
+      // The refresh token arrives via the HttpOnly cookie — no body needed.
+      const { data } = await axios.post(
+        `${BASE_URL}/api/v1/auth/refresh/`,
+        {},
+        { withCredentials: true },
+      )
       const newAccess: string = data.access
-      localStorage.setItem('refresh_token', data.refresh)
-      // Push new access token into the store without importing the store here
-      _onLogout = _onLogout  // keep logout reference
-      // Notify store via a custom event so it can update accessToken
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('provena:token-refreshed', { detail: newAccess }))
       }
