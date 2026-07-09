@@ -148,6 +148,8 @@ class TestProcessPayout:
     def test_raises_if_no_stripe_account(self, pending_payout, mock_stripe_transfer):
         with pytest.raises(ValueError, match="Stripe Connect onboarding"):
             services.process_payout(pending_payout)
+        pending_payout.refresh_from_db()
+        assert pending_payout.status == PayoutStatus.PENDING
 
     def test_raises_if_onboarding_incomplete(
         self, pending_payout, approved_supplier, mock_stripe_transfer
@@ -157,6 +159,8 @@ class TestProcessPayout:
         approved_supplier.save(update_fields=["stripe_account_id", "stripe_onboarding_complete"])
         with pytest.raises(ValueError, match="Stripe Connect onboarding"):
             services.process_payout(pending_payout)
+        pending_payout.refresh_from_db()
+        assert pending_payout.status == PayoutStatus.PENDING
 
     def test_creates_transfer_to_supplier(
         self, pending_payout, onboarded_supplier, mock_stripe_transfer
@@ -198,3 +202,57 @@ class TestProcessPayout:
             services.process_payout(pending_payout)
         pending_payout.refresh_from_db()
         assert pending_payout.status == PayoutStatus.FAILED
+
+    def test_transfer_uses_idempotency_key(
+        self, pending_payout, onboarded_supplier, mock_stripe_transfer
+    ):
+        services.process_payout(pending_payout)
+        call_kwargs = mock_stripe_transfer.Transfer.create.call_args[1]
+        assert call_kwargs["idempotency_key"] == f"payout-{pending_payout.id}"
+
+
+class TestInitiateRefund:
+    @pytest.fixture
+    def mock_stripe_refund(self):
+        from unittest.mock import patch
+
+        intent = MagicMock()
+        intent.latest_charge = "ch_test_refund"
+        with patch("apps.payments.services.stripe") as mock:
+            mock.PaymentIntent.retrieve.return_value = intent
+            mock.Refund.create.return_value = MagicMock(id="re_test")
+            yield mock
+
+    def test_raises_if_payment_not_succeeded(self, payment, mock_stripe_refund):
+        with pytest.raises(ValueError, match="status"):
+            services.initiate_refund(payment)
+
+    def test_raises_if_amount_exceeds_balance(self, succeeded_payment, mock_stripe_refund):
+        with pytest.raises(ValueError, match="exceeds refundable balance"):
+            services.initiate_refund(succeeded_payment, amount=succeeded_payment.amount + 1)
+
+    def test_full_refund_sends_correct_amount(self, succeeded_payment, mock_stripe_refund):
+        services.initiate_refund(succeeded_payment)
+        call_kwargs = mock_stripe_refund.Refund.create.call_args[1]
+        assert call_kwargs["amount"] == int(succeeded_payment.amount * 100)
+
+    def test_partial_refund_sends_correct_amount(self, succeeded_payment, mock_stripe_refund):
+        from decimal import Decimal
+
+        services.initiate_refund(succeeded_payment, amount=Decimal("1.00"))
+        call_kwargs = mock_stripe_refund.Refund.create.call_args[1]
+        assert call_kwargs["amount"] == 100
+
+    def test_uses_idempotency_key(self, succeeded_payment, mock_stripe_refund):
+        services.initiate_refund(succeeded_payment)
+        call_kwargs = mock_stripe_refund.Refund.create.call_args[1]
+        expected_amount_pence = int(succeeded_payment.amount * 100)
+        assert (
+            call_kwargs["idempotency_key"]
+            == f"refund-{succeeded_payment.id}-{expected_amount_pence}"
+        )
+
+    def test_raises_if_no_charge_on_intent(self, succeeded_payment, mock_stripe_refund):
+        mock_stripe_refund.PaymentIntent.retrieve.return_value.latest_charge = None
+        with pytest.raises(ValueError, match="No charge found"):
+            services.initiate_refund(succeeded_payment)

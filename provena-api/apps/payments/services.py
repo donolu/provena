@@ -108,26 +108,36 @@ def handle_refund(
 
 def initiate_refund(payment: Payment, amount: Decimal | None = None) -> Payment:
     """Issue a refund via Stripe. amount=None means full refund."""
-    if payment.status not in (PaymentStatus.SUCCEEDED, PaymentStatus.PARTIALLY_REFUNDED):
-        raise ValueError(f"Cannot refund a payment with status {payment.status}.")
+    # Lock the Payment row to serialise concurrent refund calls. Without this,
+    # two requests before the webhook updates refunded_amount could both pass
+    # the max_refundable check and issue duplicate refunds.
+    with transaction.atomic():
+        payment = Payment.objects.select_for_update().get(pk=payment.pk)
+        if payment.status not in (PaymentStatus.SUCCEEDED, PaymentStatus.PARTIALLY_REFUNDED):
+            raise ValueError(f"Cannot refund a payment with status {payment.status}.")
+        max_refundable = payment.amount - payment.refunded_amount
+        refund_amount: Decimal = amount if amount is not None else max_refundable
+        if refund_amount > max_refundable:
+            raise ValueError(
+                f"Refund amount £{refund_amount} exceeds refundable balance £{max_refundable}."
+            )
+        amount_pence = _to_pence(refund_amount)
 
+    # Stripe calls outside the transaction. The idempotency key encodes payment
+    # and exact pence amount so retrying the same request returns the cached
+    # Stripe response instead of creating a duplicate refund.
     stripe.api_key = settings.STRIPE_SECRET_KEY
     intent = stripe.PaymentIntent.retrieve(payment.stripe_payment_intent_id)
     charge_id = getattr(intent, "latest_charge", None)
     if not charge_id:
         raise ValueError("No charge found on this PaymentIntent.")
 
-    kwargs: dict = {"charge": charge_id}
-    if amount is not None:
-        max_refundable = payment.amount - payment.refunded_amount
-        if amount > max_refundable:
-            raise ValueError(
-                f"Refund amount £{amount} exceeds refundable balance £{max_refundable}."
-            )
-        kwargs["amount"] = _to_pence(amount)
-
-    stripe.Refund.create(**kwargs)
-    logger.info("Stripe refund initiated for payment %s (amount=%s)", payment.id, amount or "full")
+    stripe.Refund.create(
+        charge=charge_id,
+        amount=amount_pence,
+        idempotency_key=f"refund-{payment.id}-{amount_pence}",
+    )
+    logger.info("Stripe refund initiated for payment %s (amount=%s)", payment.id, refund_amount)
     return payment
 
 
@@ -168,11 +178,21 @@ def _create_payouts(payment: Payment) -> None:
 
 
 def process_payout(payout: Payout) -> Payout:
-    if payout.status != PayoutStatus.PENDING:
-        raise ValueError(f"Cannot process a payout with status {payout.status}.")
+    # Lock the Payout row and transition to PROCESSING atomically. A concurrent
+    # caller will re-read PROCESSING here and raise, preventing double-transfers.
+    with transaction.atomic():
+        payout = Payout.objects.select_for_update().get(pk=payout.pk)
+        if payout.status != PayoutStatus.PENDING:
+            raise ValueError(f"Cannot process a payout with status {payout.status}.")
+        payout.status = PayoutStatus.PROCESSING
+        payout.save(update_fields=["status", "updated_at"])
 
     supplier = payout.supplier
     if not supplier.stripe_account_id or not supplier.stripe_onboarding_complete:
+        # Supplier not yet onboarded; roll back to PENDING so the payout can be retried.
+        with transaction.atomic():
+            payout.status = PayoutStatus.PENDING
+            payout.save(update_fields=["status", "updated_at"])
         raise ValueError(
             f"Supplier '{supplier.business_name}' has not completed Stripe Connect onboarding."
         )
@@ -182,9 +202,6 @@ def process_payout(payout: Payout) -> Payout:
     payment = payout.sub_order.order.payment
     intent = stripe.PaymentIntent.retrieve(payment.stripe_payment_intent_id)
     charge_id = getattr(intent, "latest_charge", None)
-
-    payout.status = PayoutStatus.PROCESSING
-    payout.save(update_fields=["status", "updated_at"])
 
     try:
         transfer_kwargs: dict = {
@@ -196,18 +213,21 @@ def process_payout(payout: Payout) -> Payout:
                 "sub_order_id": str(payout.sub_order.id),
                 "order_reference": payment.order.reference,
             },
+            "idempotency_key": f"payout-{payout.id}",
         }
         if charge_id:
             transfer_kwargs["source_transaction"] = charge_id
 
         transfer = stripe.Transfer.create(**transfer_kwargs)
-        payout.stripe_transfer_id = transfer.id
-        payout.status = PayoutStatus.PAID
-        payout.save(update_fields=["status", "stripe_transfer_id", "updated_at"])
+        with transaction.atomic():
+            payout.stripe_transfer_id = transfer.id
+            payout.status = PayoutStatus.PAID
+            payout.save(update_fields=["status", "stripe_transfer_id", "updated_at"])
         logger.info("Stripe transfer %s created for payout %s", transfer.id, payout.id)
     except stripe.StripeError as exc:
-        payout.status = PayoutStatus.FAILED
-        payout.save(update_fields=["status", "updated_at"])
+        with transaction.atomic():
+            payout.status = PayoutStatus.FAILED
+            payout.save(update_fields=["status", "updated_at"])
         logger.exception("Stripe transfer failed for payout %s", payout.id)
         raise ValueError(f"Stripe transfer failed: {exc}") from exc
 
