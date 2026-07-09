@@ -172,6 +172,35 @@ class TestProcessReturnRefund:
         mock_initiate.assert_called_once()
         assert mock_initiate.call_args[1]["amount"] == Decimal("3.99")
 
+    def test_refunding_retry_does_not_release_claim_on_failure(
+        self, buyer, placed_order, dispatched_sub_order
+    ):
+        """A retry that observes REFUNDING must not reset status to APPROVED on transient error."""
+        from apps.payments.models import Payment, PaymentStatus
+
+        Payment.objects.create(
+            order=placed_order,
+            stripe_payment_intent_id="pi_test_retry_fail",
+            amount=Decimal("7.98"),
+            status=PaymentStatus.SUCCEEDED,
+        )
+        sub = services.deliver_sub_order(dispatched_sub_order)
+        ret = services.request_return(sub, buyer, "Faulty item")
+        services.approve_return(ret)
+
+        # Row is already mid-flight: REFUNDING was set by a different worker.
+        ret.status = ReturnStatus.REFUNDING
+        ret.refund_amount = Decimal("3.99")
+        ret.save(update_fields=["status", "refund_amount", "updated_at"])
+
+        with patch("apps.payments.services.initiate_refund", side_effect=RuntimeError("transient")):
+            with pytest.raises(RuntimeError):
+                services.process_return_refund(ret)
+
+        # The claim must still be held (REFUNDING), not reset to APPROVED.
+        ret.refresh_from_db()
+        assert ret.status == ReturnStatus.REFUNDING
+
 
 # ---------------------------------------------------------------------------
 # View tests — buyer

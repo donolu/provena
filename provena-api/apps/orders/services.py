@@ -324,6 +324,7 @@ def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderR
             locked.refund_amount = amount
             locked.status = ReturnStatus.REFUNDING
             locked.save(update_fields=["status", "refund_amount", "updated_at"])
+            claimed_this_call = True
         else:
             # REFUNDING retry: a previous attempt claimed the return and set the
             # amount. Ignore the caller's refund_amount to prevent a second Stripe
@@ -332,17 +333,20 @@ def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderR
                 "REFUNDING return must have a stored refund_amount"
             )
             amount = locked.refund_amount
+            claimed_this_call = False
 
     # Phase 2: call Stripe outside any DB transaction so the connection is not
-    # held open during the network round-trip. On failure, reset to APPROVED so
-    # the caller can retry cleanly.
+    # held open during the network round-trip. Only the caller that performed
+    # the APPROVED→REFUNDING transition resets the claim on failure; a retry
+    # that merely observed REFUNDING must not release a claim it does not own.
     try:
         payment_services.initiate_refund(payment, amount=amount)
     except Exception:
-        with transaction.atomic():
-            OrderReturn.objects.filter(pk=locked.pk, status=ReturnStatus.REFUNDING).update(
-                status=ReturnStatus.APPROVED
-            )
+        if claimed_this_call:
+            with transaction.atomic():
+                OrderReturn.objects.filter(pk=locked.pk, status=ReturnStatus.REFUNDING).update(
+                    status=ReturnStatus.APPROVED
+                )
         raise
 
     # Phase 3: return inventory and mark REFUNDED. Re-read under lock in case a
