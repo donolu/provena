@@ -10,12 +10,29 @@ RESERVATION_MINUTES = 30
 
 class Cart(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    buyer = models.OneToOneField("accounts.User", on_delete=models.CASCADE, related_name="cart")
+    buyer = models.OneToOneField(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="cart",
+        null=True,
+        blank=True,
+    )
+    session_key = models.CharField(max_length=64, null=True, blank=True, unique=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(buyer__isnull=False) | models.Q(session_key__isnull=False),
+                name="cart_has_owner",
+            )
+        ]
+
     def __str__(self) -> str:
-        return f"Cart({self.buyer.email})"
+        if self.buyer_id:
+            return f"Cart({self.buyer.email})"
+        return f"Cart(guest:{(self.session_key or '')[:8]})"
 
     @property
     def total(self) -> Decimal:

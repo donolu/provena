@@ -76,7 +76,6 @@ export default function ProductDetailPage({
   const { data: cart } = useQuery({
     queryKey: ['cart'],
     queryFn: getCart,
-    enabled: !!user,
   })
 
   const { data: wishlistData } = useQuery({

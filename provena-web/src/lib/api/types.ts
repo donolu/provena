@@ -117,11 +117,11 @@ export interface CartItem {
 }
 
 export interface Cart {
-  id: string
+  id: string | null
   items: CartItem[]
   total: string
   item_count: number
-  updated_at: string
+  updated_at?: string
 }
 
 export interface WishlistItem {

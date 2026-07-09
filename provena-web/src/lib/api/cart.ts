@@ -29,6 +29,12 @@ export async function clearCart(): Promise<void> {
   await apiClient.delete('/marketplace/cart/')
 }
 
+export async function mergeGuestCart(accessToken?: string): Promise<void> {
+  await apiClient.post('/marketplace/cart/merge/', {}, {
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+  })
+}
+
 // ── Wishlist ──────────────────────────────────────────────────────────────────
 
 export async function getWishlist(page = 1): Promise<PaginatedResponse<WishlistItem>> {

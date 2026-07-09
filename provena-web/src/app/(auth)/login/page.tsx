@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { login, loginTotp } from '@/lib/api/auth'
+import { mergeGuestCart } from '@/lib/api/cart'
 import { useAuthStore } from '@/store/auth'
 import type { LoginResponse, TOTPLoginRequired } from '@/lib/api/types'
 
@@ -36,6 +37,7 @@ export default function LoginPage() {
         setTotpStep(true)
       } else {
         const { access, user } = result as LoginResponse
+        await mergeGuestCart(access).catch(() => {})
         storeLogin(user, access)
         const next = searchParams.get('next')
         const dest = next ?? (user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue')
@@ -57,6 +59,7 @@ export default function LoginPage() {
 
     try {
       const { access, user } = await loginTotp(totpToken, totpCode)
+      await mergeGuestCart(access).catch(() => {})
       storeLogin(user, access)
       const next = searchParams.get('next')
       const dest = next ?? (user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue')

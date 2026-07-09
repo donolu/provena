@@ -33,7 +33,6 @@ export default function Home() {
   const { data: serverCart } = useQuery({
     queryKey: ['cart'],
     queryFn: getCart,
-    enabled: !!user,
   })
 
   const addMutation = useMutation({
