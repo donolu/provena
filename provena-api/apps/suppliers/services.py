@@ -2,6 +2,7 @@ import logging
 
 import stripe
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import Role, User
@@ -124,28 +125,36 @@ def create_stripe_connect_account(supplier: Supplier) -> str:
         return ""
 
     stripe.api_key = settings.STRIPE_SECRET_KEY
+    # The idempotency key ensures concurrent calls for the same supplier always
+    # get back the same Stripe account, even if both reach this point before
+    # either has saved the ID.
     account = stripe.Account.create(
         type="express",
         country="GB",
         email=supplier.user.email,
         capabilities={"transfers": {"requested": True}},
+        idempotency_key=f"connect-account-{supplier.pk}",
     )
-    supplier.stripe_account_id = account["id"]
-    supplier.save(update_fields=["stripe_account_id", "updated_at"])
-    return str(account["id"])
+    account_id = str(account["id"])
+    # Lock and re-read so only one writer wins the save; any concurrent caller
+    # will find stripe_account_id already set and return without a second write.
+    with transaction.atomic():
+        fresh = Supplier.objects.select_for_update().get(pk=supplier.pk)
+        if not fresh.stripe_account_id:
+            fresh.stripe_account_id = account_id
+            fresh.save(update_fields=["stripe_account_id", "updated_at"])
+    return account_id
 
 
 def get_stripe_connect_onboarding_url(supplier: Supplier, return_url: str, refresh_url: str) -> str:
     """Return the Stripe-hosted onboarding URL for the supplier to complete KYC."""
-    if not supplier.stripe_account_id:
-        create_stripe_connect_account(supplier)
-
-    if not supplier.stripe_account_id:
+    account_id = supplier.stripe_account_id or create_stripe_connect_account(supplier)
+    if not account_id:
         return ""
 
     stripe.api_key = settings.STRIPE_SECRET_KEY
     link = stripe.AccountLink.create(
-        account=supplier.stripe_account_id,
+        account=account_id,
         refresh_url=refresh_url,
         return_url=return_url,
         type="account_onboarding",

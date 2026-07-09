@@ -299,7 +299,6 @@ def reject_return(return_obj: OrderReturn, notes: str = "") -> OrderReturn:
     return return_obj
 
 
-@transaction.atomic
 def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderReturn:
     if return_obj.status != ReturnStatus.APPROVED:
         raise ValueError("Can only refund an approved return.")
@@ -311,16 +310,22 @@ def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderR
     if payment is None:
         raise ValueError("No payment found for this order.")
     amount = Decimal(str(refund_amount)) if refund_amount is not None else None
+    # initiate_refund() commits the idempotency record in its own transaction
+    # before calling Stripe. No outer atomic wrapper here: if we wrapped this
+    # whole function, the inner commit would become a savepoint and a later DB
+    # failure would roll back the refund record even though Stripe already
+    # accepted the charge.
     payment_services.initiate_refund(payment, amount=amount)
-    for item in return_obj.sub_order.items.select_related("variant"):
+    with transaction.atomic():
         from apps.inventory import services as inventory_services
 
-        inventory_services.return_stock(
-            item.variant,
-            item.quantity,
-            notes=f"Return {return_obj.id}",
-        )
-    return_obj.status = ReturnStatus.REFUNDED
-    return_obj.refund_amount = amount or payment.amount
-    return_obj.save(update_fields=["status", "refund_amount", "updated_at"])
+        for item in return_obj.sub_order.items.select_related("variant"):
+            inventory_services.return_stock(
+                item.variant,
+                item.quantity,
+                notes=f"Return {return_obj.id}",
+            )
+        return_obj.status = ReturnStatus.REFUNDED
+        return_obj.refund_amount = amount or payment.amount
+        return_obj.save(update_fields=["status", "refund_amount", "updated_at"])
     return return_obj
