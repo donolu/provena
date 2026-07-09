@@ -97,6 +97,7 @@ class OrderItem(models.Model):
 class ReturnStatus(models.TextChoices):
     REQUESTED = "REQUESTED", "Requested"
     APPROVED = "APPROVED", "Approved"
+    REFUNDING = "REFUNDING", "Refunding"
     REJECTED = "REJECTED", "Rejected"
     REFUNDED = "REFUNDED", "Refunded"
 

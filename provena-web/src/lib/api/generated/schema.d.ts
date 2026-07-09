@@ -2892,11 +2892,12 @@ export interface components {
         /**
          * @description * `REQUESTED` - Requested
          *     * `APPROVED` - Approved
+         *     * `REFUNDING` - Refunding
          *     * `REJECTED` - Rejected
          *     * `REFUNDED` - Refunded
          * @enum {string}
          */
-        OrderReturnStatusEnum: "REQUESTED" | "APPROVED" | "REJECTED" | "REFUNDED";
+        OrderReturnStatusEnum: "REQUESTED" | "APPROVED" | "REFUNDING" | "REJECTED" | "REFUNDED";
         /**
          * @description * `FULL_REFUND` - Full refund
          *     * `PARTIAL_REFUND` - Partial refund
