@@ -92,8 +92,11 @@ def remove_from_cart(user, item_id) -> None:
 def clear_cart(user) -> None:
     # Materialise the locked set so we delete exactly these IDs, not any CartItems
     # inserted by a concurrent add_to_cart() after the lock was taken.
+    # of=("self",) restricts the lock to marketplace_cartitem rows only; without it
+    # PostgreSQL rejects FOR UPDATE because select_related("reservation") produces a
+    # LEFT OUTER JOIN on the nullable reverse-OneToOne and PG forbids locking on that.
     items = list(
-        CartItem.objects.select_for_update()
+        CartItem.objects.select_for_update(of=("self",))
         .filter(cart__buyer=user)
         .select_related("reservation", "variant")
     )
