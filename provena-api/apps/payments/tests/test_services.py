@@ -331,7 +331,7 @@ class TestInitiateRefund:
         with pytest.raises(ValueError, match="No charge found"):
             services.initiate_refund(succeeded_payment)
 
-    def test_creates_refund_request_and_drains_after_stripe(
+    def test_creates_refund_request_and_keeps_reservation_until_webhook(
         self, succeeded_payment, mock_stripe_refund
     ):
         from apps.payments.models import PaymentRefundRequest, PaymentRefundRequestStatus
@@ -340,13 +340,36 @@ class TestInitiateRefund:
         services.initiate_refund(succeeded_payment, amount=amount)
 
         succeeded_payment.refresh_from_db()
-        # Reservation is drained to zero once Stripe confirms.
-        assert succeeded_payment.pending_refund_amount == Decimal("0.00")
+        # Stripe has accepted the refund request, but local refundable balance is
+        # only confirmed when the refund webhook advances refunded_amount.
+        assert succeeded_payment.pending_refund_amount == amount
 
         req = PaymentRefundRequest.objects.get(payment=succeeded_payment)
         assert req.amount == amount
         assert req.status == PaymentRefundRequestStatus.COMPLETED
         assert req.stripe_refund_id == "re_test"
+
+    def test_full_refund_retry_before_webhook_uses_existing_request(
+        self, succeeded_payment, mock_stripe_refund
+    ):
+        services.initiate_refund(succeeded_payment)
+        succeeded_payment.refresh_from_db()
+        assert succeeded_payment.pending_refund_amount == succeeded_payment.amount
+
+        services.initiate_refund(succeeded_payment)
+
+        succeeded_payment.refresh_from_db()
+        assert succeeded_payment.pending_refund_amount == succeeded_payment.amount
+        mock_stripe_refund.Refund.create.assert_called_once()
+
+    def test_different_refund_blocked_after_stripe_accepts_before_webhook(
+        self, succeeded_payment, mock_stripe_refund
+    ):
+        services.initiate_refund(succeeded_payment)
+        succeeded_payment.refresh_from_db()
+
+        with pytest.raises(ValueError, match="exceeds refundable balance"):
+            services.initiate_refund(succeeded_payment, amount=Decimal("0.01"))
 
     def test_concurrent_refunds_blocked_by_reservation(self, succeeded_payment, mock_stripe_refund):
         from apps.payments.models import PaymentRefundRequest, PaymentRefundRequestStatus
@@ -384,12 +407,11 @@ class TestInitiateRefund:
         succeeded_payment.pending_refund_amount = amount
         succeeded_payment.save(update_fields=["pending_refund_amount"])
 
-        # Retry: same idempotency key → should find PENDING, skip increment, call Stripe,
-        # then drain the existing reservation on success.
+        # Retry: same idempotency key → should find PENDING, skip increment, and call Stripe.
         services.initiate_refund(succeeded_payment, amount=amount)
 
         succeeded_payment.refresh_from_db()
-        assert succeeded_payment.pending_refund_amount == Decimal("0.00")
+        assert succeeded_payment.pending_refund_amount == amount
         # Stripe was called exactly once by this retry.
         mock_stripe_refund.Refund.create.assert_called_once()
 

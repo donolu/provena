@@ -136,8 +136,8 @@ def initiate_refund(payment: Payment, amount: Decimal | None = None) -> Payment:
         if payment.status not in (PaymentStatus.SUCCEEDED, PaymentStatus.PARTIALLY_REFUNDED):
             raise ValueError(f"Cannot refund a payment with status {payment.status}.")
 
-        max_refundable = payment.amount - payment.refunded_amount - payment.pending_refund_amount
-        refund_amount: Decimal = amount if amount is not None else max_refundable
+        outstanding_amount = payment.amount - payment.refunded_amount
+        refund_amount: Decimal = amount if amount is not None else outstanding_amount
         if refund_amount <= 0:
             raise ValueError("Refund amount must be greater than zero.")
         amount_pence = _to_pence(refund_amount)
@@ -153,6 +153,9 @@ def initiate_refund(payment: Payment, amount: Decimal | None = None) -> Payment:
 
         needs_reservation = created or request.status == PaymentRefundRequestStatus.FAILED
         if needs_reservation:
+            max_refundable = (
+                payment.amount - payment.refunded_amount - payment.pending_refund_amount
+            )
             if refund_amount > max_refundable:
                 if created:
                     request.delete()
@@ -205,9 +208,6 @@ def initiate_refund(payment: Payment, amount: Decimal | None = None) -> Payment:
         request.stripe_refund_id = refund.id
         request.status = PaymentRefundRequestStatus.COMPLETED
         request.save(update_fields=["stripe_refund_id", "status", "updated_at"])
-        pmt = Payment.objects.select_for_update().get(pk=payment.pk)
-        pmt.pending_refund_amount = max(Decimal("0"), pmt.pending_refund_amount - refund_amount)
-        pmt.save(update_fields=["pending_refund_amount", "updated_at"])
 
     logger.info("Stripe refund initiated for payment %s (amount=%s)", payment.id, refund_amount)
     return payment
