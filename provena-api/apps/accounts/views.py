@@ -1,3 +1,6 @@
+from datetime import timedelta
+from typing import cast
+
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -33,7 +36,8 @@ _COOKIE_PATH = "/api/v1/auth/"
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:
-    max_age = int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
+    lifetime = cast(timedelta, settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"])
+    max_age = int(lifetime.total_seconds())
     response.set_cookie(
         key=settings.REFRESH_COOKIE_NAME,
         value=token,
@@ -41,7 +45,7 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
         path=_COOKIE_PATH,
         httponly=True,
         secure=settings.REFRESH_COOKIE_SECURE,
-        samesite=settings.REFRESH_COOKIE_SAMESITE,
+        samesite=settings.REFRESH_COOKIE_SAMESITE,  # type: ignore[arg-type]
     )
 
 
@@ -49,7 +53,7 @@ def _clear_refresh_cookie(response: Response) -> None:
     response.delete_cookie(
         key=settings.REFRESH_COOKIE_NAME,
         path=_COOKIE_PATH,
-        samesite=settings.REFRESH_COOKIE_SAMESITE,
+        samesite=settings.REFRESH_COOKIE_SAMESITE,  # type: ignore[arg-type]
     )
 
 
@@ -127,7 +131,7 @@ class LoginView(APIView):
                 {"totp_required": True, "totp_session_token": session_token},
                 status=status.HTTP_200_OK,
             )
-        return _auth_response(user)
+        return _auth_response(user)  # type: ignore[arg-type]
 
 
 class TOTPLoginView(APIView):
@@ -158,7 +162,7 @@ class TOTPLoginView(APIView):
                 {"error": {"code": "TOTP_FAILED", "message": error}},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        return _auth_response(user)
+        return _auth_response(user)  # type: ignore[arg-type]
 
 
 class CookieTokenRefreshView(APIView):
@@ -185,7 +189,7 @@ class CookieTokenRefreshView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
         try:
-            refresh = RefreshToken(raw)
+            refresh = RefreshToken(raw)  # type: ignore[arg-type]
         except TokenError:
             return Response(
                 {"error": {"code": "INVALID_TOKEN", "message": "Token is invalid or expired."}},
@@ -227,7 +231,7 @@ class LogoutView(APIView):
         raw = request.COOKIES.get(settings.REFRESH_COOKIE_NAME)
         if raw:
             try:
-                RefreshToken(raw).blacklist()
+                RefreshToken(raw).blacklist()  # type: ignore[arg-type]
             except (TokenError, Exception):  # noqa: S110
                 pass  # Expired tokens don't need blacklisting
         response = Response(status=status.HTTP_204_NO_CONTENT)
