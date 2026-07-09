@@ -6,8 +6,8 @@ class TestInventoryListView:
         response = supplier_client.get("/api/v1/inventory/")
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["variant_sku"] == "CARR-1KG"
+        assert data["count"] == 1
+        assert data["results"][0]["variant_sku"] == "CARR-1KG"
 
     def test_does_not_show_other_supplier_inventory(
         self, supplier_client, second_variant, stock_level
@@ -15,21 +15,21 @@ class TestInventoryListView:
         StockLevel.objects.create(variant=second_variant, quantity_available=20)
         response = supplier_client.get("/api/v1/inventory/")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_filter_low_stock(self, supplier_client, stock_level):
         stock_level.low_stock_threshold = 60
         stock_level.save()
         response = supplier_client.get("/api/v1/inventory/?low_stock=true")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_filter_low_stock_excludes_healthy(self, supplier_client, stock_level):
         stock_level.low_stock_threshold = 10
         stock_level.save()
         response = supplier_client.get("/api/v1/inventory/?low_stock=true")
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json()["count"] == 0
 
     def test_requires_approved_supplier(self, buyer_client):
         response = buyer_client.get("/api/v1/inventory/")
@@ -217,20 +217,20 @@ class TestAdminInventoryListView:
         StockLevel.objects.create(variant=second_variant, quantity_available=20)
         response = admin_client.get("/api/v1/inventory/admin/")
         assert response.status_code == 200
-        assert len(response.json()) == 2
+        assert response.json()["count"] == 2
 
     def test_admin_filter_low_stock(self, admin_client, stock_level):
         stock_level.low_stock_threshold = 60
         stock_level.save()
         response = admin_client.get("/api/v1/inventory/admin/?low_stock=true")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_admin_filter_by_supplier(self, admin_client, stock_level, second_variant):
         StockLevel.objects.create(variant=second_variant, quantity_available=20)
         response = admin_client.get("/api/v1/inventory/admin/?supplier=green-roots-farm")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert response.json()["count"] == 1
 
     def test_supplier_cannot_access(self, supplier_client):
         response = supplier_client.get("/api/v1/inventory/admin/")

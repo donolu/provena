@@ -25,7 +25,7 @@ from .serializers import (
 )
 
 
-class SupplierListView(APIView):
+class SupplierListView(PaginatedListMixin, APIView):
     """Public list of approved suppliers."""
 
     def get_permissions(self):
@@ -34,12 +34,29 @@ class SupplierListView(APIView):
     @extend_schema(
         tags=["Suppliers (Public)"],
         summary="List approved suppliers",
-        description="Returns all suppliers with APPROVED status. No authentication required.",
+        description="Returns approved suppliers paginated (page_size=20). No authentication required.",
         responses={200: SupplierPublicSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:
-        qs = Supplier.objects.filter(status=SupplierStatus.APPROVED).select_related("address")
-        return Response(SupplierPublicSerializer(qs, many=True).data)
+        from django.db.models import Avg, Count, Q
+
+        qs = (
+            Supplier.objects.filter(status=SupplierStatus.APPROVED)
+            .select_related("address")
+            .order_by("business_name")
+            .annotate(
+                avg_rating=Avg(
+                    "products__variants__reviews__rating",
+                    filter=Q(products__variants__reviews__is_approved=True),
+                ),
+                active_product_count=Count(
+                    "products",
+                    filter=Q(products__status="ACTIVE"),
+                    distinct=True,
+                ),
+            )
+        )
+        return self.paginate(qs, SupplierPublicSerializer, request)
 
 
 class SupplierRegistrationView(APIView):

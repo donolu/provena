@@ -52,7 +52,7 @@ export async function register(payload: {
   first_name?: string
   last_name?: string
 }) {
-  const { data } = await apiClient.post<UserProfile>('/auth/register/', payload, {
+  const { data } = await apiClient.post<LoginResponse>('/auth/register/', payload, {
     withCredentials: true,
   })
   return data

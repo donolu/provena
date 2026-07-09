@@ -1,3 +1,4 @@
+from django.db.models import F
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
@@ -7,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.catalogue.models import ProductVariant
+from apps.pagination import PaginatedListMixin
 from apps.suppliers.permissions import IsApprovedSupplier
 
 from . import services
@@ -30,7 +32,7 @@ def _own_variant(request: Request, variant_id) -> ProductVariant:
 
 
 @extend_schema(tags=["Inventory (Supplier)"])
-class InventoryListView(APIView):
+class InventoryListView(PaginatedListMixin, APIView):
     permission_classes = [IsApprovedSupplier]
 
     @extend_schema(
@@ -51,8 +53,10 @@ class InventoryListView(APIView):
             .order_by("variant__sku")
         )
         if request.query_params.get("low_stock") == "true":
-            qs = [s for s in qs if s.is_low_stock]  # type: ignore[assignment]
-        return Response(StockLevelSerializer(qs, many=True).data)
+            qs = qs.filter(
+                low_stock_threshold__gt=0, quantity_available__lte=F("low_stock_threshold")
+            )
+        return self.paginate(qs, StockLevelSerializer, request)
 
 
 @extend_schema(tags=["Inventory (Supplier)"])
@@ -163,7 +167,7 @@ class StockLotListView(APIView):
 
 
 @extend_schema(tags=["Admin: Inventory"])
-class AdminInventoryListView(APIView):
+class AdminInventoryListView(PaginatedListMixin, APIView):
     permission_classes = [IsAdminUser]
 
     @extend_schema(
@@ -189,5 +193,7 @@ class AdminInventoryListView(APIView):
         if supplier_slug := request.query_params.get("supplier"):
             qs = qs.filter(variant__product__supplier__slug=supplier_slug)
         if request.query_params.get("low_stock") == "true":
-            qs = [s for s in qs if s.is_low_stock]  # type: ignore[assignment]
-        return Response(StockLevelSerializer(qs, many=True).data)
+            qs = qs.filter(
+                low_stock_threshold__gt=0, quantity_available__lte=F("low_stock_threshold")
+            )
+        return self.paginate(qs, StockLevelSerializer, request)
