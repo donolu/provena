@@ -35,6 +35,7 @@ def add_to_cart(user, variant_id, quantity: int) -> CartItem:
         cart=cart, variant=variant, defaults={"quantity": quantity}
     )
     if not created:
+        item = CartItem.objects.select_for_update().get(pk=item.pk)
         item.quantity += quantity
         item.save(update_fields=["quantity", "updated_at"])
 
@@ -54,7 +55,7 @@ def add_to_cart(user, variant_id, quantity: int) -> CartItem:
 def update_cart_item(user, item_id, quantity: int) -> CartItem:
     if quantity <= 0:
         raise ValueError("Quantity must be at least 1.")
-    item = get_object_or_404(CartItem, id=item_id, cart__buyer=user)
+    item = get_object_or_404(CartItem.objects.select_for_update(), id=item_id, cart__buyer=user)
     old_qty = item.quantity
     delta = quantity - old_qty
     if delta > 0:

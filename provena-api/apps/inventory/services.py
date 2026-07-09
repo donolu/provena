@@ -21,6 +21,12 @@ def get_or_create_stock_level(variant: ProductVariant) -> StockLevel:
     return level
 
 
+def _get_locked_stock_level(variant: ProductVariant) -> StockLevel:
+    """Ensure the StockLevel row exists and acquire a row-level lock for the current transaction."""
+    StockLevel.objects.get_or_create(variant=variant)
+    return StockLevel.objects.select_for_update().get(variant=variant)
+
+
 @transaction.atomic
 def receive_stock(
     variant: ProductVariant,
@@ -33,7 +39,7 @@ def receive_stock(
 ) -> tuple[StockLevel, StockLot, StockMovement]:
     if quantity <= 0:
         raise ValueError("Quantity must be positive.")
-    level = get_or_create_stock_level(variant)
+    level = _get_locked_stock_level(variant)
     lot = StockLot.objects.create(
         variant=variant,
         lot_number=lot_number,
@@ -67,7 +73,7 @@ def adjust_stock(
 ) -> tuple[StockLevel, StockMovement]:
     if delta == 0:
         raise ValueError("Delta cannot be zero.")
-    level = get_or_create_stock_level(variant)
+    level = _get_locked_stock_level(variant)
     new_available = level.quantity_available + delta
     if new_available < 0:
         raise ValueError(
@@ -92,7 +98,7 @@ def adjust_stock(
 def set_low_stock_threshold(variant: ProductVariant, threshold: int) -> StockLevel:
     if threshold < 0:
         raise ValueError("Threshold cannot be negative.")
-    level = get_or_create_stock_level(variant)
+    level = _get_locked_stock_level(variant)
     level.low_stock_threshold = threshold
     level.save()
     return level
@@ -107,7 +113,7 @@ def reserve_stock(
 ) -> tuple[StockLevel, StockMovement]:
     if quantity <= 0:
         raise ValueError("Quantity must be positive.")
-    level = get_or_create_stock_level(variant)
+    level = _get_locked_stock_level(variant)
     if level.quantity_available < quantity:
         raise ValueError(
             f"Insufficient stock. Requested {quantity}, available {level.quantity_available}."
@@ -135,7 +141,7 @@ def release_reservation(
 ) -> tuple[StockLevel, StockMovement]:
     if quantity <= 0:
         raise ValueError("Quantity must be positive.")
-    level = get_or_create_stock_level(variant)
+    level = _get_locked_stock_level(variant)
     if level.quantity_reserved < quantity:
         raise ValueError(f"Cannot release {quantity} — only {level.quantity_reserved} reserved.")
     level.quantity_reserved -= quantity
@@ -162,7 +168,7 @@ def dispatch_stock(
     """Remove from reserved when an order ships."""
     if quantity <= 0:
         raise ValueError("Quantity must be positive.")
-    level = get_or_create_stock_level(variant)
+    level = _get_locked_stock_level(variant)
     if level.quantity_reserved < quantity:
         raise ValueError(f"Cannot dispatch {quantity} — only {level.quantity_reserved} reserved.")
     level.quantity_reserved -= quantity
@@ -188,7 +194,7 @@ def return_stock(
 ) -> tuple[StockLevel, StockMovement]:
     if quantity <= 0:
         raise ValueError("Quantity must be positive.")
-    level = get_or_create_stock_level(variant)
+    level = _get_locked_stock_level(variant)
     level.quantity_available += quantity
     level.save()
     movement = StockMovement.objects.create(
