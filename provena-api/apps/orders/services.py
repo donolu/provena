@@ -48,15 +48,27 @@ def _consume_cart_reservation(buyer, variant: ProductVariant, quantity: int) -> 
     If the buyer holds a non-expired cart reservation for `variant` covering at least
     `quantity` units, delete it and return True (stock is already reserved).
     Returns False if no valid reservation exists.
-    """
-    from django.utils import timezone
 
-    from apps.marketplace.models import CartReservation
+    Must be called inside a transaction. The CartItem row is locked with
+    SELECT FOR UPDATE so that concurrent checkouts for the same cart item
+    serialise here: the second caller blocks until the first commits, then
+    sees DoesNotExist and falls through to reserve_stock() instead.
+    """
+    from apps.marketplace.models import CartItem, CartReservation
 
     try:
-        res = CartReservation.objects.select_related("cart_item").get(
-            cart_item__cart__buyer=buyer,
+        cart_item = CartItem.objects.select_for_update().get(
+            cart__buyer=buyer,
             variant=variant,
+        )
+    except CartItem.DoesNotExist:
+        return False
+
+    # Re-read reservation through the locked CartItem so expiry is checked
+    # after the lock is held, not before.
+    try:
+        res = CartReservation.objects.get(
+            cart_item=cart_item,
             expires_at__gt=timezone.now(),
         )
     except CartReservation.DoesNotExist:
@@ -65,19 +77,17 @@ def _consume_cart_reservation(buyer, variant: ProductVariant, quantity: int) -> 
     if res.quantity < quantity:
         # Partial reservation — release the cart portion and re-reserve the full amount.
         inventory_services.release_reservation(
-            variant, res.quantity, reference=f"CART:{res.cart_item_id}"
+            variant, res.quantity, reference=f"CART:{cart_item.id}"
         )
-        res.cart_item.delete()
+        cart_item.delete()
         return False
 
     if res.quantity > quantity:
         # More reserved than needed — release the surplus, keep the order amount reserved.
         surplus = res.quantity - quantity
-        inventory_services.release_reservation(
-            variant, surplus, reference=f"CART:{res.cart_item_id}"
-        )
+        inventory_services.release_reservation(variant, surplus, reference=f"CART:{cart_item.id}")
 
-    res.cart_item.delete()
+    cart_item.delete()
     return True
 
 

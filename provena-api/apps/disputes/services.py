@@ -146,7 +146,6 @@ def auto_escalate_overdue_disputes() -> int:
     return count
 
 
-@transaction.atomic
 def resolve_dispute(
     dispute: Dispute,
     admin,
@@ -156,6 +155,12 @@ def resolve_dispute(
 ) -> Dispute:
     refund_outcomes = {DisputeOutcome.FULL_REFUND, DisputeOutcome.PARTIAL_REFUND}
 
+    # Issue the Stripe refund BEFORE opening a DB transaction so that a network
+    # error never causes a partial rollback of already-committed dispute state.
+    # The idempotency key makes retries safe: Stripe returns the same refund on
+    # duplicate requests for the same dispute.
+    stripe_refund_id: str | None = None
+    amount_pence: int | None = None
     if outcome in refund_outcomes:
         if outcome == DisputeOutcome.FULL_REFUND:
             amount_pence = int(dispute.sub_order.subtotal * 100)
@@ -167,61 +172,66 @@ def resolve_dispute(
         stripe_refund = stripe.Refund.create(
             payment_intent=payment_intent_id,
             amount=amount_pence,
+            idempotency_key=f"dispute-refund-{dispute.id}",
         )
-        refund_record = DisputeRefund.objects.create(
-            dispute=dispute,
-            sub_order=dispute.sub_order,
-            stripe_refund_id=stripe_refund.id,
-            amount_pence=amount_pence,
-            status=DisputeRefundStatus.PENDING,
-        )
+        stripe_refund_id = stripe_refund.id
         logger.info(
             "Auto-triggered Stripe refund %s (%dp) for dispute %s",
-            stripe_refund.id,
+            stripe_refund_id,
             amount_pence,
             dispute.id,
         )
-        notify(
-            recipient=dispute.opened_by,
-            title="Refund initiated",
-            body=f"A refund of £{amount_pence / 100:.2f} has been initiated for your dispute.",
-            notification_type=NotificationType.GENERAL,
-            data={"dispute_id": str(dispute.id), "refund_id": str(refund_record.id)},
+
+    with transaction.atomic():
+        if stripe_refund_id is not None:
+            refund_record = DisputeRefund.objects.create(
+                dispute=dispute,
+                sub_order=dispute.sub_order,
+                stripe_refund_id=stripe_refund_id,
+                amount_pence=amount_pence,
+                status=DisputeRefundStatus.PENDING,
+            )
+            notify(
+                recipient=dispute.opened_by,
+                title="Refund initiated",
+                body=f"A refund of £{amount_pence / 100:.2f} has been initiated for your dispute.",  # type: ignore[operator]
+                notification_type=NotificationType.GENERAL,
+                data={"dispute_id": str(dispute.id), "refund_id": str(refund_record.id)},
+            )
+
+        dispute.status = DisputeStatus.RESOLVED
+        dispute.outcome = outcome
+        dispute.outcome_amount_pence = outcome_amount_pence
+        dispute.outcome_notes = outcome_notes
+        dispute.resolved_at = timezone.now()
+
+        if outcome in (DisputeOutcome.REJECTED, DisputeOutcome.WITHDRAWN):
+            dispute.payout_held = False
+
+        dispute.save(
+            update_fields=[
+                "status",
+                "outcome",
+                "outcome_amount_pence",
+                "outcome_notes",
+                "resolved_at",
+                "payout_held",
+            ]
         )
-
-    dispute.status = DisputeStatus.RESOLVED
-    dispute.outcome = outcome
-    dispute.outcome_amount_pence = outcome_amount_pence
-    dispute.outcome_notes = outcome_notes
-    dispute.resolved_at = timezone.now()
-
-    if outcome in (DisputeOutcome.REJECTED, DisputeOutcome.WITHDRAWN):
-        dispute.payout_held = False
-
-    dispute.save(
-        update_fields=[
-            "status",
-            "outcome",
-            "outcome_amount_pence",
-            "outcome_notes",
-            "resolved_at",
-            "payout_held",
-        ]
-    )
-    DisputeEvent.objects.create(
-        dispute=dispute,
-        author=admin,
-        event_type=DisputeEventType.RESOLVED,
-        body=outcome_notes,
-    )
-    for recipient in (dispute.opened_by, dispute.respondent):
-        notify(
-            recipient=recipient,
-            title="Dispute resolved",
-            body=f"The dispute on order {dispute.sub_order} has been resolved: {dispute.get_outcome_display()}.",
-            notification_type=NotificationType.GENERAL,
-            data={"dispute_id": str(dispute.id), "outcome": outcome},
+        DisputeEvent.objects.create(
+            dispute=dispute,
+            author=admin,
+            event_type=DisputeEventType.RESOLVED,
+            body=outcome_notes,
         )
+        for recipient in (dispute.opened_by, dispute.respondent):
+            notify(
+                recipient=recipient,
+                title="Dispute resolved",
+                body=f"The dispute on order {dispute.sub_order} has been resolved: {dispute.get_outcome_display()}.",
+                notification_type=NotificationType.GENERAL,
+                data={"dispute_id": str(dispute.id), "outcome": outcome},
+            )
     return dispute
 
 
