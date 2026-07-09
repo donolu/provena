@@ -127,7 +127,7 @@ class TestWishlistView:
     def test_list_empty(self, buyer_client):
         response = buyer_client.get("/api/v1/marketplace/wishlist/")
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json()["results"] == []
 
     def test_add_to_wishlist(self, buyer_client, variant):
         response = buyer_client.post(
@@ -152,12 +152,12 @@ class TestWishlistView:
         services.add_to_wishlist(buyer, variant.id)
         services.add_to_wishlist(buyer, second_variant.id)
         response = buyer_client.get("/api/v1/marketplace/wishlist/")
-        assert len(response.json()) == 2
+        assert len(response.json()["results"]) == 2
 
     def test_does_not_show_other_buyers_wishlist(self, second_buyer_client, buyer, variant):
         services.add_to_wishlist(buyer, variant.id)
         response = second_buyer_client.get("/api/v1/marketplace/wishlist/")
-        assert response.json() == []
+        assert response.json()["results"] == []
 
     def test_add_inactive_variant_returns_404(self, buyer_client, variant):
         variant.is_active = False
@@ -201,7 +201,7 @@ class TestProductReviewListCreateView:
         services.approve_review(review)
         response = APIClient().get(f"/api/v1/marketplace/products/{variant.id}/reviews/")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert len(response.json()["results"]) == 1
 
     def test_unapproved_not_in_public_list(self, variant, buyer):
         Review.objects.create(
@@ -214,7 +214,7 @@ class TestProductReviewListCreateView:
             is_approved=False,
         )
         response = APIClient().get(f"/api/v1/marketplace/products/{variant.id}/reviews/")
-        assert response.json() == []
+        assert response.json()["results"] == []
 
     def test_unverified_buyer_cannot_submit_review(self, buyer_client, variant):
         response = buyer_client.post(
@@ -281,21 +281,21 @@ class TestAdminReviewViews:
         self._make_review(buyer, variant)
         response = admin_client.get("/api/v1/marketplace/admin/reviews/")
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert len(response.json()["results"]) == 1
 
     def test_filter_approved(self, admin_client, buyer, variant):
         review = self._make_review(buyer, variant, rating=4, title="Good", body="Nice")
         services.approve_review(review)
         response = admin_client.get("/api/v1/marketplace/admin/reviews/?is_approved=true")
-        assert len(response.json()) == 1
+        assert len(response.json()["results"]) == 1
         response2 = admin_client.get("/api/v1/marketplace/admin/reviews/?is_approved=false")
-        assert response2.json() == []
+        assert response2.json()["results"] == []
 
     def test_filter_by_variant(self, admin_client, buyer, second_buyer, variant, second_variant):
         self._make_review(buyer, variant, rating=4, title="Good", body="Nice")
         self._make_review(second_buyer, second_variant, rating=3, title="OK", body="Fine")
         response = admin_client.get(f"/api/v1/marketplace/admin/reviews/?variant={variant.id}")
-        assert len(response.json()) == 1
+        assert len(response.json()["results"]) == 1
 
     def test_approve_review(self, admin_client, buyer, variant):
         review = self._make_review(buyer, variant, rating=5, title="Great", body="Awesome")

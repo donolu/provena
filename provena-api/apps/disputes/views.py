@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import Role, User
 from apps.orders.models import SubOrder
+from apps.pagination import PaginatedListMixin
 
 from . import services
 from .models import Dispute, DisputeStatus, DisputeType
@@ -36,7 +37,7 @@ _SUPPLIER_ONLY_TYPES = {
 }
 
 
-class DisputeListCreateView(APIView):
+class DisputeListCreateView(PaginatedListMixin, APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(responses=DisputeListSerializer(many=True))
@@ -44,7 +45,7 @@ class DisputeListCreateView(APIView):
         qs = Dispute.objects.filter(
             Q(opened_by=request.user) | Q(respondent=request.user)
         ).select_related("opened_by", "respondent", "sub_order")
-        return Response(DisputeListSerializer(qs, many=True).data)
+        return self.paginate(qs, DisputeListSerializer, request)
 
     @extend_schema(request=OpenDisputeSerializer, responses={201: DisputeDetailSerializer})
     def post(self, request: Request) -> Response:
@@ -168,9 +169,9 @@ class DisputeResolveView(APIView):
             pk=pk,
         )
 
-        if dispute.status != DisputeStatus.ESCALATED:
+        if dispute.status not in (DisputeStatus.ESCALATED, DisputeStatus.RESOLVING):
             return Response(
-                {"detail": "Only escalated disputes can be resolved."},
+                {"detail": "Only escalated disputes can be resolved or retried."},
                 status=status.HTTP_409_CONFLICT,
             )
 
@@ -327,7 +328,7 @@ class DisputeAttachmentView(APIView):
 # ---------------------------------------------------------------------------
 
 
-class AdminDisputeListView(APIView):
+class AdminDisputeListView(PaginatedListMixin, APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     @extend_schema(responses=DisputeListSerializer(many=True))
@@ -341,7 +342,7 @@ class AdminDisputeListView(APIView):
             from django.utils import timezone
 
             qs = qs.filter(status=DisputeStatus.OPEN, response_deadline__lt=timezone.now())
-        return Response(DisputeListSerializer(qs, many=True).data)
+        return self.paginate(qs, DisputeListSerializer, request)
 
 
 class AdminDisputeRefundView(APIView):

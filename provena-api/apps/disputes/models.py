@@ -27,6 +27,7 @@ class DisputeStatus(models.TextChoices):
     OPEN = "OPEN", "Open"
     RESPONDENT_REPLIED = "RESPONDENT_REPLIED", "Respondent replied"
     ESCALATED = "ESCALATED", "Escalated to admin"
+    RESOLVING = "RESOLVING", "Resolving"
     RESOLVED = "RESOLVED", "Resolved"
     CLOSED = "CLOSED", "Closed"
 

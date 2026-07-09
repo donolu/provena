@@ -138,8 +138,15 @@ export interface WishlistItem {
 // ── Orders ────────────────────────────────────────────────────────────────────
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED'
-export type DisputeStatus = 'OPEN' | 'RESOLVED' | 'REJECTED'
-export type ReturnStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'REFUNDED'
+export type DisputeStatus =
+  | 'OPEN'
+  | 'RESPONDENT_REPLIED'
+  | 'ESCALATED'
+  | 'RESOLVING'
+  | 'RESOLVED'
+  | 'REJECTED'
+  | 'CLOSED'
+export type ReturnStatus = 'REQUESTED' | 'APPROVED' | 'REFUNDING' | 'REJECTED' | 'REFUNDED'
 
 export interface OrderReturn {
   id: string

@@ -1864,7 +1864,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List wishlist items */
+        /**
+         * List wishlist items
+         * @description Adds a paginate() helper to raw APIView subclasses.
+         *
+         *     Usage:
+         *         class MyListView(PaginatedListMixin, APIView):
+         *             def get(self, request):
+         *                 qs = MyModel.objects.all()
+         *                 return self.paginate(qs, MySerializer, request)
+         */
         get: operations["marketplace_wishlist_list"];
         put?: never;
         /**
@@ -1902,7 +1911,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List approved reviews for a variant */
+        /**
+         * List approved reviews for a variant
+         * @description Adds a paginate() helper to raw APIView subclasses.
+         *
+         *     Usage:
+         *         class MyListView(PaginatedListMixin, APIView):
+         *             def get(self, request):
+         *                 qs = MyModel.objects.all()
+         *                 return self.paginate(qs, MySerializer, request)
+         */
         get: operations["marketplace_products_reviews_list"];
         put?: never;
         /**
@@ -2265,8 +2283,26 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * @description Adds a paginate() helper to raw APIView subclasses.
+         *
+         *     Usage:
+         *         class MyListView(PaginatedListMixin, APIView):
+         *             def get(self, request):
+         *                 qs = MyModel.objects.all()
+         *                 return self.paginate(qs, MySerializer, request)
+         */
         get: operations["disputes_list"];
         put?: never;
+        /**
+         * @description Adds a paginate() helper to raw APIView subclasses.
+         *
+         *     Usage:
+         *         class MyListView(PaginatedListMixin, APIView):
+         *             def get(self, request):
+         *                 qs = MyModel.objects.all()
+         *                 return self.paginate(qs, MySerializer, request)
+         */
         post: operations["disputes_create"];
         delete?: never;
         options?: never;
@@ -2393,6 +2429,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * @description Adds a paginate() helper to raw APIView subclasses.
+         *
+         *     Usage:
+         *         class MyListView(PaginatedListMixin, APIView):
+         *             def get(self, request):
+         *                 qs = MyModel.objects.all()
+         *                 return self.paginate(qs, MySerializer, request)
+         */
         get: operations["disputes_admin_list"];
         put?: never;
         post?: never;
@@ -2650,7 +2695,7 @@ export interface components {
             dispute_type: components["schemas"]["DisputeTypeEnum"];
             description: string;
             resolution_requested: components["schemas"]["ResolutionRequestedEnum"];
-            status?: components["schemas"]["Status0e8Enum"];
+            status?: components["schemas"]["Status3beEnum"];
             outcome?: components["schemas"]["OutcomeEnum"] | components["schemas"]["BlankEnum"];
             /** Format: int64 */
             outcome_amount_pence?: number | null;
@@ -2688,7 +2733,7 @@ export interface components {
             /** Format: uuid */
             sub_order: string;
             dispute_type: components["schemas"]["DisputeTypeEnum"];
-            status?: components["schemas"]["Status0e8Enum"];
+            status?: components["schemas"]["Status3beEnum"];
             resolution_requested: components["schemas"]["ResolutionRequestedEnum"];
             outcome?: components["schemas"]["OutcomeEnum"] | components["schemas"]["BlankEnum"];
             /** Format: email */
@@ -2937,6 +2982,36 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["AdminUser"][];
         };
+        PaginatedDisputeListList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["DisputeList"][];
+        };
+        PaginatedNotificationList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["Notification"][];
+        };
         PaginatedOrderList: {
             /** @example 123 */
             count: number;
@@ -3012,6 +3087,21 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["Product"][];
         };
+        PaginatedReviewList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["Review"][];
+        };
         PaginatedStockLevelList: {
             /** @example 123 */
             count: number;
@@ -3056,6 +3146,21 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["SupplierPublic"][];
+        };
+        PaginatedWishlistItemList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["WishlistItem"][];
         };
         PasswordResetConfirmRequest: {
             token: string;
@@ -3393,21 +3498,22 @@ export interface components {
          */
         RoleEnum: "BUYER" | "SUPPLIER" | "ADMIN";
         /**
-         * @description * `OPEN` - Open
-         *     * `RESPONDENT_REPLIED` - Respondent replied
-         *     * `ESCALATED` - Escalated to admin
-         *     * `RESOLVED` - Resolved
-         *     * `CLOSED` - Closed
-         * @enum {string}
-         */
-        Status0e8Enum: "OPEN" | "RESPONDENT_REPLIED" | "ESCALATED" | "RESOLVED" | "CLOSED";
-        /**
          * @description * `DRAFT` - Draft
          *     * `ACTIVE` - Active
          *     * `ARCHIVED` - Archived
          * @enum {string}
          */
         Status37cEnum: "DRAFT" | "ACTIVE" | "ARCHIVED";
+        /**
+         * @description * `OPEN` - Open
+         *     * `RESPONDENT_REPLIED` - Respondent replied
+         *     * `ESCALATED` - Escalated to admin
+         *     * `RESOLVING` - Resolving
+         *     * `RESOLVED` - Resolved
+         *     * `CLOSED` - Closed
+         * @enum {string}
+         */
+        Status3beEnum: "OPEN" | "RESPONDENT_REPLIED" | "ESCALATED" | "RESOLVING" | "RESOLVED" | "CLOSED";
         /**
          * @description * `PENDING` - Pending
          *     * `CONFIRMED` - Confirmed
@@ -6749,7 +6855,12 @@ export interface operations {
     };
     marketplace_wishlist_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6761,7 +6872,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WishlistItem"][];
+                    "application/json": components["schemas"]["PaginatedWishlistItemList"];
                 };
             };
         };
@@ -6813,7 +6924,12 @@ export interface operations {
     };
     marketplace_products_reviews_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
             header?: never;
             path: {
                 variant_id: string;
@@ -6827,7 +6943,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Review"][];
+                    "application/json": components["schemas"]["PaginatedReviewList"];
                 };
             };
         };
@@ -6861,7 +6977,10 @@ export interface operations {
     };
     marketplace_admin_reviews_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6873,7 +6992,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Review"][];
+                    "application/json": components["schemas"]["PaginatedReviewList"];
                 };
             };
         };
@@ -6921,7 +7040,12 @@ export interface operations {
     };
     notifications_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6933,7 +7057,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Notification"][];
+                    "application/json": components["schemas"]["PaginatedNotificationList"];
                 };
             };
         };
@@ -7262,7 +7386,12 @@ export interface operations {
     };
     disputes_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7274,7 +7403,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DisputeList"][];
+                    "application/json": components["schemas"]["PaginatedDisputeListList"];
                 };
             };
         };
@@ -7513,7 +7642,12 @@ export interface operations {
     };
     disputes_admin_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7525,7 +7659,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DisputeList"][];
+                    "application/json": components["schemas"]["PaginatedDisputeListList"];
                 };
             };
         };

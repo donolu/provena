@@ -124,7 +124,12 @@ def handle_refund(
     return payment
 
 
-def initiate_refund(payment: Payment, amount: Decimal | None = None) -> Payment:
+def initiate_refund(
+    payment: Payment,
+    amount: Decimal | None = None,
+    *,
+    idempotency_key: str | None = None,
+) -> Payment:
     """Issue a refund via Stripe. amount=None means full refund."""
     # Each (payment, amount-in-pence) pair maps to one PaymentRefundRequest row keyed
     # by the Stripe idempotency key. Retries of the same amount find the existing row
@@ -141,15 +146,21 @@ def initiate_refund(payment: Payment, amount: Decimal | None = None) -> Payment:
         if refund_amount <= 0:
             raise ValueError("Refund amount must be greater than zero.")
         amount_pence = _to_pence(refund_amount)
-        stripe_idempotency_key = f"refund-{payment.id}-{amount_pence}"
+        stripe_idempotency_key = idempotency_key or f"refund-{payment.id}-{amount_pence}"
 
         request, created = PaymentRefundRequest.objects.get_or_create(
             stripe_idempotency_key=stripe_idempotency_key,
             defaults={"payment": payment, "amount": refund_amount},
         )
+        if request.payment_id != payment.id:
+            raise ValueError("Refund idempotency key belongs to a different payment.")
 
         if request.status == PaymentRefundRequestStatus.COMPLETED:
             return payment
+
+        if not created:
+            refund_amount = request.amount
+            amount_pence = _to_pence(refund_amount)
 
         needs_reservation = created or request.status == PaymentRefundRequestStatus.FAILED
         if needs_reservation:

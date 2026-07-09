@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Cart, CartItem, WishlistItem } from './types'
+import type { Cart, CartItem, PaginatedResponse, WishlistItem } from './types'
 
 // ── Cart ──────────────────────────────────────────────────────────────────────
 
@@ -32,8 +32,8 @@ export async function clearCart(): Promise<void> {
 // ── Wishlist ──────────────────────────────────────────────────────────────────
 
 export async function getWishlist(): Promise<WishlistItem[]> {
-  const { data } = await apiClient.get<WishlistItem[]>('/marketplace/wishlist/')
-  return data
+  const { data } = await apiClient.get<PaginatedResponse<WishlistItem>>('/marketplace/wishlist/')
+  return data.results
 }
 
 export async function addToWishlist(variantId: string): Promise<WishlistItem> {

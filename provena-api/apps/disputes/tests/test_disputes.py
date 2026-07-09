@@ -8,9 +8,11 @@ from apps.disputes.models import (
     Dispute,
     DisputeEvent,
     DisputeEventType,
+    DisputeRefund,
     DisputeStatus,
     DisputeType,
 )
+from apps.payments.models import PaymentRefundRequest
 
 BASE = "/api/v1/disputes/"
 
@@ -120,7 +122,10 @@ class TestResolveDisputeService:
 
         fake_refund = MagicMock()
         fake_refund.id = "re_auto123"
-        with patch("apps.disputes.services.stripe") as mock_stripe:
+        fake_intent = MagicMock()
+        fake_intent.latest_charge = "ch_auto123"
+        with patch("apps.payments.services.stripe") as mock_stripe:
+            mock_stripe.PaymentIntent.retrieve.return_value = fake_intent
             mock_stripe.Refund.create.return_value = fake_refund
             services.resolve_dispute(dispute, admin_user, "FULL_REFUND", None, "Refund approved.")
 
@@ -235,18 +240,24 @@ class TestAutoRefundOnResolve:
 
         fake_refund = MagicMock()
         fake_refund.id = "re_autotest456"
-        with patch("apps.disputes.services.stripe") as mock_stripe:
+        fake_intent = MagicMock()
+        fake_intent.latest_charge = "ch_autotest456"
+        with patch("apps.payments.services.stripe") as mock_stripe:
+            mock_stripe.PaymentIntent.retrieve.return_value = fake_intent
             mock_stripe.Refund.create.return_value = fake_refund
             services.resolve_dispute(dispute, admin_user, "FULL_REFUND", None, "Approved.")
             mock_stripe.Refund.create.assert_called_once()
             _, kwargs = mock_stripe.Refund.create.call_args
-            assert kwargs["payment_intent"] == payment.stripe_payment_intent_id
-
-        from apps.disputes.models import DisputeRefund
+            assert kwargs["charge"] == "ch_autotest456"
+            assert kwargs["idempotency_key"] == f"dispute-refund-{dispute.id}"
 
         refund = DisputeRefund.objects.get(dispute=dispute)
         assert refund.stripe_refund_id == "re_autotest456"
         assert refund.sub_order == dispatched_sub_order
+        request = PaymentRefundRequest.objects.get(
+            stripe_idempotency_key=f"dispute-refund-{dispute.id}"
+        )
+        assert request.stripe_refund_id == "re_autotest456"
 
     def test_partial_refund_uses_outcome_amount(
         self, buyer, supplier, admin_user, dispatched_sub_order, payment
@@ -264,11 +275,48 @@ class TestAutoRefundOnResolve:
 
         fake_refund = MagicMock()
         fake_refund.id = "re_partial789"
-        with patch("apps.disputes.services.stripe") as mock_stripe:
+        fake_intent = MagicMock()
+        fake_intent.latest_charge = "ch_partial789"
+        with patch("apps.payments.services.stripe") as mock_stripe:
+            mock_stripe.PaymentIntent.retrieve.return_value = fake_intent
             mock_stripe.Refund.create.return_value = fake_refund
             services.resolve_dispute(dispute, admin_user, "PARTIAL_REFUND", 200, "Half refund.")
             _, kwargs = mock_stripe.Refund.create.call_args
             assert kwargs["amount"] == 200
+
+    def test_resolving_retry_uses_claimed_outcome_and_amount(
+        self, buyer, supplier, admin_user, dispatched_sub_order, payment
+    ):
+        dispute = services.open_dispute(
+            sub_order=dispatched_sub_order,
+            opened_by=buyer,
+            respondent=supplier.user,
+            dispute_type=DisputeType.DAMAGED,
+            description="Partially damaged.",
+            resolution_requested="PARTIAL_REFUND",
+        )
+        dispute.status = DisputeStatus.RESOLVING
+        dispute.outcome = "PARTIAL_REFUND"
+        dispute.outcome_amount_pence = 200
+        dispute.outcome_notes = "Original approved amount."
+        dispute.save(update_fields=["status", "outcome", "outcome_amount_pence", "outcome_notes"])
+
+        fake_refund = MagicMock()
+        fake_refund.id = "re_retry_claim"
+        fake_intent = MagicMock()
+        fake_intent.latest_charge = "ch_retry_claim"
+        with patch("apps.payments.services.stripe") as mock_stripe:
+            mock_stripe.PaymentIntent.retrieve.return_value = fake_intent
+            mock_stripe.Refund.create.return_value = fake_refund
+            services.resolve_dispute(dispute, admin_user, "REJECTED", None, "Conflicting retry.")
+            _, kwargs = mock_stripe.Refund.create.call_args
+            assert kwargs["amount"] == 200
+
+        dispute.refresh_from_db()
+        assert dispute.status == DisputeStatus.RESOLVED
+        assert dispute.outcome == "PARTIAL_REFUND"
+        assert dispute.outcome_amount_pence == 200
+        assert dispute.outcome_notes == "Original approved amount."
 
     def test_rejected_outcome_does_not_call_stripe(
         self, buyer, supplier, admin_user, dispatched_sub_order
@@ -284,9 +332,9 @@ class TestAutoRefundOnResolve:
         dispute.status = DisputeStatus.ESCALATED
         dispute.save(update_fields=["status"])
 
-        with patch("apps.disputes.services.stripe") as mock_stripe:
+        with patch("apps.disputes.services.initiate_refund") as mock_refund:
             services.resolve_dispute(dispute, admin_user, "REJECTED", None, "Rejected.")
-            mock_stripe.Refund.create.assert_not_called()
+            mock_refund.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -387,12 +435,12 @@ class TestDisputeListView:
         )
         res = buyer_client.get(BASE)
         assert res.status_code == 200
-        assert len(res.json()) == 1
+        assert len(res.json()["results"]) == 1
 
     def test_unrelated_user_sees_empty_list(self, admin_client):
         res = admin_client.get(BASE)
         assert res.status_code == 200
-        assert res.json() == []
+        assert res.json()["results"] == []
 
 
 class TestDisputeDetailView:
@@ -528,7 +576,10 @@ class TestResolveView:
 
         fake_refund = MagicMock()
         fake_refund.id = "re_viewtest"
-        with patch("apps.disputes.services.stripe") as mock_stripe:
+        fake_intent = MagicMock()
+        fake_intent.latest_charge = "ch_viewtest"
+        with patch("apps.payments.services.stripe") as mock_stripe:
+            mock_stripe.PaymentIntent.retrieve.return_value = fake_intent
             mock_stripe.Refund.create.return_value = fake_refund
             res = admin_client.post(
                 f"{BASE}{dispute.id}/resolve/",
@@ -607,7 +658,10 @@ class TestResolveView:
         dispute.status = DisputeStatus.ESCALATED
         dispute.save(update_fields=["status"])
 
-        with patch("apps.disputes.services.stripe") as mock_stripe:
+        fake_intent = MagicMock()
+        fake_intent.latest_charge = "ch_error"
+        with patch("apps.payments.services.stripe") as mock_stripe:
+            mock_stripe.PaymentIntent.retrieve.return_value = fake_intent
             mock_stripe.Refund.create.side_effect = Exception("Stripe unreachable")
             res = admin_client.post(
                 f"{BASE}{dispute.id}/resolve/",
@@ -668,7 +722,7 @@ class TestAdminListView:
         )
         res = admin_client.get(f"{BASE}admin/")
         assert res.status_code == 200
-        assert len(res.json()) == 1
+        assert len(res.json()["results"]) == 1
 
     def test_non_admin_cannot_access(self, buyer_client):
         res = buyer_client.get(f"{BASE}admin/")
@@ -686,9 +740,9 @@ class TestAdminListView:
         dispute.status = DisputeStatus.ESCALATED
         dispute.save(update_fields=["status"])
         res = admin_client.get(f"{BASE}admin/?status=OPEN")
-        assert res.json() == []
+        assert res.json()["results"] == []
         res2 = admin_client.get(f"{BASE}admin/?status=ESCALATED")
-        assert len(res2.json()) == 1
+        assert len(res2.json()["results"]) == 1
 
 
 class TestAdminRefundView:

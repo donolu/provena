@@ -38,8 +38,10 @@ export async function getMyProducts(): Promise<PaginatedResponse<Product>> {
 }
 
 export async function getProductReviews(variantId: string): Promise<Review[]> {
-  const { data } = await apiClient.get<Review[]>(`/marketplace/products/${variantId}/reviews/`)
-  return data
+  const { data } = await apiClient.get<PaginatedResponse<Review>>(
+    `/marketplace/products/${variantId}/reviews/`,
+  )
+  return data.results
 }
 
 export async function submitReview(

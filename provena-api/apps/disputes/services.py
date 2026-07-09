@@ -3,15 +3,17 @@
 import logging
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 
 import boto3
-import stripe
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
 from apps.notifications.models import NotificationType
 from apps.notifications.services import notify
+from apps.payments.models import PaymentRefundRequest
+from apps.payments.services import initiate_refund
 
 from .models import (
     ALLOWED_ATTACHMENT_TYPES,
@@ -154,46 +156,107 @@ def resolve_dispute(
     outcome_notes: str,
 ) -> Dispute:
     refund_outcomes = {DisputeOutcome.FULL_REFUND, DisputeOutcome.PARTIAL_REFUND}
-
-    # Issue the Stripe refund BEFORE opening a DB transaction so that a network
-    # error never causes a partial rollback of already-committed dispute state.
-    # The idempotency key makes retries safe: Stripe returns the same refund on
-    # duplicate requests for the same dispute.
-    # stripe_refund_data carries (stripe_refund_id, amount_pence) when a refund
-    # was issued; None otherwise. The tuple keeps both fields type-narrowed to int/str.
-    stripe_refund_data: tuple[str, int] | None = None
-    if outcome in refund_outcomes:
-        if outcome == DisputeOutcome.FULL_REFUND:
-            amount_pence: int = int(dispute.sub_order.subtotal * 100)
-        else:
-            if outcome_amount_pence is None:
-                raise ValueError("outcome_amount_pence is required for PARTIAL_REFUND outcomes.")
-            amount_pence = outcome_amount_pence
-
-        stripe.api_key = settings.STRIPE_SECRET_KEY
-        payment_intent_id = dispute.sub_order.order.payment.stripe_payment_intent_id
-        stripe_refund = stripe.Refund.create(
-            payment_intent=payment_intent_id,
-            amount=amount_pence,
-            idempotency_key=f"dispute-refund-{dispute.id}",
-        )
-        stripe_refund_data = (stripe_refund.id, amount_pence)
-        logger.info(
-            "Auto-triggered Stripe refund %s (%dp) for dispute %s",
-            stripe_refund_data[0],
-            stripe_refund_data[1],
-            dispute.id,
-        )
+    claimed_this_call = False
+    refund_amount_pence: int | None = None
+    refund_idempotency_key = f"dispute-refund-{dispute.id}"
 
     with transaction.atomic():
-        if stripe_refund_data is not None:
-            stripe_refund_id, refund_amount_pence = stripe_refund_data
-            refund_record = DisputeRefund.objects.create(
-                dispute=dispute,
-                sub_order=dispute.sub_order,
-                stripe_refund_id=stripe_refund_id,
-                amount_pence=refund_amount_pence,
-                status=DisputeRefundStatus.PENDING,
+        dispute = (
+            Dispute.objects.select_for_update(of=("self",))
+            .select_related("sub_order__order__payment", "opened_by", "respondent")
+            .get(pk=dispute.pk)
+        )
+        if dispute.status == DisputeStatus.RESOLVED:
+            return dispute
+
+        if dispute.status == DisputeStatus.ESCALATED:
+            if outcome in refund_outcomes:
+                if outcome == DisputeOutcome.FULL_REFUND:
+                    refund_amount_pence = int(dispute.sub_order.subtotal * 100)
+                else:
+                    if outcome_amount_pence is None:
+                        raise ValueError(
+                            "outcome_amount_pence is required for PARTIAL_REFUND outcomes."
+                        )
+                    refund_amount_pence = outcome_amount_pence
+
+            dispute.status = DisputeStatus.RESOLVING
+            dispute.outcome = outcome
+            dispute.outcome_amount_pence = refund_amount_pence
+            dispute.outcome_notes = outcome_notes
+            dispute.save(
+                update_fields=[
+                    "status",
+                    "outcome",
+                    "outcome_amount_pence",
+                    "outcome_notes",
+                ]
+            )
+            claimed_this_call = True
+        elif dispute.status == DisputeStatus.RESOLVING:
+            outcome = dispute.outcome
+            outcome_amount_pence = dispute.outcome_amount_pence
+            outcome_notes = dispute.outcome_notes
+            if outcome in refund_outcomes:
+                if outcome_amount_pence is None:
+                    raise ValueError("Resolving dispute is missing its claimed refund amount.")
+                refund_amount_pence = outcome_amount_pence
+        else:
+            raise ValueError("Only escalated disputes can be resolved.")
+
+    try:
+        if outcome in refund_outcomes:
+            if refund_amount_pence is None:
+                raise ValueError("Refund outcome is missing its claimed refund amount.")
+            payment = dispute.sub_order.order.payment
+            initiate_refund(
+                payment,
+                amount=Decimal(refund_amount_pence) / Decimal("100"),
+                idempotency_key=refund_idempotency_key,
+            )
+            refund_request = PaymentRefundRequest.objects.get(
+                stripe_idempotency_key=refund_idempotency_key
+            )
+            logger.info(
+                "Auto-triggered Stripe refund %s (%dp) for dispute %s",
+                refund_request.stripe_refund_id,
+                refund_amount_pence,
+                dispute.id,
+            )
+    except Exception:
+        if claimed_this_call:
+            with transaction.atomic():
+                locked = Dispute.objects.select_for_update().get(pk=dispute.pk)
+                if locked.status == DisputeStatus.RESOLVING:
+                    locked.status = DisputeStatus.ESCALATED
+                    locked.save(update_fields=["status"])
+        raise
+
+    with transaction.atomic():
+        dispute = (
+            Dispute.objects.select_for_update(of=("self",))
+            .select_related("sub_order", "opened_by", "respondent")
+            .get(pk=dispute.pk)
+        )
+        if dispute.status == DisputeStatus.RESOLVED:
+            return dispute
+
+        if outcome in refund_outcomes:
+            if refund_amount_pence is None:
+                raise ValueError("Refund outcome is missing its claimed refund amount.")
+            refund_request = PaymentRefundRequest.objects.get(
+                stripe_idempotency_key=refund_idempotency_key
+            )
+            if not refund_request.stripe_refund_id:
+                raise ValueError("Refund request did not return a Stripe refund id.")
+            refund_record, _created = DisputeRefund.objects.get_or_create(
+                stripe_refund_id=refund_request.stripe_refund_id,
+                defaults={
+                    "dispute": dispute,
+                    "sub_order": dispute.sub_order,
+                    "amount_pence": refund_amount_pence,
+                    "status": DisputeRefundStatus.PENDING,
+                },
             )
             refund_record_id = str(refund_record.id)
             transaction.on_commit(
@@ -208,7 +271,7 @@ def resolve_dispute(
 
         dispute.status = DisputeStatus.RESOLVED
         dispute.outcome = outcome
-        dispute.outcome_amount_pence = outcome_amount_pence
+        dispute.outcome_amount_pence = refund_amount_pence
         dispute.outcome_notes = outcome_notes
         dispute.resolved_at = timezone.now()
 
