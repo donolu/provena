@@ -51,8 +51,10 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # interface. They have no effect on REST API security: every API endpoint
 # authenticates via JWT Bearer tokens (JWTAuthentication), so the session
 # cookie is never read and CSRF tokens are never checked for API requests.
-# If HttpOnly cookie-based refresh tokens are introduced (finding #2),
-# CsrfViewMiddleware will need to be enforced on the token-refresh endpoint.
+# The HttpOnly refresh-token cookie (provena_rt) uses SameSite=Lax, which
+# prevents cross-site POST requests from carrying the cookie — CSRF on the
+# token-refresh endpoint is mitigated by the browser's SameSite policy rather
+# than by CsrfViewMiddleware.
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
