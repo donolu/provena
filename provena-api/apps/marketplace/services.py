@@ -90,12 +90,16 @@ def remove_from_cart(user, item_id) -> None:
 
 @transaction.atomic
 def clear_cart(user) -> None:
-    items = (
+    # Materialise the locked set so we delete exactly these IDs, not any CartItems
+    # inserted by a concurrent add_to_cart() after the lock was taken.
+    items = list(
         CartItem.objects.select_for_update()
         .filter(cart__buyer=user)
         .select_related("reservation", "variant")
     )
+    locked_ids = []
     for item in items:
+        locked_ids.append(item.id)
         try:
             res = item.reservation
             inventory_services.release_reservation(
@@ -103,7 +107,8 @@ def clear_cart(user) -> None:
             )
         except CartReservation.DoesNotExist:
             pass
-    CartItem.objects.filter(cart__buyer=user).delete()
+    if locked_ids:
+        CartItem.objects.filter(id__in=locked_ids).delete()
 
 
 # ---------------------------------------------------------------------------
