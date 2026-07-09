@@ -28,11 +28,19 @@ class SupplierRateThrottle(UserRateThrottle):
 
 
 class AdminRateThrottle(UserRateThrottle):
-    """Staff users are exempt from rate limiting; others fall back to the default rate."""
+    """Staff users are unconditionally exempt from rate limiting.
+
+    No rate is configured for this class — get_rate() returns None so DRF
+    skips enforcement for any non-staff caller too. In practice, admin
+    endpoints are protected by IsAdmin, so non-staff never reach them.
+    """
 
     scope = "admin"
 
-    def allow_request(self, request, view):
+    def get_rate(self) -> None:  # type: ignore[override]
+        return None
+
+    def allow_request(self, request, view) -> bool:
         if request.user and request.user.is_authenticated and request.user.is_staff:
             return True
         return super().allow_request(request, view)

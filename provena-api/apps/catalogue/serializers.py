@@ -198,6 +198,8 @@ class AdminProductSerializer(serializers.ModelSerializer):
     category_slug = serializers.SlugField(source="category.slug", read_only=True, allow_null=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
+    average_rating = serializers.FloatField(read_only=True, allow_null=True)
+    review_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Product
@@ -214,6 +216,8 @@ class AdminProductSerializer(serializers.ModelSerializer):
             "category_slug",
             "variants",
             "images",
+            "average_rating",
+            "review_count",
             "created_at",
             "updated_at",
         ]

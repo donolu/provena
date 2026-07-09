@@ -205,7 +205,6 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "apps.accounts.throttling.BuyerRateThrottle",
         "apps.accounts.throttling.SupplierRateThrottle",
-        "apps.accounts.throttling.AdminRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/hour",
