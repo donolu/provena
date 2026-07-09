@@ -159,13 +159,16 @@ def resolve_dispute(
     # error never causes a partial rollback of already-committed dispute state.
     # The idempotency key makes retries safe: Stripe returns the same refund on
     # duplicate requests for the same dispute.
-    stripe_refund_id: str | None = None
-    amount_pence: int | None = None
+    # stripe_refund_data carries (stripe_refund_id, amount_pence) when a refund
+    # was issued; None otherwise. The tuple keeps both fields type-narrowed to int/str.
+    stripe_refund_data: tuple[str, int] | None = None
     if outcome in refund_outcomes:
         if outcome == DisputeOutcome.FULL_REFUND:
-            amount_pence = int(dispute.sub_order.subtotal * 100)
+            amount_pence: int = int(dispute.sub_order.subtotal * 100)
         else:
-            amount_pence = outcome_amount_pence  # type: ignore[assignment]
+            if outcome_amount_pence is None:
+                raise ValueError("outcome_amount_pence is required for PARTIAL_REFUND outcomes.")
+            amount_pence = outcome_amount_pence
 
         stripe.api_key = settings.STRIPE_SECRET_KEY
         payment_intent_id = dispute.sub_order.order.payment.stripe_payment_intent_id
@@ -174,27 +177,28 @@ def resolve_dispute(
             amount=amount_pence,
             idempotency_key=f"dispute-refund-{dispute.id}",
         )
-        stripe_refund_id = stripe_refund.id
+        stripe_refund_data = (stripe_refund.id, amount_pence)
         logger.info(
             "Auto-triggered Stripe refund %s (%dp) for dispute %s",
-            stripe_refund_id,
+            stripe_refund.id,
             amount_pence,
             dispute.id,
         )
 
     with transaction.atomic():
-        if stripe_refund_id is not None:
+        if stripe_refund_data is not None:
+            stripe_refund_id, refund_amount_pence = stripe_refund_data
             refund_record = DisputeRefund.objects.create(
                 dispute=dispute,
                 sub_order=dispute.sub_order,
                 stripe_refund_id=stripe_refund_id,
-                amount_pence=amount_pence,
+                amount_pence=refund_amount_pence,
                 status=DisputeRefundStatus.PENDING,
             )
             notify(
                 recipient=dispute.opened_by,
                 title="Refund initiated",
-                body=f"A refund of £{amount_pence / 100:.2f} has been initiated for your dispute.",  # type: ignore[operator]
+                body=f"A refund of £{refund_amount_pence / 100:.2f} has been initiated for your dispute.",
                 notification_type=NotificationType.GENERAL,
                 data={"dispute_id": str(dispute.id), "refund_id": str(refund_record.id)},
             )
