@@ -232,16 +232,21 @@ def resolve_dispute(
             body=outcome_notes,
         )
         outcome_display = dispute.get_outcome_display()
-        for recipient in (dispute.opened_by, dispute.respondent):
-            transaction.on_commit(
-                lambda r=recipient: notify(
+
+        def _make_resolved_notifier(r):
+            def _notify() -> None:
+                notify(
                     recipient=r,
                     title="Dispute resolved",
                     body=f"The dispute on order {dispute.sub_order} has been resolved: {outcome_display}.",
                     notification_type=NotificationType.GENERAL,
                     data={"dispute_id": str(dispute.id), "outcome": outcome},
                 )
-            )
+
+            return _notify
+
+        for recipient in (dispute.opened_by, dispute.respondent):
+            transaction.on_commit(_make_resolved_notifier(recipient))
     return dispute
 
 
