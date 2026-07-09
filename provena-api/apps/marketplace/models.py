@@ -30,7 +30,7 @@ class Cart(models.Model):
         ]
 
     def __str__(self) -> str:
-        if self.buyer_id:
+        if self.buyer is not None:
             return f"Cart({self.buyer.email})"
         return f"Cart(guest:{(self.session_key or '')[:8]})"
 
