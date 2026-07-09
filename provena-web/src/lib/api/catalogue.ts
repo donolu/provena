@@ -13,6 +13,7 @@ export async function getCategory(slug: string): Promise<Category> {
 
 export async function getProducts(params?: {
   category?: string
+  supplier?: string
   search?: string
   min_price?: number
   max_price?: number

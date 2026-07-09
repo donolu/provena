@@ -1,5 +1,17 @@
 import { apiClient } from './client'
-import type { AdminSupplier, PaginatedResponse, SupplierProfile } from './types'
+import type { AdminSupplier, PaginatedResponse, PublicSupplier, SupplierProfile } from './types'
+
+// ── Public supplier profile ───────────────────────────────────────────────────
+
+export async function getPublicSuppliers(): Promise<PublicSupplier[]> {
+  const { data } = await apiClient.get<PublicSupplier[]>('/suppliers/')
+  return data
+}
+
+export async function getPublicSupplier(slug: string): Promise<PublicSupplier> {
+  const { data } = await apiClient.get<PublicSupplier>(`/suppliers/${slug}/`)
+  return data
+}
 
 // ── Supplier self-service ─────────────────────────────────────────────────────
 
