@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -50,6 +51,24 @@ class TestTriggerPayoutTask:
 
         assert result["status"] == "skipped"
         stripe_connect_mocks.Transfer.create.assert_not_called()
+
+    def test_resumes_processing_payout_via_task(
+        self, pending_payout, approved_supplier, stripe_connect_mocks
+    ):
+        from django.utils import timezone
+
+        approved_supplier.stripe_account_id = "acct_test"
+        approved_supplier.stripe_onboarding_complete = True
+        approved_supplier.save()
+
+        pending_payout.status = PayoutStatus.PROCESSING
+        pending_payout.processing_started_at = timezone.now() - timedelta(minutes=15)
+        pending_payout.save(update_fields=["status", "processing_started_at"])
+
+        result = trigger_payout(str(pending_payout.id))
+
+        assert result["status"] == "processed"
+        stripe_connect_mocks.Transfer.create.assert_called_once()
 
     def test_skips_supplier_without_stripe(self, pending_payout):
         result = trigger_payout(str(pending_payout.id))

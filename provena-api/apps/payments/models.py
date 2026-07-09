@@ -3,6 +3,12 @@ import uuid
 from django.db import models
 
 
+class PaymentRefundRequestStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    COMPLETED = "COMPLETED", "Completed"
+    FAILED = "FAILED", "Failed"
+
+
 class PaymentStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
     PROCESSING = "PROCESSING", "Processing"
@@ -31,6 +37,7 @@ class Payment(models.Model):
         max_length=14, choices=PaymentStatus.choices, default=PaymentStatus.PENDING
     )
     refunded_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    pending_refund_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -56,6 +63,7 @@ class Payout(models.Model):
         max_length=12, choices=PayoutStatus.choices, default=PayoutStatus.PENDING
     )
     stripe_transfer_id = models.CharField(max_length=200, blank=True)
+    processing_started_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -64,3 +72,26 @@ class Payout(models.Model):
 
     def __str__(self) -> str:
         return f"Payout {self.sub_order} / {self.status}"
+
+
+class PaymentRefundRequest(models.Model):
+    """Tracks each distinct refund attempt so retries reuse the same reservation."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name="refund_requests")
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    stripe_idempotency_key = models.CharField(max_length=200, unique=True)
+    stripe_refund_id = models.CharField(max_length=200, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=PaymentRefundRequestStatus.choices,
+        default=PaymentRefundRequestStatus.PENDING,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"RefundRequest {self.payment_id} / {self.amount} / {self.status}"

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import Payment, Payout
@@ -30,6 +32,7 @@ class RefundSerializer(serializers.Serializer):
         decimal_places=2,
         required=False,
         allow_null=True,
+        min_value=Decimal("0.01"),
         help_text="Amount to refund in GBP. Omit for a full refund.",
     )
 
