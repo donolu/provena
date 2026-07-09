@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock
 
@@ -110,8 +111,6 @@ class TestHandleRefund:
             services.handle_refund("pi_nonexistent")
 
     def test_drains_pending_refund_amount_on_webhook(self, succeeded_payment):
-        from decimal import Decimal
-
         # Simulate an in-flight refund reservation of £1.
         succeeded_payment.pending_refund_amount = Decimal("1.00")
         succeeded_payment.save(update_fields=["pending_refund_amount"])
@@ -159,6 +158,20 @@ class TestProcessPayout:
         pending_payout.save(update_fields=["status"])
         with pytest.raises(ValueError, match="status"):
             services.process_payout(pending_payout)
+
+    def test_raises_if_active_processing_payout(
+        self, pending_payout, onboarded_supplier, mock_stripe_transfer
+    ):
+        from django.utils import timezone
+
+        # Mark as recently started — should be treated as active, not stale.
+        pending_payout.status = PayoutStatus.PROCESSING
+        pending_payout.processing_started_at = timezone.now()
+        pending_payout.save(update_fields=["status", "processing_started_at"])
+
+        with pytest.raises(ValueError, match="already being processed"):
+            services.process_payout(pending_payout)
+        mock_stripe_transfer.Transfer.create.assert_not_called()
 
     def test_raises_if_no_stripe_account(self, pending_payout, mock_stripe_transfer):
         with pytest.raises(ValueError, match="Stripe Connect onboarding"):
@@ -218,6 +231,24 @@ class TestProcessPayout:
         pending_payout.refresh_from_db()
         assert pending_payout.status == PayoutStatus.FAILED
 
+    def test_stripe_error_does_not_overwrite_paid_payout(
+        self, pending_payout, onboarded_supplier, mock_stripe_transfer
+    ):
+        # Simulate: Transfer.create raised but payout was already written as PAID
+        # (e.g. by the first worker whose commit arrived after we raised).
+        def _mark_paid_then_raise(*args, **kwargs):
+            pending_payout.status = PayoutStatus.PAID
+            pending_payout.save(update_fields=["status"])
+            raise Exception("network blip")
+
+        mock_stripe_transfer.StripeError = Exception
+        mock_stripe_transfer.Transfer.create.side_effect = _mark_paid_then_raise
+
+        with pytest.raises(ValueError, match="Stripe transfer failed"):
+            services.process_payout(pending_payout)
+        pending_payout.refresh_from_db()
+        assert pending_payout.status == PayoutStatus.PAID
+
     def test_transfer_uses_idempotency_key(
         self, pending_payout, onboarded_supplier, mock_stripe_transfer
     ):
@@ -228,13 +259,24 @@ class TestProcessPayout:
     def test_resumes_stale_processing_payout(
         self, pending_payout, onboarded_supplier, mock_stripe_transfer
     ):
+        from django.utils import timezone
+
         # Simulate process dying after PROCESSING was set but before PAID was saved.
         pending_payout.status = PayoutStatus.PROCESSING
-        pending_payout.save(update_fields=["status"])
+        pending_payout.processing_started_at = timezone.now() - timedelta(minutes=15)
+        pending_payout.save(update_fields=["status", "processing_started_at"])
+
         services.process_payout(pending_payout)
         pending_payout.refresh_from_db()
         assert pending_payout.status == PayoutStatus.PAID
         mock_stripe_transfer.Transfer.create.assert_called_once()
+
+    def test_sets_processing_started_at_on_pending_transition(
+        self, pending_payout, onboarded_supplier, mock_stripe_transfer
+    ):
+        services.process_payout(pending_payout)
+        pending_payout.refresh_from_db()
+        assert pending_payout.processing_started_at is not None
 
 
 class TestInitiateRefund:
@@ -257,14 +299,20 @@ class TestInitiateRefund:
         with pytest.raises(ValueError, match="exceeds refundable balance"):
             services.initiate_refund(succeeded_payment, amount=succeeded_payment.amount + 1)
 
+    def test_raises_if_amount_is_zero(self, succeeded_payment, mock_stripe_refund):
+        with pytest.raises(ValueError, match="greater than zero"):
+            services.initiate_refund(succeeded_payment, amount=Decimal("0.00"))
+
+    def test_raises_if_amount_is_negative(self, succeeded_payment, mock_stripe_refund):
+        with pytest.raises(ValueError, match="greater than zero"):
+            services.initiate_refund(succeeded_payment, amount=Decimal("-1.00"))
+
     def test_full_refund_sends_correct_amount(self, succeeded_payment, mock_stripe_refund):
         services.initiate_refund(succeeded_payment)
         call_kwargs = mock_stripe_refund.Refund.create.call_args[1]
         assert call_kwargs["amount"] == int(succeeded_payment.amount * 100)
 
     def test_partial_refund_sends_correct_amount(self, succeeded_payment, mock_stripe_refund):
-        from decimal import Decimal
-
         services.initiate_refund(succeeded_payment, amount=Decimal("1.00"))
         call_kwargs = mock_stripe_refund.Refund.create.call_args[1]
         assert call_kwargs["amount"] == 100
@@ -283,26 +331,90 @@ class TestInitiateRefund:
         with pytest.raises(ValueError, match="No charge found"):
             services.initiate_refund(succeeded_payment)
 
-    def test_reserves_pending_refund_amount_under_lock(self, succeeded_payment, mock_stripe_refund):
-        from decimal import Decimal
+    def test_creates_refund_request_and_drains_after_stripe(
+        self, succeeded_payment, mock_stripe_refund
+    ):
+        from apps.payments.models import PaymentRefundRequest, PaymentRefundRequestStatus
 
-        services.initiate_refund(succeeded_payment, amount=Decimal("1.00"))
+        amount = Decimal("1.00")
+        services.initiate_refund(succeeded_payment, amount=amount)
+
         succeeded_payment.refresh_from_db()
-        assert succeeded_payment.pending_refund_amount == Decimal("1.00")
+        # Reservation is drained to zero once Stripe confirms.
+        assert succeeded_payment.pending_refund_amount == Decimal("0.00")
+
+        req = PaymentRefundRequest.objects.get(payment=succeeded_payment)
+        assert req.amount == amount
+        assert req.status == PaymentRefundRequestStatus.COMPLETED
+        assert req.stripe_refund_id == "re_test"
 
     def test_concurrent_refunds_blocked_by_reservation(self, succeeded_payment, mock_stripe_refund):
-        from decimal import Decimal
+        from apps.payments.models import PaymentRefundRequest, PaymentRefundRequestStatus
 
-        # First call reserves the full balance.
-        services.initiate_refund(succeeded_payment)
-        succeeded_payment.refresh_from_db()
-        # Second call for any positive amount should now find no balance.
+        # Simulate an in-flight full-refund reservation (another worker is calling Stripe).
+        amount_pence = int(succeeded_payment.amount * 100)
+        PaymentRefundRequest.objects.create(
+            payment=succeeded_payment,
+            amount=succeeded_payment.amount,
+            stripe_idempotency_key=f"refund-{succeeded_payment.id}-{amount_pence}",
+            status=PaymentRefundRequestStatus.PENDING,
+        )
+        succeeded_payment.pending_refund_amount = succeeded_payment.amount
+        succeeded_payment.save(update_fields=["pending_refund_amount"])
+
+        # A concurrent call for a different amount should find no refundable balance.
         with pytest.raises(ValueError, match="exceeds refundable balance"):
             services.initiate_refund(succeeded_payment, amount=Decimal("0.01"))
 
-    def test_releases_reservation_on_stripe_error(self, succeeded_payment, mock_stripe_refund):
-        from decimal import Decimal
+    def test_retry_with_same_amount_does_not_double_reserve(
+        self, succeeded_payment, mock_stripe_refund
+    ):
+        from apps.payments.models import PaymentRefundRequest, PaymentRefundRequestStatus
 
+        amount = Decimal("1.00")
+        amount_pence = 100
+
+        # Simulate a PENDING request whose reservation is already in place.
+        PaymentRefundRequest.objects.create(
+            payment=succeeded_payment,
+            amount=amount,
+            stripe_idempotency_key=f"refund-{succeeded_payment.id}-{amount_pence}",
+            status=PaymentRefundRequestStatus.PENDING,
+        )
+        succeeded_payment.pending_refund_amount = amount
+        succeeded_payment.save(update_fields=["pending_refund_amount"])
+
+        # Retry: same idempotency key → should find PENDING, skip increment, call Stripe,
+        # then drain the existing reservation on success.
+        services.initiate_refund(succeeded_payment, amount=amount)
+
+        succeeded_payment.refresh_from_db()
+        assert succeeded_payment.pending_refund_amount == Decimal("0.00")
+        # Stripe was called exactly once by this retry.
+        mock_stripe_refund.Refund.create.assert_called_once()
+
+    def test_failed_request_can_be_retried(self, succeeded_payment, mock_stripe_refund):
+        from apps.payments.models import PaymentRefundRequest, PaymentRefundRequestStatus
+
+        amount = Decimal("1.00")
+        amount_pence = 100
+
+        # Simulate a previously-failed attempt with no pending reservation.
+        PaymentRefundRequest.objects.create(
+            payment=succeeded_payment,
+            amount=amount,
+            stripe_idempotency_key=f"refund-{succeeded_payment.id}-{amount_pence}",
+            status=PaymentRefundRequestStatus.FAILED,
+        )
+
+        # Retry: should reset to PENDING, re-reserve, and call Stripe.
+        services.initiate_refund(succeeded_payment, amount=amount)
+
+        req = PaymentRefundRequest.objects.get(payment=succeeded_payment)
+        assert req.status == PaymentRefundRequestStatus.COMPLETED
+        mock_stripe_refund.Refund.create.assert_called_once()
+
+    def test_releases_reservation_on_stripe_error(self, succeeded_payment, mock_stripe_refund):
         mock_stripe_refund.StripeError = Exception
         mock_stripe_refund.Refund.create.side_effect = Exception("stripe down")
         with pytest.raises(ValueError, match="Stripe refund failed"):

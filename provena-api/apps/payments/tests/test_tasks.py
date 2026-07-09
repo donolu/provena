@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -54,12 +55,15 @@ class TestTriggerPayoutTask:
     def test_resumes_processing_payout_via_task(
         self, pending_payout, approved_supplier, stripe_connect_mocks
     ):
+        from django.utils import timezone
+
         approved_supplier.stripe_account_id = "acct_test"
         approved_supplier.stripe_onboarding_complete = True
         approved_supplier.save()
 
         pending_payout.status = PayoutStatus.PROCESSING
-        pending_payout.save()
+        pending_payout.processing_started_at = timezone.now() - timedelta(minutes=15)
+        pending_payout.save(update_fields=["status", "processing_started_at"])
 
         result = trigger_payout(str(pending_payout.id))
 

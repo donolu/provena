@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import Order, OrderItem, OrderReturn, SubOrder
@@ -174,5 +176,5 @@ class ReturnActionSerializer(serializers.Serializer):
 
 class ReturnRefundSerializer(serializers.Serializer):
     amount = serializers.DecimalField(
-        max_digits=12, decimal_places=2, required=False, allow_null=True
+        max_digits=12, decimal_places=2, required=False, allow_null=True, min_value=Decimal("0.01")
     )
