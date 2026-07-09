@@ -2478,6 +2478,10 @@ export interface components {
             readonly category_slug: string | null;
             readonly variants: components["schemas"]["ProductVariant"][];
             readonly images: components["schemas"]["ProductImage"][];
+            /** Format: double */
+            readonly average_rating: number | null;
+            /** @default 0 */
+            readonly review_count: number;
             /** Format: date-time */
             readonly created_at: string;
             /** Format: date-time */
