@@ -180,8 +180,8 @@ def resolve_dispute(
         stripe_refund_data = (stripe_refund.id, amount_pence)
         logger.info(
             "Auto-triggered Stripe refund %s (%dp) for dispute %s",
-            stripe_refund.id,
-            amount_pence,
+            stripe_refund_data[0],
+            stripe_refund_data[1],
             dispute.id,
         )
 
