@@ -211,6 +211,7 @@ class StripeConnectView(APIView):
             200: OpenApiResponse(
                 description="`{onboarding_url: 'https://connect.stripe.com/...'}`"
             ),
+            503: OpenApiResponse(description="Stripe Connect is not configured on this server"),
         },
     )
     def get(self, request: Request) -> Response:
@@ -224,6 +225,11 @@ class StripeConnectView(APIView):
             return_url=return_url,
             refresh_url=refresh_url,
         )
+        if not url:
+            return Response(
+                {"detail": "Payment features are not configured on this server."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         return Response({"onboarding_url": url})
 
 

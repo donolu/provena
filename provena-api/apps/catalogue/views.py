@@ -1,4 +1,5 @@
-from django.db.models import Q
+from django.db import models
+from django.db.models import Avg, Count, FloatField, IntegerField, OuterRef, Q, Subquery
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
@@ -43,6 +44,23 @@ from .serializers import (
 def _own_product(request: Request, slug: str) -> Product:
     """Return the product owned by the requesting supplier, or 404."""
     return get_object_or_404(Product, slug=slug, supplier=request.user.supplier)  # type: ignore[union-attr]
+
+
+def _annotate_ratings(qs: "models.QuerySet[Product]") -> "models.QuerySet[Product]":
+    """Annotate average_rating and review_count onto a Product queryset in a single pass."""
+    from apps.marketplace.models import Review
+
+    approved_reviews = Review.objects.filter(variant__product=OuterRef("pk"), is_approved=True)
+    return qs.annotate(
+        average_rating=Subquery(
+            approved_reviews.values("variant__product").annotate(v=Avg("rating")).values("v"),
+            output_field=FloatField(),
+        ),
+        review_count=Subquery(
+            approved_reviews.values("variant__product").annotate(v=Count("id")).values("v"),
+            output_field=IntegerField(),
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +246,7 @@ class ProductListCreateView(PaginatedListMixin, APIView):
             qs = qs.filter(variants__price__gte=min_price).distinct()
         if max_price := request.query_params.get("max_price"):
             qs = qs.filter(variants__price__lte=max_price).distinct()
-        return self.paginate(qs, ProductSerializer, request)
+        return self.paginate(_annotate_ratings(qs), ProductSerializer, request)
 
     @extend_schema(
         tags=["Catalogue: Products"],
@@ -286,7 +304,7 @@ class SupplierProductListView(PaginatedListMixin, APIView):
         )
         if status_filter := request.query_params.get("status"):
             qs = qs.filter(status=status_filter.upper())
-        return self.paginate(qs, ProductSerializer, request)
+        return self.paginate(_annotate_ratings(qs), ProductSerializer, request)
 
 
 # ---------------------------------------------------------------------------
@@ -313,8 +331,10 @@ class ProductDetailView(APIView):
     )
     def get(self, request: Request, slug: str) -> Response:
         product = get_object_or_404(
-            Product.objects.select_related("supplier", "category").prefetch_related(
-                "variants", "variants__images", "images"
+            _annotate_ratings(
+                Product.objects.select_related("supplier", "category").prefetch_related(
+                    "variants", "variants__images", "images"
+                )
             ),
             slug=slug,
             status=ProductStatus.ACTIVE,
@@ -663,7 +683,7 @@ class AdminProductListView(APIView):
             qs = qs.filter(status=status_filter.upper())
         if supplier_slug := request.query_params.get("supplier"):
             qs = qs.filter(supplier__slug=supplier_slug)
-        return Response(AdminProductSerializer(qs, many=True).data)
+        return Response(AdminProductSerializer(_annotate_ratings(qs), many=True).data)
 
 
 class AdminProductFeatureView(APIView):
