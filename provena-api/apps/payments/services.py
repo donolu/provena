@@ -16,18 +16,21 @@ def _to_pence(amount: Decimal) -> int:
     return int(amount * 100)
 
 
-@transaction.atomic
 def create_payment_intent(order: Order) -> Payment:
     if order.status != OrderStatus.PENDING:
         raise ValueError(f"Cannot create payment for order in status {order.status}.")
     if hasattr(order, "payment"):
         return order.payment
 
+    # Stripe is called outside any DB transaction so a network error never causes a rollback
+    # of already-committed data. The idempotency key makes retries safe: Stripe returns the
+    # same PaymentIntent on duplicate requests for the same order reference.
     stripe.api_key = settings.STRIPE_SECRET_KEY
     intent = stripe.PaymentIntent.create(
         amount=_to_pence(order.total_amount),
         currency="gbp",
         metadata={"order_reference": order.reference},
+        idempotency_key=f"order-{order.reference}",
     )
     return Payment.objects.create(
         order=order,
@@ -49,7 +52,7 @@ def handle_payment_succeeded(stripe_payment_intent_id: str) -> Payment:
     payment.status = PaymentStatus.SUCCEEDED
     payment.save(update_fields=["status", "updated_at"])
     _create_payouts(payment)
-    _send_order_emails(payment.order)
+    transaction.on_commit(lambda: _send_order_emails(payment.order))
     return payment
 
 

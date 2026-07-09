@@ -178,12 +178,7 @@ def dispatch_sub_order(sub_order: SubOrder, tracking_number: str = "") -> SubOrd
     sub_order.tracking_number = tracking_number
     sub_order.save(update_fields=["status", "tracking_number", "updated_at"])
     _sync_order_status(sub_order.order)
-    try:
-        from apps.notifications.email_service import send_shipping_update
-
-        send_shipping_update(sub_order)
-    except Exception:
-        logger.exception("Failed to send shipping update email for sub_order %s", sub_order.id)
+    transaction.on_commit(lambda: _safe_send_shipping_update(sub_order))
     return sub_order
 
 
@@ -196,6 +191,20 @@ def deliver_sub_order(sub_order: SubOrder) -> SubOrder:
     sub_order.save(update_fields=["status", "delivered_at", "updated_at"])
     _sync_order_status(sub_order.order)
     _trigger_sub_order_payout(sub_order)
+    transaction.on_commit(lambda: _safe_send_delivery_confirmation(sub_order))
+    return sub_order
+
+
+def _safe_send_shipping_update(sub_order: SubOrder) -> None:
+    try:
+        from apps.notifications.email_service import send_shipping_update
+
+        send_shipping_update(sub_order)
+    except Exception:
+        logger.exception("Failed to send shipping update email for sub_order %s", sub_order.id)
+
+
+def _safe_send_delivery_confirmation(sub_order: SubOrder) -> None:
     try:
         from apps.notifications.email_service import send_delivery_confirmation
 
@@ -204,7 +213,6 @@ def deliver_sub_order(sub_order: SubOrder) -> SubOrder:
         logger.exception(
             "Failed to send delivery confirmation email for sub_order %s", sub_order.id
         )
-    return sub_order
 
 
 def _trigger_sub_order_payout(sub_order: SubOrder) -> None:
