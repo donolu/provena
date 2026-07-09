@@ -300,40 +300,64 @@ def reject_return(return_obj: OrderReturn, notes: str = "") -> OrderReturn:
 
 
 def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderReturn:
-    if return_obj.status != ReturnStatus.APPROVED:
-        raise ValueError("Can only refund an approved return.")
-    from decimal import Decimal
-
     from apps.payments import services as payment_services
 
-    payment = getattr(return_obj.sub_order.order, "payment", None)
-    if payment is None:
-        raise ValueError("No payment found for this order.")
-    amount = Decimal(str(refund_amount)) if refund_amount is not None else None
-    # initiate_refund() commits the idempotency record in its own transaction
-    # before calling Stripe. No outer atomic wrapper here: if we wrapped this
-    # whole function, the inner commit would become a savepoint and a later DB
-    # failure would roll back the refund record even though Stripe already
-    # accepted the charge.
-    payment_services.initiate_refund(payment, amount=amount)
+    # Phase 1: atomically claim the return by advancing it from APPROVED to
+    # REFUNDING and locking in the refund amount. A concurrent caller blocks on
+    # the row lock and, after this transaction commits, sees REFUNDING (retry
+    # path) or REFUNDED (already done) rather than APPROVED.
     with transaction.atomic():
-        # Re-read with a row lock so a concurrent call that also passed the
-        # initial status check blocks here until we commit. If the locked row
-        # is already REFUNDED the concurrent caller won the race; bail out
-        # without touching stock a second time.
         locked = OrderReturn.objects.select_for_update().get(pk=return_obj.pk)
+
         if locked.status == ReturnStatus.REFUNDED:
             return locked
 
-        from apps.inventory import services as inventory_services
+        if locked.status not in (ReturnStatus.APPROVED, ReturnStatus.REFUNDING):
+            raise ValueError("Can only refund an approved return.")
 
-        for item in locked.sub_order.items.select_related("variant"):
+        payment = getattr(locked.sub_order.order, "payment", None)
+        if payment is None:
+            raise ValueError("No payment found for this order.")
+
+        if locked.status == ReturnStatus.APPROVED:
+            amount = Decimal(str(refund_amount)) if refund_amount is not None else payment.amount
+            locked.refund_amount = amount
+            locked.status = ReturnStatus.REFUNDING
+            locked.save(update_fields=["status", "refund_amount", "updated_at"])
+        else:
+            # REFUNDING retry: a previous attempt claimed the return and set the
+            # amount. Ignore the caller's refund_amount to prevent a second Stripe
+            # charge for a different value.
+            assert locked.refund_amount is not None, (
+                "REFUNDING return must have a stored refund_amount"
+            )
+            amount = locked.refund_amount
+
+    # Phase 2: call Stripe outside any DB transaction so the connection is not
+    # held open during the network round-trip. On failure, reset to APPROVED so
+    # the caller can retry cleanly.
+    try:
+        payment_services.initiate_refund(payment, amount=amount)
+    except Exception:
+        with transaction.atomic():
+            OrderReturn.objects.filter(pk=locked.pk, status=ReturnStatus.REFUNDING).update(
+                status=ReturnStatus.APPROVED
+            )
+        raise
+
+    # Phase 3: return inventory and mark REFUNDED. Re-read under lock in case a
+    # concurrent retry also reached Stripe; bail early if already REFUNDED.
+    with transaction.atomic():
+        final = OrderReturn.objects.select_for_update().get(pk=locked.pk)
+        if final.status == ReturnStatus.REFUNDED:
+            return final
+
+        for item in final.sub_order.items.select_related("variant"):
             inventory_services.return_stock(
                 item.variant,
                 item.quantity,
-                notes=f"Return {locked.id}",
+                notes=f"Return {final.id}",
             )
-        locked.status = ReturnStatus.REFUNDED
-        locked.refund_amount = amount or payment.amount
-        locked.save(update_fields=["status", "refund_amount", "updated_at"])
-    return locked
+        final.status = ReturnStatus.REFUNDED
+        final.save(update_fields=["status", "updated_at"])
+    return final

@@ -144,6 +144,34 @@ class TestProcessReturnRefund:
 
         assert result.refund_amount == Decimal("3.99")
 
+    def test_refunding_retry_uses_claimed_amount(self, buyer, placed_order, dispatched_sub_order):
+        """A REFUNDING retry ignores the caller's new amount; uses the already-claimed value."""
+        from apps.payments.models import Payment, PaymentStatus
+
+        Payment.objects.create(
+            order=placed_order,
+            stripe_payment_intent_id="pi_test_retry",
+            amount=Decimal("7.98"),
+            status=PaymentStatus.SUCCEEDED,
+        )
+        sub = services.deliver_sub_order(dispatched_sub_order)
+        ret = services.request_return(sub, buyer, "Faulty item")
+        services.approve_return(ret)
+
+        # Simulate a first attempt that claimed £3.99 and set REFUNDING, then crashed
+        # before Stripe was called (e.g. the process was killed mid-flight).
+        ret.status = ReturnStatus.REFUNDING
+        ret.refund_amount = Decimal("3.99")
+        ret.save(update_fields=["status", "refund_amount", "updated_at"])
+
+        with patch("apps.payments.services.initiate_refund") as mock_initiate:
+            result = services.process_return_refund(ret, refund_amount=Decimal("1.00"))
+
+        assert result.status == ReturnStatus.REFUNDED
+        # initiate_refund must have been called with the stored £3.99, not the caller's £1.00.
+        mock_initiate.assert_called_once()
+        assert mock_initiate.call_args[1]["amount"] == Decimal("3.99")
+
 
 # ---------------------------------------------------------------------------
 # View tests — buyer
