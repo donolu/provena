@@ -2478,6 +2478,10 @@ export interface components {
             readonly category_slug: string | null;
             readonly variants: components["schemas"]["ProductVariant"][];
             readonly images: components["schemas"]["ProductImage"][];
+            /** Format: double */
+            readonly average_rating: number | null;
+            /** @default 0 */
+            readonly review_count: number;
             /** Format: date-time */
             readonly created_at: string;
             /** Format: date-time */
@@ -3211,6 +3215,7 @@ export interface components {
             readonly category_name: string | null;
             /** Format: double */
             readonly average_rating: number | null;
+            /** @default 0 */
             readonly review_count: number;
             readonly variants: components["schemas"]["ProductVariant"][];
             readonly images: components["schemas"]["ProductImage"][];
@@ -4432,6 +4437,13 @@ export interface operations {
         responses: {
             /** @description `{onboarding_url: 'https://connect.stripe.com/...'}` */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Stripe Connect is not configured on this server */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
