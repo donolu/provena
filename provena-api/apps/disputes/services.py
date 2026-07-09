@@ -180,8 +180,8 @@ def resolve_dispute(
         stripe_refund_data = (stripe_refund.id, amount_pence)
         logger.info(
             "Auto-triggered Stripe refund %s (%dp) for dispute %s",
-            stripe_refund.id,
-            amount_pence,
+            stripe_refund_data[0],
+            stripe_refund_data[1],
             dispute.id,
         )
 
@@ -195,12 +195,15 @@ def resolve_dispute(
                 amount_pence=refund_amount_pence,
                 status=DisputeRefundStatus.PENDING,
             )
-            notify(
-                recipient=dispute.opened_by,
-                title="Refund initiated",
-                body=f"A refund of £{refund_amount_pence / 100:.2f} has been initiated for your dispute.",
-                notification_type=NotificationType.GENERAL,
-                data={"dispute_id": str(dispute.id), "refund_id": str(refund_record.id)},
+            refund_record_id = str(refund_record.id)
+            transaction.on_commit(
+                lambda: notify(
+                    recipient=dispute.opened_by,
+                    title="Refund initiated",
+                    body=f"A refund of £{refund_amount_pence / 100:.2f} has been initiated for your dispute.",
+                    notification_type=NotificationType.GENERAL,
+                    data={"dispute_id": str(dispute.id), "refund_id": refund_record_id},
+                )
             )
 
         dispute.status = DisputeStatus.RESOLVED
@@ -228,14 +231,22 @@ def resolve_dispute(
             event_type=DisputeEventType.RESOLVED,
             body=outcome_notes,
         )
+        outcome_display = dispute.get_outcome_display()
+
+        def _make_resolved_notifier(r):
+            def _notify() -> None:
+                notify(
+                    recipient=r,
+                    title="Dispute resolved",
+                    body=f"The dispute on order {dispute.sub_order} has been resolved: {outcome_display}.",
+                    notification_type=NotificationType.GENERAL,
+                    data={"dispute_id": str(dispute.id), "outcome": outcome},
+                )
+
+            return _notify
+
         for recipient in (dispute.opened_by, dispute.respondent):
-            notify(
-                recipient=recipient,
-                title="Dispute resolved",
-                body=f"The dispute on order {dispute.sub_order} has been resolved: {dispute.get_outcome_display()}.",
-                notification_type=NotificationType.GENERAL,
-                data={"dispute_id": str(dispute.id), "outcome": outcome},
-            )
+            transaction.on_commit(_make_resolved_notifier(recipient))
     return dispute
 
 

@@ -84,7 +84,7 @@ class TestTriggerPayoutTask:
         assert result["status"] == "not_found"
 
     def test_deliver_sub_order_queues_payout_task(
-        self, succeeded_payment, sub_order, approved_supplier
+        self, succeeded_payment, sub_order, approved_supplier, django_capture_on_commit_callbacks
     ):
         from apps.orders import services as order_services
 
@@ -92,5 +92,6 @@ class TestTriggerPayoutTask:
         order_services.dispatch_sub_order(sub_order, tracking_number="TRK123")
 
         with patch("apps.payments.tasks.trigger_payout.delay") as mock_delay:
-            order_services.deliver_sub_order(sub_order)
+            with django_capture_on_commit_callbacks(execute=True):
+                order_services.deliver_sub_order(sub_order)
             mock_delay.assert_called_once_with(str(Payout.objects.get(sub_order=sub_order).id))
