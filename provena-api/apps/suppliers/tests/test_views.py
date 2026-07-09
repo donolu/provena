@@ -66,9 +66,9 @@ class TestPublicSupplierViews:
     def test_public_list_shows_only_approved(self, api_client, pending_supplier, approved_supplier):
         res = api_client.get(PUBLIC_LIST_URL)
         assert res.status_code == status.HTTP_200_OK
-        names = [s["business_name"] for s in res.data]
+        names = [s["business_name"] for s in res.data["results"]]
         assert "Fresh Farms Ltd" in names
-        assert len(res.data) == 1  # pending not shown
+        assert res.data["count"] == 1  # pending not shown
 
     def test_public_detail_by_slug(self, api_client, approved_supplier):
         res = api_client.get(f"/api/v1/suppliers/{approved_supplier.slug}/")

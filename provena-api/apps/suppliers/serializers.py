@@ -66,6 +66,10 @@ class SupplierPublicSerializer(serializers.ModelSerializer):
         ]
 
     def get_average_rating(self, obj: "Supplier") -> float | None:
+        # Prefer the queryset annotation injected by SupplierListView to avoid N+1.
+        if hasattr(obj, "avg_rating"):
+            avg = obj.avg_rating
+            return round(float(avg), 1) if avg is not None else None
         from django.db.models import Avg
 
         from apps.marketplace.models import Review
@@ -77,6 +81,8 @@ class SupplierPublicSerializer(serializers.ModelSerializer):
         return round(avg, 1) if avg is not None else None
 
     def get_product_count(self, obj: "Supplier") -> int:
+        if hasattr(obj, "active_product_count"):
+            return int(obj.active_product_count)
         return int(obj.products.filter(status="ACTIVE").count())
 
 
