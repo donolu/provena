@@ -162,7 +162,7 @@ def resolve_dispute(
 
     with transaction.atomic():
         dispute = (
-            Dispute.objects.select_for_update()
+            Dispute.objects.select_for_update(of=("self",))
             .select_related("sub_order__order__payment", "opened_by", "respondent")
             .get(pk=dispute.pk)
         )
@@ -234,7 +234,7 @@ def resolve_dispute(
 
     with transaction.atomic():
         dispute = (
-            Dispute.objects.select_for_update()
+            Dispute.objects.select_for_update(of=("self",))
             .select_related("sub_order", "opened_by", "respondent")
             .get(pk=dispute.pk)
         )
