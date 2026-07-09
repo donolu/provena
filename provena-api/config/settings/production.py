@@ -18,6 +18,9 @@ CSRF_COOKIE_SECURE = True
 X_FRAME_OPTIONS = "DENY"
 
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS")
+# CORS_ALLOW_CREDENTIALS is set to True in base.py to allow the browser to
+# send the HttpOnly refresh-token cookie on cross-origin requests to /auth/refresh/.
+# It must always be paired with CORS_ALLOWED_ORIGINS (never CORS_ALLOW_ALL_ORIGINS).
 
 # S3 / Cloudflare R2 file storage
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
