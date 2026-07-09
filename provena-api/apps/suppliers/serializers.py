@@ -48,6 +48,8 @@ class DocumentReviewSerializer(serializers.Serializer):
 
 class SupplierPublicSerializer(serializers.ModelSerializer):
     address = SupplierAddressSerializer(read_only=True)
+    average_rating = serializers.SerializerMethodField()
+    product_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Supplier
@@ -59,7 +61,23 @@ class SupplierPublicSerializer(serializers.ModelSerializer):
             "logo_url",
             "website",
             "address",
+            "average_rating",
+            "product_count",
         ]
+
+    def get_average_rating(self, obj: "Supplier") -> float | None:
+        from django.db.models import Avg
+
+        from apps.marketplace.models import Review
+
+        result = Review.objects.filter(variant__product__supplier=obj, is_approved=True).aggregate(
+            avg=Avg("rating")
+        )
+        avg = result["avg"]
+        return round(avg, 1) if avg is not None else None
+
+    def get_product_count(self, obj: "Supplier") -> int:
+        return int(obj.products.filter(status="ACTIVE").count())
 
 
 class SupplierProfileSerializer(serializers.ModelSerializer):

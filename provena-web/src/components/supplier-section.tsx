@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { ProductCard } from '@/components/product-card'
 import type { Product } from '@/lib/api/types'
 
@@ -21,11 +22,19 @@ export function SupplierSection({
   return (
     <section aria-label={supplierName}>
       <div className="flex items-center gap-4 mb-6">
-        <span className="text-[11px] uppercase tracking-[0.14em] font-sans font-semibold text-forest whitespace-nowrap">
+        <Link
+          href={`/suppliers/${supplierSlug}`}
+          className="text-[11px] uppercase tracking-[0.14em] font-sans font-semibold text-forest whitespace-nowrap hover:text-meadow transition-colors duration-150"
+        >
           {supplierName}
-        </span>
+        </Link>
         <div aria-hidden="true" className="flex-1 h-px bg-hoarfrost" />
-        <span className="text-[10px] font-mono text-hoarfrost">{supplierSlug}</span>
+        <Link
+          href={`/suppliers/${supplierSlug}`}
+          className="text-[10px] font-mono text-hoarfrost hover:text-soil transition-colors duration-150"
+        >
+          View all
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">

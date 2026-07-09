@@ -3517,6 +3517,9 @@ export interface components {
             logo_url?: string;
             website?: string;
             readonly address: components["schemas"]["SupplierAddress"];
+            /** Format: double */
+            readonly average_rating: number | null;
+            readonly product_count: number;
         };
         SupplierRegistrationRequest: {
             business_name: string;

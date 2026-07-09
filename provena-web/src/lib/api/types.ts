@@ -250,6 +250,18 @@ export interface SupplierDocument {
   reviewed_by_email: string | null
 }
 
+export interface PublicSupplier {
+  id: string
+  business_name: string
+  slug: string
+  description: string
+  logo_url: string
+  website: string
+  address: SupplierAddress | null
+  average_rating: number | null
+  product_count: number
+}
+
 export interface SupplierProfile {
   id: string
   user_email: string
