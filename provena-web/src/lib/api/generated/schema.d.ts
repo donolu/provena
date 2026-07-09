@@ -1310,7 +1310,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Audit log for a variant */
+        /**
+         * Audit log for a variant
+         * @description Adds a paginate() helper to raw APIView subclasses.
+         *
+         *     Usage:
+         *         class MyListView(PaginatedListMixin, APIView):
+         *             def get(self, request):
+         *                 qs = MyModel.objects.all()
+         *                 return self.paginate(qs, MySerializer, request)
+         */
         get: operations["inventory_movements_list"];
         put?: never;
         post?: never;
@@ -1327,7 +1336,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Stock lots for a variant */
+        /**
+         * Stock lots for a variant
+         * @description Adds a paginate() helper to raw APIView subclasses.
+         *
+         *     Usage:
+         *         class MyListView(PaginatedListMixin, APIView):
+         *             def get(self, request):
+         *                 qs = MyModel.objects.all()
+         *                 return self.paginate(qs, MySerializer, request)
+         */
         get: operations["inventory_lots_list"];
         put?: never;
         post?: never;
@@ -3117,6 +3135,36 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["StockLevel"][];
         };
+        PaginatedStockLotList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["StockLot"][];
+        };
+        PaginatedStockMovementList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["StockMovement"][];
+        };
         PaginatedSubOrderListList: {
             /** @example 123 */
             count: number;
@@ -3131,6 +3179,21 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["SubOrderList"][];
+        };
+        PaginatedSupplierDocumentList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["SupplierDocument"][];
         };
         PaginatedSupplierPublicList: {
             /** @example 123 */
@@ -4490,7 +4553,12 @@ export interface operations {
     };
     suppliers_me_documents_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4502,7 +4570,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SupplierDocument"][];
+                    "application/json": components["schemas"]["PaginatedSupplierDocumentList"];
                 };
             };
         };
@@ -4611,6 +4679,10 @@ export interface operations {
     suppliers_admin_documents_list: {
         parameters: {
             query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
                 /** @description Filter by document status (default: PENDING) */
                 status?: "APPROVED" | "PENDING" | "REJECTED";
             };
@@ -4625,7 +4697,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SupplierDocument"][];
+                    "application/json": components["schemas"]["PaginatedSupplierDocumentList"];
                 };
             };
         };
@@ -6026,7 +6098,12 @@ export interface operations {
     };
     inventory_movements_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
             header?: never;
             path: {
                 variant_id: string;
@@ -6040,14 +6117,19 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StockMovement"][];
+                    "application/json": components["schemas"]["PaginatedStockMovementList"];
                 };
             };
         };
     };
     inventory_lots_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
             header?: never;
             path: {
                 variant_id: string;
@@ -6061,7 +6143,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StockLot"][];
+                    "application/json": components["schemas"]["PaginatedStockLotList"];
                 };
             };
         };

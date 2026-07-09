@@ -31,9 +31,9 @@ export async function clearCart(): Promise<void> {
 
 // ── Wishlist ──────────────────────────────────────────────────────────────────
 
-export async function getWishlist(): Promise<WishlistItem[]> {
-  const { data } = await apiClient.get<PaginatedResponse<WishlistItem>>('/marketplace/wishlist/')
-  return data.results
+export async function getWishlist(page = 1): Promise<PaginatedResponse<WishlistItem>> {
+  const { data } = await apiClient.get<PaginatedResponse<WishlistItem>>('/marketplace/wishlist/', { params: { page } })
+  return data
 }
 
 export async function addToWishlist(variantId: string): Promise<WishlistItem> {

@@ -159,7 +159,7 @@ class SupplierPublicDetailView(APIView):
         return Response(SupplierPublicSerializer(supplier).data)
 
 
-class SupplierDocumentListView(APIView):
+class SupplierDocumentListView(PaginatedListMixin, APIView):
     """Supplier uploads KYC documents."""
 
     permission_classes = [IsAnySupplier]
@@ -171,7 +171,7 @@ class SupplierDocumentListView(APIView):
     )
     def get(self, request: Request) -> Response:
         docs = request.user.supplier.documents.all()  # type: ignore[union-attr]
-        return Response(SupplierDocumentSerializer(docs, many=True).data)
+        return self.paginate(docs, SupplierDocumentSerializer, request)
 
     @extend_schema(
         tags=["Suppliers (Supplier)"],
@@ -389,7 +389,7 @@ class AdminSupplierRejectView(APIView):
         return Response({"status": supplier.status})
 
 
-class AdminDocumentListView(APIView):
+class AdminDocumentListView(PaginatedListMixin, APIView):
     """Admin: list all documents, filtered to pending by default."""
 
     permission_classes = [IsAdmin]
@@ -414,7 +414,7 @@ class AdminDocumentListView(APIView):
         qs = SupplierDocument.objects.select_related("supplier", "reviewed_by")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        return Response(SupplierDocumentSerializer(qs, many=True).data)
+        return self.paginate(qs, SupplierDocumentSerializer, request)
 
 
 class AdminDocumentReviewView(APIView):

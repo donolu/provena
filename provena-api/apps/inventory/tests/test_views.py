@@ -173,14 +173,14 @@ class TestStockMovementListView:
         services.adjust_stock(variant, -10, notes="Adjustment")
         response = supplier_client.get(f"/api/v1/inventory/{variant.id}/movements/")
         assert response.status_code == 200
-        assert len(response.json()) == 2
+        assert response.json()["count"] == 2
 
     def test_movement_fields(self, supplier_client, variant):
         from apps.inventory import services
 
         services.receive_stock(variant, 30)
         response = supplier_client.get(f"/api/v1/inventory/{variant.id}/movements/")
-        m = response.json()[0]
+        m = response.json()["results"][0]
         assert m["movement_type"] == "INBOUND"
         assert m["quantity"] == 30
         assert m["quantity_after"] == 30
@@ -198,14 +198,14 @@ class TestStockLotListView:
         services.receive_stock(variant, 50, lot_number="LOT-B")
         response = supplier_client.get(f"/api/v1/inventory/{variant.id}/lots/")
         assert response.status_code == 200
-        lot_numbers = [lot["lot_number"] for lot in response.json()]
+        lot_numbers = [lot["lot_number"] for lot in response.json()["results"]]
         assert "LOT-A" in lot_numbers
         assert "LOT-B" in lot_numbers
 
     def test_empty_lots(self, supplier_client, variant):
         response = supplier_client.get(f"/api/v1/inventory/{variant.id}/lots/")
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json()["results"] == []
 
     def test_cannot_see_other_supplier_lots(self, supplier_client, second_variant):
         response = supplier_client.get(f"/api/v1/inventory/{second_variant.id}/lots/")

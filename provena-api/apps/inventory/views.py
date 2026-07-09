@@ -141,7 +141,7 @@ class AdjustStockView(APIView):
 
 
 @extend_schema(tags=["Inventory (Supplier)"])
-class StockMovementListView(APIView):
+class StockMovementListView(PaginatedListMixin, APIView):
     permission_classes = [IsApprovedSupplier]
 
     @extend_schema(
@@ -151,11 +151,11 @@ class StockMovementListView(APIView):
     def get(self, request: Request, variant_id) -> Response:
         variant = _own_variant(request, variant_id)
         movements = StockMovement.objects.filter(variant=variant).select_related("performed_by")
-        return Response(StockMovementSerializer(movements, many=True).data)
+        return self.paginate(movements, StockMovementSerializer, request)
 
 
 @extend_schema(tags=["Inventory (Supplier)"])
-class StockLotListView(APIView):
+class StockLotListView(PaginatedListMixin, APIView):
     permission_classes = [IsApprovedSupplier]
 
     @extend_schema(
@@ -165,7 +165,7 @@ class StockLotListView(APIView):
     def get(self, request: Request, variant_id) -> Response:
         variant = _own_variant(request, variant_id)
         lots = StockLot.objects.filter(variant=variant)
-        return Response(StockLotSerializer(lots, many=True).data)
+        return self.paginate(lots, StockLotSerializer, request)
 
 
 @extend_schema(tags=["Admin: Inventory"])

@@ -103,7 +103,7 @@ class TestSupplierDocuments:
         )
         res = supplier_user_client.get(DOCUMENTS_URL)
         assert res.status_code == status.HTTP_200_OK
-        assert len(res.data) == 1
+        assert res.data["count"] == 1
 
     def test_invalid_document_type_returns_400(self, supplier_user_client, pending_supplier):
         res = supplier_user_client.post(
@@ -185,7 +185,7 @@ class TestAdminSupplierViews:
         upload_document(pending_supplier, DocumentType.IDENTITY, "https://example.com/doc.pdf")
         res = admin_client.get(ADMIN_DOCS_URL)
         assert res.status_code == status.HTTP_200_OK
-        assert len(res.data) == 1
+        assert res.data["count"] == 1
 
 
 STRIPE_CONNECT_URL = "/api/v1/suppliers/me/stripe-connect/"

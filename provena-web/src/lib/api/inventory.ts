@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { StockLevel, StockLot, StockMovement } from './types'
+import type { PaginatedResponse, StockLevel, StockLot, StockMovement } from './types'
 
 const BASE = '/inventory'
 
@@ -38,12 +38,12 @@ export async function adjustStock(
   return data
 }
 
-export async function getStockLots(variantId: string): Promise<StockLot[]> {
-  const { data } = await apiClient.get<StockLot[]>(`${BASE}/${variantId}/lots/`)
+export async function getStockLots(variantId: string, page = 1): Promise<PaginatedResponse<StockLot>> {
+  const { data } = await apiClient.get<PaginatedResponse<StockLot>>(`${BASE}/${variantId}/lots/`, { params: { page } })
   return data
 }
 
-export async function getStockMovements(variantId: string): Promise<StockMovement[]> {
-  const { data } = await apiClient.get<StockMovement[]>(`${BASE}/${variantId}/movements/`)
+export async function getStockMovements(variantId: string, page = 1): Promise<PaginatedResponse<StockMovement>> {
+  const { data } = await apiClient.get<PaginatedResponse<StockMovement>>(`${BASE}/${variantId}/movements/`, { params: { page } })
   return data
 }
