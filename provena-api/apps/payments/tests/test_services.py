@@ -109,6 +109,21 @@ class TestHandleRefund:
         with pytest.raises(Payment.DoesNotExist):
             services.handle_refund("pi_nonexistent")
 
+    def test_drains_pending_refund_amount_on_webhook(self, succeeded_payment):
+        from decimal import Decimal
+
+        # Simulate an in-flight refund reservation of £1.
+        succeeded_payment.pending_refund_amount = Decimal("1.00")
+        succeeded_payment.save(update_fields=["pending_refund_amount"])
+        amount_pence = int(succeeded_payment.amount * 100)
+        services.handle_refund(
+            succeeded_payment.stripe_payment_intent_id,
+            amount_refunded_pence=100,
+            charge_amount_pence=amount_pence,
+        )
+        succeeded_payment.refresh_from_db()
+        assert succeeded_payment.pending_refund_amount == Decimal("0.00")
+
 
 class TestHandlePaymentCancelled:
     def test_updates_status(self, payment):
@@ -139,8 +154,8 @@ class TestProcessPayout:
         mock_stripe_services.Transfer.create.return_value = transfer_mock
         return mock_stripe_services
 
-    def test_raises_if_not_pending(self, pending_payout, onboarded_supplier, mock_stripe_transfer):
-        pending_payout.status = PayoutStatus.PROCESSING
+    def test_raises_if_paid(self, pending_payout, onboarded_supplier, mock_stripe_transfer):
+        pending_payout.status = PayoutStatus.PAID
         pending_payout.save(update_fields=["status"])
         with pytest.raises(ValueError, match="status"):
             services.process_payout(pending_payout)
@@ -210,6 +225,17 @@ class TestProcessPayout:
         call_kwargs = mock_stripe_transfer.Transfer.create.call_args[1]
         assert call_kwargs["idempotency_key"] == f"payout-{pending_payout.id}"
 
+    def test_resumes_stale_processing_payout(
+        self, pending_payout, onboarded_supplier, mock_stripe_transfer
+    ):
+        # Simulate process dying after PROCESSING was set but before PAID was saved.
+        pending_payout.status = PayoutStatus.PROCESSING
+        pending_payout.save(update_fields=["status"])
+        services.process_payout(pending_payout)
+        pending_payout.refresh_from_db()
+        assert pending_payout.status == PayoutStatus.PAID
+        mock_stripe_transfer.Transfer.create.assert_called_once()
+
 
 class TestInitiateRefund:
     @pytest.fixture
@@ -256,3 +282,30 @@ class TestInitiateRefund:
         mock_stripe_refund.PaymentIntent.retrieve.return_value.latest_charge = None
         with pytest.raises(ValueError, match="No charge found"):
             services.initiate_refund(succeeded_payment)
+
+    def test_reserves_pending_refund_amount_under_lock(self, succeeded_payment, mock_stripe_refund):
+        from decimal import Decimal
+
+        services.initiate_refund(succeeded_payment, amount=Decimal("1.00"))
+        succeeded_payment.refresh_from_db()
+        assert succeeded_payment.pending_refund_amount == Decimal("1.00")
+
+    def test_concurrent_refunds_blocked_by_reservation(self, succeeded_payment, mock_stripe_refund):
+        from decimal import Decimal
+
+        # First call reserves the full balance.
+        services.initiate_refund(succeeded_payment)
+        succeeded_payment.refresh_from_db()
+        # Second call for any positive amount should now find no balance.
+        with pytest.raises(ValueError, match="exceeds refundable balance"):
+            services.initiate_refund(succeeded_payment, amount=Decimal("0.01"))
+
+    def test_releases_reservation_on_stripe_error(self, succeeded_payment, mock_stripe_refund):
+        from decimal import Decimal
+
+        mock_stripe_refund.StripeError = Exception
+        mock_stripe_refund.Refund.create.side_effect = Exception("stripe down")
+        with pytest.raises(ValueError, match="Stripe refund failed"):
+            services.initiate_refund(succeeded_payment, amount=Decimal("1.00"))
+        succeeded_payment.refresh_from_db()
+        assert succeeded_payment.pending_refund_amount == Decimal("0.00")

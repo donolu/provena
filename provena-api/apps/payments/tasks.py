@@ -22,7 +22,7 @@ def trigger_payout(self, payout_id: str) -> dict:
         logger.error("trigger_payout: payout %s not found", payout_id)
         return {"status": "not_found", "payout_id": payout_id}
 
-    if payout.status != PayoutStatus.PENDING:
+    if payout.status not in (PayoutStatus.PENDING, PayoutStatus.PROCESSING):
         logger.info(
             "trigger_payout: payout %s already in status %s, skipping",
             payout_id,

@@ -88,6 +88,7 @@ def handle_refund(
     payment = Payment.objects.select_for_update().get(
         stripe_payment_intent_id=stripe_payment_intent_id
     )
+    old_refunded = payment.refunded_amount
     if amount_refunded_pence is not None and charge_amount_pence is not None:
         payment.refunded_amount = Decimal(amount_refunded_pence) / 100
         is_full = amount_refunded_pence >= charge_amount_pence
@@ -95,8 +96,14 @@ def handle_refund(
         payment.refunded_amount = payment.amount
         is_full = True
 
+    # Drain pending_refund_amount by the confirmed delta so the available-to-refund
+    # balance stays accurate between initiate_refund() and the next webhook fire.
+    confirmed_delta = payment.refunded_amount - old_refunded
+    payment.pending_refund_amount = max(
+        Decimal("0"), payment.pending_refund_amount - confirmed_delta
+    )
     payment.status = PaymentStatus.REFUNDED if is_full else PaymentStatus.PARTIALLY_REFUNDED
-    payment.save(update_fields=["status", "refunded_amount", "updated_at"])
+    payment.save(update_fields=["status", "refunded_amount", "pending_refund_amount", "updated_at"])
 
     if is_full:
         Payout.objects.filter(
@@ -108,20 +115,25 @@ def handle_refund(
 
 def initiate_refund(payment: Payment, amount: Decimal | None = None) -> Payment:
     """Issue a refund via Stripe. amount=None means full refund."""
-    # Lock the Payment row to serialise concurrent refund calls. Without this,
-    # two requests before the webhook updates refunded_amount could both pass
-    # the max_refundable check and issue duplicate refunds.
+    # Lock the Payment row to serialise concurrent refund calls. We also reserve
+    # the amount in pending_refund_amount while holding the lock so a second
+    # concurrent call (with a different amount) cannot both pass the
+    # max_refundable check before the Stripe webhook updates refunded_amount.
     with transaction.atomic():
         payment = Payment.objects.select_for_update().get(pk=payment.pk)
         if payment.status not in (PaymentStatus.SUCCEEDED, PaymentStatus.PARTIALLY_REFUNDED):
             raise ValueError(f"Cannot refund a payment with status {payment.status}.")
-        max_refundable = payment.amount - payment.refunded_amount
+        max_refundable = payment.amount - payment.refunded_amount - payment.pending_refund_amount
         refund_amount: Decimal = amount if amount is not None else max_refundable
         if refund_amount > max_refundable:
             raise ValueError(
                 f"Refund amount £{refund_amount} exceeds refundable balance £{max_refundable}."
             )
         amount_pence = _to_pence(refund_amount)
+        # Reserve the amount before releasing the lock; prevents a second concurrent
+        # call from treating the same balance as available.
+        payment.pending_refund_amount += refund_amount
+        payment.save(update_fields=["pending_refund_amount", "updated_at"])
 
     # Stripe calls outside the transaction. The idempotency key encodes payment
     # and exact pence amount so retrying the same request returns the cached
@@ -130,13 +142,29 @@ def initiate_refund(payment: Payment, amount: Decimal | None = None) -> Payment:
     intent = stripe.PaymentIntent.retrieve(payment.stripe_payment_intent_id)
     charge_id = getattr(intent, "latest_charge", None)
     if not charge_id:
+        with transaction.atomic():
+            payment = Payment.objects.select_for_update().get(pk=payment.pk)
+            payment.pending_refund_amount = max(
+                Decimal("0"), payment.pending_refund_amount - refund_amount
+            )
+            payment.save(update_fields=["pending_refund_amount", "updated_at"])
         raise ValueError("No charge found on this PaymentIntent.")
 
-    stripe.Refund.create(
-        charge=charge_id,
-        amount=amount_pence,
-        idempotency_key=f"refund-{payment.id}-{amount_pence}",
-    )
+    try:
+        stripe.Refund.create(
+            charge=charge_id,
+            amount=amount_pence,
+            idempotency_key=f"refund-{payment.id}-{amount_pence}",
+        )
+    except stripe.StripeError as exc:
+        with transaction.atomic():
+            payment = Payment.objects.select_for_update().get(pk=payment.pk)
+            payment.pending_refund_amount = max(
+                Decimal("0"), payment.pending_refund_amount - refund_amount
+            )
+            payment.save(update_fields=["pending_refund_amount", "updated_at"])
+        raise ValueError(f"Stripe refund failed: {exc}") from exc
+
     logger.info("Stripe refund initiated for payment %s (amount=%s)", payment.id, refund_amount)
     return payment
 
@@ -180,12 +208,16 @@ def _create_payouts(payment: Payment) -> None:
 def process_payout(payout: Payout) -> Payout:
     # Lock the Payout row and transition to PROCESSING atomically. A concurrent
     # caller will re-read PROCESSING here and raise, preventing double-transfers.
+    # A stale PROCESSING payout (process died after Transfer.create but before PAID
+    # was saved) falls through so Transfer.create is retried — the idempotency key
+    # returns the existing Stripe transfer rather than creating a second one.
     with transaction.atomic():
         payout = Payout.objects.select_for_update().get(pk=payout.pk)
-        if payout.status != PayoutStatus.PENDING:
+        if payout.status == PayoutStatus.PENDING:
+            payout.status = PayoutStatus.PROCESSING
+            payout.save(update_fields=["status", "updated_at"])
+        elif payout.status != PayoutStatus.PROCESSING:
             raise ValueError(f"Cannot process a payout with status {payout.status}.")
-        payout.status = PayoutStatus.PROCESSING
-        payout.save(update_fields=["status", "updated_at"])
 
     supplier = payout.supplier
     if not supplier.stripe_account_id or not supplier.stripe_onboarding_complete:

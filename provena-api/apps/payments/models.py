@@ -31,6 +31,7 @@ class Payment(models.Model):
         max_length=14, choices=PaymentStatus.choices, default=PaymentStatus.PENDING
     )
     refunded_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    pending_refund_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
