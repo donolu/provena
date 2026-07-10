@@ -1355,6 +1355,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orders/ws-ticket/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a short-lived WebSocket ticket
+         * @description Returns a one-time token valid for 30 seconds. Pass it as `?ticket=<token>` on the WebSocket handshake to avoid placing the JWT access token in the URL.
+         */
+        post: operations["orders_ws_ticket_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orders/supplier/": {
         parameters: {
             query?: never;
@@ -6164,6 +6184,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaginatedStockLotList"];
+                };
+            };
+        };
+    };
+    orders_ws_ticket_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ticket?: string;
+                    };
                 };
             };
         };
