@@ -5,7 +5,7 @@ from channels.middleware import BaseMiddleware
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 
-from .views import WS_TICKET_PREFIX
+from .views import WS_TICKET_PREFIX, WS_TICKET_TTL
 
 
 @database_sync_to_async
@@ -28,6 +28,8 @@ class JwtAuthMiddleware(BaseMiddleware):
             key = f"{WS_TICKET_PREFIX}{ticket_list[0]}"
             user_id = cache.get(key)
             if user_id:
-                cache.delete(key)
-                scope["user"] = await _get_user(user_id)
+                claimed = cache.add(f"{key}:claimed", "1", timeout=WS_TICKET_TTL)
+                if claimed:
+                    cache.delete(key)
+                    scope["user"] = await _get_user(user_id)
         return await super().__call__(scope, receive, send)
