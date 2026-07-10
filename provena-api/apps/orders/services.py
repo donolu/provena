@@ -41,6 +41,25 @@ def _sync_order_status(order: Order) -> None:
         return
     order.status = new_status
     order.save(update_fields=["status", "updated_at"])
+    _push_order_status(order.reference, new_status)
+
+
+def _push_order_status(reference: str, status: str) -> None:
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+
+        from .consumers import _order_group
+
+        layer = get_channel_layer()
+        if layer is None:
+            return
+        async_to_sync(layer.group_send)(
+            _order_group(reference),
+            {"type": "order.status", "status": status},
+        )
+    except Exception:
+        logger.exception("Failed to push order status via WebSocket")
 
 
 def _consume_cart_reservation(buyer, variant: ProductVariant, quantity: int) -> bool:
