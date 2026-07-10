@@ -59,15 +59,20 @@ def _dump_to_gzip(path: str) -> None:
     ]
     env = {**os.environ, "PGPASSWORD": str(db.get("PASSWORD") or "")}
 
-    with subprocess.Popen(  # noqa: S603  # nosec B603 - fixed argv, no shell, inputs from settings
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env
-    ) as proc:
-        assert proc.stdout is not None
-        with gzip.open(path, "wb") as gz:
-            shutil.copyfileobj(proc.stdout, gz)
-        _, stderr = proc.communicate()
-    if proc.returncode != 0:
-        raise RuntimeError(f"pg_dump failed ({proc.returncode}): {stderr.decode(errors='replace')}")
+    # stderr goes to an unbounded temp file, not a pipe: draining only stdout
+    # while pg_dump blocks writing to a full stderr pipe would deadlock.
+    with tempfile.TemporaryFile() as errfile:
+        with subprocess.Popen(  # noqa: S603  # nosec B603 - fixed argv, no shell, inputs from settings
+            cmd, stdout=subprocess.PIPE, stderr=errfile, env=env
+        ) as proc:
+            assert proc.stdout is not None
+            with gzip.open(path, "wb") as gz:
+                shutil.copyfileobj(proc.stdout, gz)
+        # Popen.__exit__ has waited, so returncode is set.
+        if proc.returncode != 0:
+            errfile.seek(0)
+            message = errfile.read().decode(errors="replace")
+            raise RuntimeError(f"pg_dump failed ({proc.returncode}): {message}")
 
 
 def create_backup() -> str:
@@ -91,18 +96,22 @@ def prune_old_backups() -> int:
     """Delete backups older than the retention window. Returns the number deleted."""
     retention_days = int(getattr(settings, "DB_BACKUP_RETENTION_DAYS", 30))
     prefix = getattr(settings, "DB_BACKUP_PREFIX", "backups/")
+    # Only ever touch backups this job created, not other archives that might
+    # share the prefix.
+    key_prefix = f"{prefix}{KEY_PREFIX}"
     bucket = _bucket()
     cutoff = timezone.now() - timedelta(days=retention_days)
 
     client = _s3_client()
     stale: list[dict[str, str]] = []
     paginator = client.get_paginator("list_objects_v2")
-    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+    for page in paginator.paginate(Bucket=bucket, Prefix=key_prefix):
         for obj in page.get("Contents", []):
-            if not obj["Key"].endswith(KEY_SUFFIX):
+            key = obj["Key"]
+            if not (key.startswith(key_prefix) and key.endswith(KEY_SUFFIX)):
                 continue
             if obj["LastModified"] < cutoff:
-                stale.append({"Key": obj["Key"]})
+                stale.append({"Key": key})
 
     for i in range(0, len(stale), 1000):
         client.delete_objects(Bucket=bucket, Delete={"Objects": stale[i : i + 1000]})

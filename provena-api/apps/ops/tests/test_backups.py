@@ -75,6 +75,8 @@ class TestPruneOldBackups:
                     {"Key": "backups/provena-old.sql.gz", "LastModified": old},
                     {"Key": "backups/provena-recent.sql.gz", "LastModified": recent},
                     {"Key": "backups/notes.txt", "LastModified": old},  # ignored: wrong suffix
+                    # ignored: not one of our backups despite the .sql.gz suffix
+                    {"Key": "backups/other-archive.sql.gz", "LastModified": old},
                 ]
             )
         ]
@@ -105,7 +107,6 @@ class TestDumpToGzip:
     def test_writes_gzipped_dump_and_builds_pg_dump_command(self, mock_popen, tmp_path):
         proc = MagicMock()
         proc.stdout = io.BytesIO(b"-- pg dump output")
-        proc.communicate.return_value = (b"", b"")
         proc.returncode = 0
         mock_popen.return_value.__enter__.return_value = proc
 
@@ -122,7 +123,6 @@ class TestDumpToGzip:
     def test_raises_on_nonzero_exit(self, mock_popen, tmp_path):
         proc = MagicMock()
         proc.stdout = io.BytesIO(b"")
-        proc.communicate.return_value = (b"", b"connection refused")
         proc.returncode = 1
         mock_popen.return_value.__enter__.return_value = proc
 
