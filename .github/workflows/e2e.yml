@@ -57,7 +57,7 @@ jobs:
       # these are not secrets; they mirror the defaults of seed_e2e_data.
       DJANGO_SECRET_KEY: e2e-ci-secret-key
       DB_PASSWORD: provena
-      E2E_BASE_URL: http://localhost:3000
+      E2E_BASE_URL: http://localhost
       E2E_BUYER_EMAIL: e2e-buyer@provena.test
       E2E_BUYER_PASSWORD: E2ePassw0rd!
       E2E_SUPPLIER_EMAIL: e2e-supplier@provena.test
@@ -88,9 +88,9 @@ jobs:
         working-directory: provena-web
 
       - name: Build and start the stack
-        run: docker compose up -d --build db redis api web
+        run: docker compose up -d --build db redis api web nginx
 
-      - name: Wait for the API and web to be ready
+      - name: Wait for the stack to be ready
         run: |
           wait_for() {
             local url="$1"
@@ -104,9 +104,9 @@ jobs:
             done
             echo "  timed out waiting for $url (last: $code)"; return 1
           }
-          # Django up + database reachable, then the production web server.
-          wait_for "http://localhost:8000/api/v1/health/"
-          wait_for "http://localhost:3000/catalogue"
+          # Everything is reached through the Nginx origin, as in production.
+          wait_for "http://localhost/api/v1/health/"
+          wait_for "http://localhost/catalogue"
 
       - name: Apply migrations
         run: docker compose exec -T api python manage.py migrate --noinput

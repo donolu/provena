@@ -1,10 +1,11 @@
 # E2E overrides: a production web build (next start, no on-demand route
-# compilation) for deterministic Playwright runs, paired with the API on
-# permissive development settings (CORS for :3000, no HTTPS redirect).
+# compilation) for deterministic Playwright runs, driven through the Nginx
+# origin (single origin, same as production) with the API on permissive
+# development settings behind it (no CORS, no HTTPS redirect).
 #
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.e2e.yml \
-#     up -d --build db redis api web
+#     up -d --build db redis api web nginx
 services:
 
   db:
@@ -35,8 +36,7 @@ services:
       context: ./provena-web
       target: runner
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:8000
+        # Browser talks to the API through the Nginx origin, as in production.
+        NEXT_PUBLIC_API_URL: http://localhost
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-    ports:
-      - "3000:3000"
+      NEXT_PUBLIC_API_URL: http://localhost
