@@ -696,7 +696,7 @@ class DataExportDownloadView(APIView):
             400: OpenApiResponse(description="Invalid, expired, or already used token"),
         },
     )
-    def get(self, request: Request):  # type: ignore[override]
+    def get(self, request: Request):
         import hashlib
         import json
 
