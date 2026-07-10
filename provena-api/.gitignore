@@ -13,6 +13,7 @@ build/
 *.egg
 venv/
 .venv/
+.venv*/
 
 # Django
 *.sqlite3
