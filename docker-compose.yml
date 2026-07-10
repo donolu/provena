@@ -50,7 +50,8 @@ services:
     build:
       context: ./provena-api
       target: production
-    command: celery -A config.celery worker --loglevel=info --concurrency=4
+    # -E emits task events so celery-exporter can expose task metrics.
+    command: celery -A config.celery worker --loglevel=info --concurrency=4 -E
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.production
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
