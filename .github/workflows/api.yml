@@ -160,12 +160,10 @@ jobs:
           PYEOF
 
   generate-client:
-    name: Generate OpenAPI client
+    name: Verify OpenAPI types
     needs: [changes, test]
     if: needs.changes.outputs.client == 'true'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     env:
       DJANGO_SETTINGS_MODULE: config.settings.development
       DJANGO_SECRET_KEY: ci-schema-key
@@ -176,11 +174,6 @@ jobs:
       STRIPE_WEBHOOK_SECRET: whsec_placeholder
     steps:
       - uses: actions/checkout@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # Check out the actual PR branch so we can push back to it.
-          # For push events head_ref is empty; ref defaults to the pushed branch.
-          ref: ${{ github.head_ref || github.ref }}
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -202,13 +195,20 @@ jobs:
       - name: Generate TypeScript types
         run: npm run generate:types
         working-directory: provena-web
-      - name: Commit updated types
+      # Verify the committed types match the schema, rather than auto-committing
+      # them from CI. A bot push with GITHUB_TOKEN cannot re-trigger the required
+      # checks (anti-recursion), so an auto-commit would move the PR head to a
+      # commit whose checks never ran and block the PR (#104). Instead, fail here
+      # and have the author regenerate locally and commit.
+      - name: Verify generated types are up to date
         working-directory: .
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add provena-web/src/lib/api/generated/
-          git diff --staged --quiet || (git commit -m "chore: regenerate OpenAPI types [skip ci]" && git push)
+          if ! git diff --quiet provena-web/src/lib/api/generated/; then
+            echo "::error::OpenAPI types are out of date. Run 'npm run generate:types' in provena-web/ and commit the result."
+            git diff --stat provena-web/src/lib/api/generated/
+            exit 1
+          fi
+          echo "OpenAPI types are up to date."
 
   api-ci:
     name: API CI

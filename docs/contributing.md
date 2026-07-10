@@ -216,7 +216,7 @@ pytest apps/orders/tests/test_services.py::TestDeliverSubOrder::test_payout_trig
    npm run generate:types
    ```
 
-   This regenerates `provena-web/src/lib/api/generated/schema.d.ts`. Commit it alongside your API changes. The `Generate OpenAPI client` CI job will fail on your PR if you forget — it exports the schema from your branch and checks whether the committed `schema.d.ts` matches.
+   This regenerates `provena-web/src/lib/api/generated/schema.d.ts`. Commit it alongside your API changes. The `Verify OpenAPI types` CI job will fail on your PR if you forget — it exports the schema from your branch and checks whether the committed `schema.d.ts` matches.
 
 The OpenAPI schema (`/api/schema/`) is auto-generated from the views by `drf-spectacular`. Add `@extend_schema` decorators to views for richer schema output.
 
