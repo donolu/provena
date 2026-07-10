@@ -22,11 +22,10 @@ test.describe('Admin supplier approval', () => {
   test('admin suppliers list loads', async ({ page }) => {
     await page.goto('/admin/suppliers')
     await expect(page.locator('h1, h2')).toContainText(/supplier/i)
-    // Table or empty state
-    const table = page.locator('table')
-    const empty = page.locator('text=/no suppliers/i')
-    const found = (await table.count()) > 0 || (await empty.count()) > 0
-    expect(found).toBe(true)
+    // Wait for the async load to settle into a table or an empty state.
+    await expect(
+      page.locator('table').or(page.getByText(/no suppliers/i)).first()
+    ).toBeVisible()
   })
 
   test('admin can open a pending supplier and see approve/reject buttons', async ({ page }) => {
@@ -61,10 +60,9 @@ test.describe('Admin supplier approval', () => {
   test('admin audit log page loads', async ({ page }) => {
     await page.goto('/admin/audit-log')
     await expect(page.locator('h1')).toContainText(/audit/i)
-    // Either a table or empty state
-    const table = page.locator('table')
-    const empty = page.locator('text=/no audit entries/i')
-    const found = (await table.count()) > 0 || (await empty.count()) > 0
-    expect(found).toBe(true)
+    // Wait for the async load to settle into a table or an empty state.
+    await expect(
+      page.locator('table').or(page.getByText(/no audit entries/i)).first()
+    ).toBeVisible()
   })
 })

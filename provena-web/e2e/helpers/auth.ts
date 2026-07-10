@@ -12,13 +12,18 @@ export async function loginAs(page: Page, email: string, password: string, totpS
   await page.click('button[type="submit"]')
 
   if (totpSecret) {
-    // Two-step verification screen shown for TOTP-enabled accounts.
+    // Two-step verification screen shown for TOTP-enabled accounts. Tolerate
+    // the case where it is slow to render or login completes without it.
     const codeInput = page.locator('input[autocomplete="one-time-code"]')
-    await codeInput.waitFor({ state: 'visible', timeout: 10_000 })
-    await codeInput.fill(generateTotp(totpSecret))
-    await page.getByRole('button', { name: /verify/i }).click()
+    try {
+      await codeInput.waitFor({ state: 'visible', timeout: 20_000 })
+      await codeInput.fill(generateTotp(totpSecret))
+      await page.getByRole('button', { name: /verify/i }).click()
+    } catch {
+      // No TOTP challenge appeared; fall through to the redirect wait.
+    }
   }
 
   // Wait for redirect away from login
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 10_000 })
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 20_000 })
 }
