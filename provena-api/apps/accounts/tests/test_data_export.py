@@ -167,6 +167,21 @@ class TestGenerateDataExportTask:
         export.refresh_from_db()
         assert export.status == DataExportStatus.FAILED
 
+    def test_task_clears_payload_on_email_failure(self, buyer):
+        export = DataExportRequest.objects.create(user=buyer)
+        with patch(
+            "apps.accounts.tasks.send_data_export_ready_email",
+            side_effect=RuntimeError("smtp down"),
+        ):
+            with pytest.raises(RuntimeError):
+                generate_data_export(str(export.id))
+
+        export.refresh_from_db()
+        assert export.status == DataExportStatus.FAILED
+        assert export.payload is None
+        assert export.token_hash == ""
+        assert export.expires_at is None
+
     def test_task_noop_for_missing_export(self):
         generate_data_export("00000000-0000-0000-0000-000000000000")
 

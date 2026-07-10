@@ -38,7 +38,10 @@ def generate_data_export(export_id: str) -> None:
 
     except Exception:
         export.status = DataExportStatus.FAILED
-        export.save(update_fields=["status"])
+        export.payload = None
+        export.token_hash = ""  # nosec B105
+        export.expires_at = None
+        export.save(update_fields=["status", "payload", "token_hash", "expires_at"])
         raise
 
 

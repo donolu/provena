@@ -657,17 +657,20 @@ class DataExportRequestView(APIView):
     def post(self, request: Request) -> Response:
         from datetime import timedelta
 
+        from django.db import transaction
         from django.utils import timezone
 
-        user = cast(User, request.user)
+        requesting_user = cast(User, request.user)
         cutoff = timezone.now() - timedelta(days=DataExportRequest.RATE_LIMIT_DAYS)
-        if DataExportRequest.objects.filter(user=user, requested_at__gte=cutoff).exists():
-            return Response(
-                {"detail": "A data export was already requested in the last 30 days."},
-                status=status.HTTP_429_TOO_MANY_REQUESTS,
-            )
 
-        export = DataExportRequest.objects.create(user=user)
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=requesting_user.pk)
+            if DataExportRequest.objects.filter(user=user, requested_at__gte=cutoff).exists():
+                return Response(
+                    {"detail": "A data export was already requested in the last 30 days."},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+            export = DataExportRequest.objects.create(user=user)
 
         generate_data_export.delay(str(export.id))
 
