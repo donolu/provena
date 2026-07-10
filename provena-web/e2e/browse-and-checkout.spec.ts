@@ -24,7 +24,21 @@ test.describe('Browse and checkout', () => {
     await cards.first().getByRole('link').first().click()
     await page.waitForURL(/\/catalogue\/[^/]+$/)
     await expect(page.locator('h1')).toBeVisible()
-    await expect(page.getByRole('button', { name: /add to cart/i })).toBeVisible()
+    // The related-products grid also renders "Add to cart" buttons, so target
+    // the main product's (first in the DOM).
+    await expect(page.getByRole('button', { name: /add to cart/i }).first()).toBeVisible()
+  })
+
+  test('product detail shows a related-products grid', async ({ page }) => {
+    await page.goto('/catalogue')
+    const cards = page.locator('[data-testid="product-card"]')
+    await expect(cards.first()).toBeVisible({ timeout: 15_000 })
+    await cards.first().getByRole('link').first().click()
+    await page.waitForURL(/\/catalogue\/[^/]+$/)
+    // "You might also like" loads client-side from the related endpoint.
+    const related = page.locator('section', { hasText: /you might also like/i })
+    await expect(related.getByRole('heading', { name: /you might also like/i })).toBeVisible()
+    await expect(related.locator('[data-testid="product-card"]').first()).toBeVisible()
   })
 
   test('logged-in buyer can add to cart and reach checkout', async ({ page }) => {
@@ -45,7 +59,8 @@ test.describe('Browse and checkout', () => {
     await cards.first().getByRole('link').first().click()
     await page.waitForURL(/\/catalogue\/[^/]+$/)
 
-    const addBtn = page.getByRole('button', { name: /add to cart/i })
+    // Main product button (the related grid also has "Add to cart" buttons).
+    const addBtn = page.getByRole('button', { name: /add to cart/i }).first()
     await expect(addBtn).toBeVisible()
     await addBtn.click()
 

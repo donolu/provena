@@ -7,7 +7,8 @@ import { ChevronLeft, Heart, ShoppingBasket, Star } from 'lucide-react'
 import Link from 'next/link'
 import { Nav } from '@/components/nav'
 import { CartDrawer } from '@/components/cart-drawer'
-import { getProduct, getProductReviews, submitReview } from '@/lib/api/catalogue'
+import { getProduct, getProductReviews, getRelatedProducts, submitReview } from '@/lib/api/catalogue'
+import { ProductCard } from '@/components/product-card'
 import { getCart, addToCart, updateCartItem, removeCartItem as deleteCartItem, getWishlist, addToWishlist, removeFromWishlist } from '@/lib/api/cart'
 import { useAuthStore } from '@/store/auth'
 import type { ProductVariant } from '@/lib/api/types'
@@ -123,6 +124,33 @@ export default function ProductDetailPage({
     mutationFn: async () => {
       if (wishlistItemForVariant) await removeFromWishlist(wishlistItemForVariant.id)
       else await addToWishlist(activeVariant!.id)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['wishlist'] }),
+  })
+
+  // "You might also like"
+  const { data: related = [] } = useQuery({
+    queryKey: ['related', slug],
+    queryFn: () => getRelatedProducts(slug),
+  })
+
+  const relatedInWishlist = (variantId: string) => wishlist.some((w) => w.variant === variantId)
+
+  const relatedAddToCartMutation = useMutation<void, Error, string>({
+    mutationFn: async (variantId) => {
+      await addToCart(variantId, 1)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cart'] })
+      setCartOpen(true)
+    },
+  })
+
+  const relatedWishlistMutation = useMutation<void, Error, string>({
+    mutationFn: async (variantId) => {
+      const existing = wishlist.find((w) => w.variant === variantId)
+      if (existing) await removeFromWishlist(existing.id)
+      else await addToWishlist(variantId)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['wishlist'] }),
   })
@@ -494,6 +522,23 @@ export default function ProductDetailPage({
             </p>
           )}
         </div>
+
+        {related.length > 0 && (
+          <section className="mt-16 border-t border-hoarfrost pt-10">
+            <h2 className="font-display italic text-xl text-forest mb-6">You might also like</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {related.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  inWishlist={p.variants[0] ? relatedInWishlist(p.variants[0].id) : false}
+                  onAddToCart={(variantId) => relatedAddToCartMutation.mutate(variantId)}
+                  onToggleWishlist={(variantId) => relatedWishlistMutation.mutate(variantId)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       <CartDrawer
