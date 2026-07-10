@@ -140,3 +140,35 @@ Provena is a multi-supplier marketplace where a single buyer order may involve s
 
 **Consequences:**
 The bidirectional model requires the dispute type taxonomy to cover both buyer and supplier grievances, adding some UI and API complexity compared to a buyer-only flow. The category-scoped window requires `dispute_window_days` to be set correctly when new categories are created; an omission (defaulting to 3 days) is a safe fallback rather than a breaking state. The manual refund step adds latency for buyers waiting on a refund decision; this is an acceptable trade-off at launch volumes and will be revisited when Stripe Connect is implemented. The payout hold approach assumes disputes are typically raised before payout; if payout cycles become very short (e.g. daily), the clawback path will be exercised more frequently and may need its own tooling.
+
+---
+
+## ADR-009: End-to-End Testing with Playwright against the Docker Compose Stack
+
+**Date:** 2026-07-10
+**Status:** Proposed
+
+**Context:**
+Provena's automated tests currently sit at two levels: the API suite (`pytest`, run in `api.yml`) exercises Django in isolation, and the web suite (`vitest`, run in `web.yml`) exercises React components and units with the network layer mocked. Both are fast and valuable, but by construction each mocks the other side of the HTTP boundary. The defects that survive both are integration defects that live at the seams between the two stacks:
+
+- **Authentication flow.** Login returns a short-lived access token in the body and a rotating refresh token in an HttpOnly cookie (`provena_rt`); the frontend refreshes silently against `/api/v1/auth/refresh/`. A regression in cookie attributes, CORS, or the Nginx proxy can break real sessions while every unit test still passes.
+- **Contract drift.** The frontend consumes a TypeScript client generated from the API's OpenAPI schema (ADR-007, `generate-client` job). A schema change that is not regenerated, or a field rename, is invisible to unit tests on either side but breaks the running app.
+- **Reverse-proxy routing.** Nginx routes `/api/` to Django and everything else to Next.js. Path, header, and SSR/ISR behaviour is only exercised when the whole stack runs together.
+- **Payment and multi-actor journeys.** Checkout, supplier dispatch, and admin approval span several services and roles end to end.
+
+Playwright specs for the three critical journeys already exist in `provena-web/e2e/` (browse-and-checkout, supplier-order-management, admin-supplier-approval) with a shared auth helper. They do **not** run in CI: `playwright.config.ts` sets no `webServer` under CI, and each spec calls `test.skip` when its `E2E_{ADMIN,BUYER,SUPPLIER}_EMAIL/PASSWORD` credentials are unset. The result is E2E test code that never executes, which gives false confidence and will bit-rot. Issue #20 tracks closing this gap.
+
+**Decision:**
+
+**Run Playwright against the full Docker Compose stack in a dedicated `e2e.yml` workflow.** The workflow brings up the same `docker-compose.yml` + `docker-compose.dev.yml` stack used for local development (Nginx, PostgreSQL, Redis, Django, Celery worker, Next.js), waits on the API health check, runs `npm run test:e2e` against the Nginx entrypoint via `E2E_BASE_URL`, and tears the stack down. Running against real Compose, rather than a mocked backend or a bespoke lightweight harness, is the whole point: it exercises the production-parity seams above. A mocked backend was rejected because it reintroduces the blind spot E2E exists to cover; a bespoke harness was rejected because it would drift from how the app is actually deployed.
+
+**Seed a deterministic fixture and supply role credentials.** A management command seeds a buyer, supplier, and admin account plus a minimal catalogue, and the three `E2E_*_EMAIL/PASSWORD` pairs are provided as CI secrets so the existing `test.skip` guards deactivate and the specs actually run. This keeps the tests self-contained and repeatable rather than dependent on ambient data.
+
+**Gate to pull requests into `main`, not every push.** The stack boot plus browser run is slow and resource-heavy relative to the unit suites, so it runs on `pull_request` to `main` and `workflow_dispatch`, not on every branch push. The existing CI config is retained: `retries: 2`, `workers: 1`, `trace: 'on-first-retry'`, `screenshot: 'only-on-failure'`, and the `github` reporter. Traces and screenshots are uploaded as workflow artefacts so failures are debuggable without reproduction.
+
+**Introduce as a non-blocking check first, then promote to required.** The job runs informationally at first to gather flake data against the branch-protection model (which treats each job as an individual required check). Once stable it is added to the required checks on `main`. This avoids a flaky new gate blocking unrelated work on day one.
+
+**Keep E2E at the top of the pyramid.** E2E complements, and does not replace, the unit and API suites. Coverage is deliberately limited to a small set of high-value journeys; broad behaviour stays in the faster lower layers.
+
+**Consequences:**
+PR CI gains several minutes of wall-clock time on changes that touch the app, since the Compose stack must boot before tests run. A seed fixture and its teardown must be maintained, and CI secrets for the seeded accounts must be managed. Because E2E is tied to Compose, drift in the Compose definition surfaces early as an E2E failure, which is desirable. Playwright is inherently more flake-prone than unit tests; the retry, trace, and artefact settings mitigate this, and the staged non-blocking-then-required rollout limits disruption while confidence is established. The alternative of leaving the specs skipped was rejected: unexecuted tests are worse than no tests because they imply coverage that does not exist.
