@@ -1,0 +1,139 @@
+name: E2E CI
+
+# End-to-end Playwright suite against the Docker Compose stack (ADR-009).
+# Heavy, so it runs only on PRs into main and on manual dispatch. It is
+# intentionally NOT in the required status checks during initial rollout:
+# it reports pass/fail for visibility but does not block merges until it has
+# proven stable, at which point it is promoted to a required check.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or SHA to run against"
+        required: false
+        default: ""
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: check
+        run: |
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          base="${{ github.event.pull_request.base.sha }}"
+          changed=$(git diff --name-only "$base" "${{ github.sha }}")
+          # Docs- and config-only changes do not affect the running app.
+          code=$(printf '%s\n' "$changed" \
+            | grep -E '^(provena-api/|provena-web/|nginx/|docker-compose)' \
+            | grep -vE '(^|/)\.gitignore$|\.md$|^provena-api/docs/' || true)
+          if [[ -n "$code" ]] || printf '%s\n' "$changed" | grep -qE '^\.github/workflows/e2e\.yml$'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  e2e:
+    name: Playwright E2E
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    env:
+      # Production web build (next start) + permissive dev API, for a fast and
+      # deterministic run. COMPOSE_FILE makes every `docker compose` call below
+      # pick up the E2E override automatically.
+      COMPOSE_FILE: docker-compose.yml:docker-compose.e2e.yml
+      # Deterministic test credentials. The stack is an ephemeral throwaway, so
+      # these are not secrets; they mirror the defaults of seed_e2e_data.
+      DJANGO_SECRET_KEY: e2e-ci-secret-key
+      DB_PASSWORD: provena
+      E2E_BASE_URL: http://localhost:3000
+      E2E_BUYER_EMAIL: e2e-buyer@provena.test
+      E2E_BUYER_PASSWORD: E2ePassw0rd!
+      E2E_SUPPLIER_EMAIL: e2e-supplier@provena.test
+      E2E_SUPPLIER_PASSWORD: E2ePassw0rd!
+      E2E_SUPPLIER_TOTP_SECRET: JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP
+      E2E_ADMIN_EMAIL: e2e-admin@provena.test
+      E2E_ADMIN_PASSWORD: E2ePassw0rd!
+      E2E_ADMIN_TOTP_SECRET: KRSXG5CTMVRXEZLUKRSXG5CTMVRXEZLU
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.ref || github.head_ref || github.ref }}
+
+      # Playwright itself runs on the runner (the web container only serves the
+      # app), so install the runner's web dependencies and browser here.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: provena-web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: provena-web
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+        working-directory: provena-web
+
+      - name: Build and start the stack
+        run: docker compose up -d --build db redis api web
+
+      - name: Wait for the API and web to be ready
+        run: |
+          wait_for() {
+            local url="$1"
+            echo "Waiting for $url ..."
+            for i in $(seq 1 60); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)
+              if [[ "$code" =~ ^(200|301|302)$ ]]; then
+                echo "  ready ($code)"; return 0
+              fi
+              sleep 3
+            done
+            echo "  timed out waiting for $url (last: $code)"; return 1
+          }
+          # Django up + database reachable, then the production web server.
+          wait_for "http://localhost:8000/api/v1/health/"
+          wait_for "http://localhost:3000/catalogue"
+
+      - name: Apply migrations
+        run: docker compose exec -T api python manage.py migrate --noinput
+
+      - name: Seed E2E data
+        run: docker compose exec -T api python manage.py seed_e2e_data --password "$E2E_BUYER_PASSWORD"
+
+      - name: Run Playwright tests
+        run: npm run test:e2e
+        working-directory: provena-web
+
+      - name: Collect stack logs on failure
+        if: failure()
+        run: docker compose logs --no-color > docker-compose.log || true
+
+      - name: Upload report, traces, and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            provena-web/playwright-report/
+            provena-web/test-results/
+            docker-compose.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

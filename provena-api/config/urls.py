@@ -2,7 +2,10 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
+from .health import health_check
+
 api_v1 = [
+    path("health/", health_check, name="health"),
     path("auth/", include("apps.accounts.urls")),
     path("suppliers/", include("apps.suppliers.urls")),
     path("catalogue/", include("apps.catalogue.urls")),
