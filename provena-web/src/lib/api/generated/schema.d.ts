@@ -415,6 +415,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/me/export/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a personal data export (GDPR Article 20)
+         * @description Queues an export of all personal data held for the authenticated user. A download link valid for 24 hours is emailed on completion. Limited to one request per 30 days.
+         */
+        post: operations["auth_me_export_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me/export/download/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a completed data export
+         * @description Returns the personal data archive as a JSON file. Requires the one-time token emailed on export completion. Token expires after 24 hours.
+         */
+        get: operations["auth_me_export_download_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/admin/exports/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all data export requests
+         * @description Adds a paginate() helper to raw APIView subclasses.
+         *
+         *     Usage:
+         *         class MyListView(PaginatedListMixin, APIView):
+         *             def get(self, request):
+         *                 qs = MyModel.objects.all()
+         *                 return self.paginate(qs, MySerializer, request)
+         */
+        get: operations["auth_admin_exports_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/suppliers/": {
         parameters: {
             query?: never;
@@ -4481,6 +4547,86 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    auth_me_export_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description Export already requested in the last 30 days */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_me_export_download_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Invalid, expired, or already used token */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_admin_exports_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id?: string;
+                        user_email?: string;
+                        status?: string;
+                        requested_at?: string;
+                        completed_at?: string;
+                        expires_at?: string;
+                    }[];
+                };
             };
         };
     };
