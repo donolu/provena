@@ -38,7 +38,14 @@ jobs:
             echo "web=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if git diff --name-only "$base" "${{ github.sha }}" | grep -qE '^(provena-web/|\.github/workflows/web\.yml$)'; then
+          changed=$(git diff --name-only "$base" "${{ github.sha }}")
+          # Changes under provena-web/ that can actually affect a build or test.
+          # Docs- and config-only files are ignored so they don't trigger the
+          # Next.js lint/test suite.
+          web_code=$(printf '%s\n' "$changed" \
+            | grep -E '^provena-web/' \
+            | grep -vE '(^|/)\.gitignore$|\.md$' || true)
+          if [[ -n "$web_code" ]] || printf '%s\n' "$changed" | grep -qE '^\.github/workflows/web\.yml$'; then
             echo "web=true" >> "$GITHUB_OUTPUT"
           else
             echo "web=false" >> "$GITHUB_OUTPUT"

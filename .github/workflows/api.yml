@@ -41,12 +41,20 @@ jobs:
             exit 0
           fi
           changed=$(git diff --name-only "$base" "${{ github.sha }}")
-          if echo "$changed" | grep -qE '^(provena-api/|\.github/workflows/api\.yml$)'; then
+          # Changes under provena-api/ that can actually affect a build, test, or
+          # runtime output. Docs- and config-only files are ignored so they don't
+          # trigger the Django lint/test suite.
+          api_code=$(printf '%s\n' "$changed" \
+            | grep -E '^provena-api/' \
+            | grep -vE '(^|/)\.gitignore$|\.md$|^provena-api/docs/' || true)
+          if [[ -n "$api_code" ]] || printf '%s\n' "$changed" | grep -qE '^\.github/workflows/api\.yml$'; then
             echo "api=true" >> "$GITHUB_OUTPUT"
           else
             echo "api=false" >> "$GITHUB_OUTPUT"
           fi
-          if echo "$changed" | grep -qE '^(provena-api/|provena-web/package\.json$|provena-web/package-lock\.json$|\.github/workflows/api\.yml$)'; then
+          # Regenerate the OpenAPI client when API code changes (schema may shift)
+          # or when the web package manifests change.
+          if [[ -n "$api_code" ]] || printf '%s\n' "$changed" | grep -qE '^(provena-web/package\.json$|provena-web/package-lock\.json$|\.github/workflows/api\.yml$)'; then
             echo "client=true" >> "$GITHUB_OUTPUT"
           else
             echo "client=false" >> "$GITHUB_OUTPUT"
