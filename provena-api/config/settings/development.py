@@ -6,7 +6,9 @@ env = environ.Env()
 
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+# "api" is the Docker service name, so in-network scrapers (Prometheus hitting
+# api:8000/metrics) and other services pass the Host check.
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "api"]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",

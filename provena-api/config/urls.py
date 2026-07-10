@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.urls import include, path
+from django_prometheus.exports import ExportToDjangoView
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
 from .health import health_check
@@ -26,4 +27,7 @@ api_v1 = [
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/", include(api_v1)),
+    # Prometheus scrape target. Mounted at root so it is reached internally
+    # (api:8000/metrics); public traffic through Nginx never routes here.
+    path("metrics", ExportToDjangoView, name="prometheus-metrics"),
 ]

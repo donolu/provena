@@ -31,6 +31,7 @@ THIRD_PARTY_APPS = [
     "django_celery_results",
     "storages",
     "drf_spectacular",
+    "django_prometheus",
 ]
 
 LOCAL_APPS = [
@@ -58,6 +59,9 @@ INSTALLED_APPS = ["daphne", *DJANGO_APPS, *THIRD_PARTY_APPS, *LOCAL_APPS]
 # token-refresh endpoint is mitigated by the browser's SameSite policy rather
 # than by CsrfViewMiddleware.
 MIDDLEWARE = [
+    # PrometheusBeforeMiddleware must be first and PrometheusAfterMiddleware last
+    # so request latency/count metrics wrap the whole stack.
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -67,6 +71,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -100,6 +105,16 @@ CHANNEL_LAYERS = {
 DATABASES = {
     "default": env.db("DATABASE_URL"),
 }
+
+# Wrap the DB backend so django-prometheus records query metrics. Falls back to
+# the original engine for anything not mapped (keeps sqlite CI jobs working).
+_DB_METRICS_ENGINES = {
+    "django.db.backends.postgresql": "django_prometheus.db.backends.postgresql",
+    "django.db.backends.sqlite3": "django_prometheus.db.backends.sqlite3",
+}
+DATABASES["default"]["ENGINE"] = _DB_METRICS_ENGINES.get(
+    DATABASES["default"]["ENGINE"], DATABASES["default"]["ENGINE"]
+)
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -253,6 +268,10 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TIMEZONE = TIME_ZONE
+# Emit task-sent/received/started events so a celery-exporter can expose task
+# latency, throughput, and queue metrics to Prometheus.
+CELERY_WORKER_SEND_TASK_EVENTS = True
+CELERY_TASK_SEND_SENT_EVENT = True
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 CELERY_BEAT_SCHEDULE = {
     "release-expired-cart-reservations": {
