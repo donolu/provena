@@ -34,12 +34,13 @@ class Command(BaseCommand):
     def handle(self, *args, **options) -> None:
         from apps.catalogue.models import Category, Product, ProductStatus, ProductVariant
         from apps.inventory.models import StockLevel
+        from apps.orders.models import Order, OrderItem, OrderStatus, SubOrder
         from apps.suppliers.models import Supplier, SupplierAddress, SupplierStatus
 
         password = options["password"]
 
         # ── Buyer (no TOTP) ──────────────────────────────────────────────────
-        self._upsert_user(
+        buyer = self._upsert_user(
             options["buyer_email"], password, role="BUYER", first_name="E2E", last_name="Buyer"
         )
 
@@ -130,6 +131,40 @@ class Command(BaseCommand):
         StockLevel.objects.update_or_create(
             variant=variant,
             defaults={"quantity_available": 100, "quantity_reserved": 0},
+        )
+
+        # ── One deterministic order in a dispatchable state ──────────────────
+        # A CONFIRMED sub-order for the approved supplier renders the "Dispatch"
+        # control on /supplier/orders, so the supplier order-management spec
+        # exercises a real order instead of skipping on an empty list.
+        order, _ = Order.objects.update_or_create(
+            reference="E2E-ORDER-0001",
+            defaults={
+                "buyer": buyer,
+                "status": OrderStatus.CONFIRMED,
+                "shipping_name": "E2E Buyer",
+                "shipping_line1": "1 Test Street",
+                "shipping_city": "London",
+                "shipping_postcode": "EC1A 1BB",
+                "shipping_country": "GB",
+                "total_amount": Decimal("9.99"),
+            },
+        )
+        sub_order, _ = SubOrder.objects.update_or_create(
+            order=order,
+            supplier=supplier,
+            defaults={"status": OrderStatus.CONFIRMED, "subtotal": Decimal("9.99")},
+        )
+        OrderItem.objects.update_or_create(
+            sub_order=sub_order,
+            variant=variant,
+            defaults={
+                "product_name": product.name,
+                "variant_name": variant.name,
+                "sku": variant.sku,
+                "quantity": 1,
+                "unit_price": Decimal("9.99"),
+            },
         )
 
         self.stdout.write(self.style.SUCCESS("E2E data seeded."))
