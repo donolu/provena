@@ -21,10 +21,10 @@ test.describe('Browse and checkout', () => {
     const cards = page.locator('[data-testid="product-card"]')
     await expect(cards.first()).toBeVisible({ timeout: 15_000 })
     // Navigate to first product
-    await cards.first().click()
+    await cards.first().getByRole('link').first().click()
     await page.waitForURL(/\/catalogue\/[^/]+$/)
     await expect(page.locator('h1')).toBeVisible()
-    await expect(page.getByRole('button', { name: /add to basket/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /add to cart/i })).toBeVisible()
   })
 
   test('logged-in buyer can add to cart and reach checkout', async ({ page }) => {
@@ -42,17 +42,18 @@ test.describe('Browse and checkout', () => {
     await page.goto('/catalogue')
     const cards = page.locator('[data-testid="product-card"]')
     await expect(cards.first()).toBeVisible({ timeout: 15_000 })
-    await cards.first().click()
+    await cards.first().getByRole('link').first().click()
     await page.waitForURL(/\/catalogue\/[^/]+$/)
 
-    const addBtn = page.getByRole('button', { name: /add to basket/i })
+    const addBtn = page.getByRole('button', { name: /add to cart/i })
     await expect(addBtn).toBeVisible()
     await addBtn.click()
 
-    // Cart drawer should open
-    await expect(page.getByRole('link', { name: /checkout/i })).toBeVisible({ timeout: 5_000 })
-    await page.getByRole('link', { name: /checkout/i }).click()
+    // Adding opens the cart drawer, which offers "Proceed to checkout".
+    const checkoutBtn = page.getByRole('button', { name: /proceed to checkout/i })
+    await expect(checkoutBtn).toBeVisible()
+    await checkoutBtn.click()
     await page.waitForURL('/checkout')
-    await expect(page.locator('h1, h2')).toContainText(/checkout|order/i)
+    await expect(page.locator('h1')).toContainText(/checkout/i)
   })
 })

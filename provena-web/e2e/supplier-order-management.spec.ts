@@ -16,7 +16,7 @@ test.describe('Supplier order management', () => {
 
   test('supplier dashboard loads with key metrics', async ({ page }) => {
     await page.goto('/supplier/dashboard')
-    await expect(page.locator('h1, h2')).toContainText(/dashboard|overview/i)
+    await expect(page.locator('h1, h2').first()).toContainText(/dashboard|overview/i)
     // Revenue or orders summary card visible
     await expect(page.locator('[data-testid="summary-card"], .stat-card, .rounded-xl').first()).toBeVisible()
   })

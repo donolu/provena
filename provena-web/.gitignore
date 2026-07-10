@@ -11,3 +11,5 @@ dist/
 coverage/
 *.tsbuildinfo
 schema.yaml
+test-results/
+playwright-report/

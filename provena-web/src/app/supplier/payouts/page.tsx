@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { Suspense, useState, useTransition } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
 import { Wallet, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react'
@@ -63,7 +63,7 @@ function StripeConnectBanner({ onboardingComplete }: { onboardingComplete: boole
   )
 }
 
-export default function PayoutsPage() {
+function PayoutsContent() {
   const [page, setPage] = useState(1)
   const searchParams = useSearchParams()
   const justConnected = searchParams.get('connected') === '1'
@@ -163,5 +163,13 @@ export default function PayoutsPage() {
         <Pagination page={page} count={totalCount} onChange={setPage} />
       </div>
     </div>
+  )
+}
+
+export default function PayoutsPage() {
+  return (
+    <Suspense fallback={null}>
+      <PayoutsContent />
+    </Suspense>
   )
 }

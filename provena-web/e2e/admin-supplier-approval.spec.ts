@@ -30,27 +30,10 @@ test.describe('Admin supplier approval', () => {
 
   test('admin can open a pending supplier and see approve/reject buttons', async ({ page }) => {
     await page.goto('/admin/suppliers')
+    // Wait for the table to load (the seed includes a pending supplier).
+    await expect(page.locator('table tbody tr').first()).toBeVisible()
 
-    // Filter to PENDING if filter control exists
-    const statusFilter = page.locator('select, [data-testid="status-filter"]').first()
-    if (await statusFilter.count() > 0) {
-      await statusFilter.selectOption({ label: 'PENDING' })
-      await page.waitForTimeout(500)
-    }
-
-    const rows = page.locator('table tbody tr')
-    const count = await rows.count()
-    test.skip(count === 0, 'No pending suppliers to test with')
-
-    // Click first pending supplier row or its view button
-    const viewBtn = rows.first().getByRole('button', { name: /view|details|manage/i })
-    if (await viewBtn.count() > 0) {
-      await viewBtn.click()
-    } else {
-      await rows.first().click()
-    }
-
-    // Approve or reject button should be visible
+    // A PENDING supplier renders inline Approve / Reject actions in its row.
     const approveBtn = page.getByRole('button', { name: /approve/i })
     const rejectBtn = page.getByRole('button', { name: /reject/i })
     const hasActions = (await approveBtn.count()) > 0 || (await rejectBtn.count()) > 0

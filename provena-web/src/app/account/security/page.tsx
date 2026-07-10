@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useMutation } from '@tanstack/react-query'
 import { ShieldCheck, ShieldOff, KeyRound, AlertTriangle } from 'lucide-react'
@@ -16,7 +16,7 @@ function extractSecret(otpauthUri: string): string {
   }
 }
 
-export default function SecurityPage() {
+function SecurityContent() {
   const searchParams = useSearchParams()
   const enforce = searchParams.get('enforce') === '1'
 
@@ -181,5 +181,13 @@ export default function SecurityPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function SecurityPage() {
+  return (
+    <Suspense fallback={null}>
+      <SecurityContent />
+    </Suspense>
   )
 }

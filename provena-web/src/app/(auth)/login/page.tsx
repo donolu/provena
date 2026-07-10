@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { login, loginTotp } from '@/lib/api/auth'
@@ -8,7 +8,7 @@ import { mergeGuestCart } from '@/lib/api/cart'
 import { useAuthStore } from '@/store/auth'
 import type { LoginResponse, TOTPLoginRequired } from '@/lib/api/types'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { login: storeLogin } = useAuthStore()
@@ -177,5 +177,13 @@ export default function LoginPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }

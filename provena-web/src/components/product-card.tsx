@@ -54,7 +54,7 @@ export function ProductCard({ product, inWishlist, onAddToCart, onToggleWishlist
   if (!variant) return null
 
   return (
-    <div className="relative group">
+    <div className="relative group" data-testid="product-card">
       {/* Marigold crop marks — the signature element */}
       <span aria-hidden="true" className="crop-corner crop-tl" />
       <span aria-hidden="true" className="crop-corner crop-tr" />
