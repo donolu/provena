@@ -22,7 +22,6 @@ DJANGO_APPS = [
 ]
 
 THIRD_PARTY_APPS = [
-    "daphne",
     "channels",
     "rest_framework",
     "rest_framework_simplejwt",
@@ -47,7 +46,7 @@ LOCAL_APPS = [
     "apps.disputes",
 ]
 
-INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+INSTALLED_APPS = ["daphne", *DJANGO_APPS, *THIRD_PARTY_APPS, *LOCAL_APPS]
 
 # SessionMiddleware and CsrfViewMiddleware are required by the Django admin
 # interface. They have no effect on REST API security: every API endpoint

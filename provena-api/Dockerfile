@@ -21,7 +21,7 @@ COPY . .
 
 # Production image: minimal, no dev tools
 FROM base AS production
-RUN pip install --require-hashes -r requirements.txt
+RUN pip install .
 COPY . .
 RUN python manage.py collectstatic --noinput
 

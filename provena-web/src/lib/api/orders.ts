@@ -188,3 +188,8 @@ export async function adminRejectDispute(id: string, resolution: string): Promis
   })
   return data
 }
+
+export async function getWsTicket(): Promise<string> {
+  const { data } = await apiClient.post<{ ticket: string }>('/orders/ws-ticket/')
+  return data.ticket
+}

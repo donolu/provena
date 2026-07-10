@@ -3,17 +3,18 @@ from urllib.parse import parse_qs
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
 from django.contrib.auth.models import AnonymousUser
-from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import AccessToken
+from django.core.cache import cache
+
+from .views import WS_TICKET_PREFIX
 
 
 @database_sync_to_async
-def _get_user(user_id: int):
+def _get_user(user_id: str):
     from django.contrib.auth import get_user_model
 
     User = get_user_model()
     try:
-        return User.objects.get(pk=str(user_id))
+        return User.objects.get(pk=user_id)
     except User.DoesNotExist:
         return AnonymousUser()
 
@@ -21,12 +22,12 @@ def _get_user(user_id: int):
 class JwtAuthMiddleware(BaseMiddleware):
     async def __call__(self, scope, receive, send):
         qs = parse_qs(scope.get("query_string", b"").decode())
-        token_list = qs.get("token", [])
+        ticket_list = qs.get("ticket", [])
         scope["user"] = AnonymousUser()
-        if token_list:
-            try:
-                token = AccessToken(token_list[0])
-                scope["user"] = await _get_user(token["user_id"])
-            except (TokenError, Exception):  # noqa: S110
-                pass
+        if ticket_list:
+            key = f"{WS_TICKET_PREFIX}{ticket_list[0]}"
+            user_id = cache.get(key)
+            if user_id:
+                cache.delete(key)
+                scope["user"] = await _get_user(user_id)
         return await super().__call__(scope, receive, send)
