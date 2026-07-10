@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import { Nav } from '@/components/nav'
 import { ProductCard } from '@/components/product-card'
+import { RecentlyViewed } from '@/components/recently-viewed'
 import { CartDrawer } from '@/components/cart-drawer'
 import { getProducts, getActiveBanners } from '@/lib/api/catalogue'
 import { getCart, addToCart, updateCartItem, removeCartItem } from '@/lib/api/cart'
@@ -217,6 +218,10 @@ export default function Home() {
           </Link>
         </section>
       )}
+
+      <div className="max-w-6xl mx-auto px-6 pb-14">
+        <RecentlyViewed />
+      </div>
 
       <CartDrawer
         open={cartOpen}

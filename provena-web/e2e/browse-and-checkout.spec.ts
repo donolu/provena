@@ -41,6 +41,22 @@ test.describe('Browse and checkout', () => {
     await expect(related.locator('[data-testid="product-card"]').first()).toBeVisible()
   })
 
+  test('recently viewed strip tracks a visited product', async ({ page }) => {
+    // Visit a product detail page (tracked client-side into localStorage).
+    await page.goto('/catalogue')
+    const cards = page.locator('[data-testid="product-card"]')
+    await expect(cards.first()).toBeVisible({ timeout: 15_000 })
+    await cards.first().getByRole('link').first().click()
+    await page.waitForURL(/\/catalogue\/[^/]+$/)
+    await expect(page.locator('h1')).toBeVisible()
+
+    // The homepage should now show it in the "Recently viewed" strip.
+    await page.goto('/')
+    const strip = page.locator('section', { hasText: /recently viewed/i })
+    await expect(strip.getByRole('heading', { name: /recently viewed/i })).toBeVisible()
+    await expect(strip.locator('[data-testid="product-card"]').first()).toBeVisible()
+  })
+
   test('logged-in buyer can add to cart and reach checkout', async ({ page }) => {
     const email = process.env.E2E_BUYER_EMAIL
     const password = process.env.E2E_BUYER_PASSWORD
