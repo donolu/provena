@@ -31,6 +31,7 @@ from .serializers import (
     TOTPVerifySerializer,
     UserProfileSerializer,
 )
+from .tasks import generate_data_export
 
 _COOKIE_PATH = "/api/v1/auth/"
 
@@ -668,8 +669,6 @@ class DataExportRequestView(APIView):
 
         export = DataExportRequest.objects.create(user=user)
 
-        from .tasks import generate_data_export
-
         generate_data_export.delay(str(export.id))
 
         return Response(
@@ -700,6 +699,7 @@ class DataExportDownloadView(APIView):
         import hashlib
         import json
 
+        from django.db import transaction
         from django.http import HttpResponse
         from django.utils import timezone
 
@@ -708,24 +708,28 @@ class DataExportDownloadView(APIView):
             return Response({"detail": "Token required."}, status=status.HTTP_400_BAD_REQUEST)
 
         token_hash = hashlib.sha256(token.encode()).hexdigest()
-        export = DataExportRequest.objects.filter(
-            token_hash=token_hash, status=DataExportStatus.COMPLETED
-        ).first()
 
-        if not export or not export.expires_at or export.expires_at < timezone.now():
-            return Response(
-                {"detail": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST
+        with transaction.atomic():
+            export = (
+                DataExportRequest.objects.select_for_update()
+                .filter(token_hash=token_hash, status=DataExportStatus.COMPLETED)
+                .first()
             )
 
-        payload_bytes = json.dumps(export.payload, indent=2).encode()
+            if not export or not export.expires_at or export.expires_at < timezone.now():
+                return Response(
+                    {"detail": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+            payload = export.payload
+            export.token_hash = ""  # nosec B105
+            export.payload = None
+            export.save(update_fields=["token_hash", "payload"])
+
+        payload_bytes = json.dumps(payload, indent=2).encode()
         response = HttpResponse(payload_bytes, content_type="application/json")
         response["Content-Disposition"] = 'attachment; filename="provena-data-export.json"'
         response["Content-Length"] = len(payload_bytes)
-
-        # Invalidate after download
-        export.token_hash = ""  # nosec B105
-        export.save(update_fields=["token_hash"])
-
         return response
 
 

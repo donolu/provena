@@ -1,4 +1,5 @@
 import hashlib
+import json
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -7,7 +8,7 @@ from django.utils import timezone
 from rest_framework import status
 
 from apps.accounts.models import DataExportRequest, DataExportStatus
-from apps.accounts.tasks import _collect_user_data, generate_data_export
+from apps.accounts.tasks import _collect_user_data, generate_data_export, purge_expired_exports
 
 EXPORT_URL = "/api/v1/auth/me/export/"
 DOWNLOAD_URL = "/api/v1/auth/me/export/download/"
@@ -80,11 +81,12 @@ class TestDataExportDownloadView:
         assert res["Content-Disposition"] == 'attachment; filename="provena-data-export.json"'
         assert res["Content-Type"] == "application/json"
 
-    def test_token_invalidated_after_download(self, api_client, buyer):
+    def test_token_and_payload_cleared_after_download(self, api_client, buyer):
         export, token = _make_completed_export(buyer)
         api_client.get(DOWNLOAD_URL, {"token": token})
         export.refresh_from_db()
         assert export.token_hash == ""
+        assert export.payload is None
 
     def test_second_download_with_same_token_fails(self, api_client, buyer):
         _export, token = _make_completed_export(buyer)
@@ -105,6 +107,12 @@ class TestDataExportDownloadView:
         _make_completed_export(buyer)
         res = api_client.get(DOWNLOAD_URL, {"token": "wrong-token"})
         assert res.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_payload_returned_is_correct(self, api_client, buyer):
+        _export, token = _make_completed_export(buyer)
+        res = api_client.get(DOWNLOAD_URL, {"token": token})
+        data = json.loads(res.content)
+        assert data["profile"]["email"] == buyer.email
 
 
 # ---------------------------------------------------------------------------
@@ -169,7 +177,49 @@ class TestGenerateDataExportTask:
             "profile",
             "addresses",
             "orders",
+            "wishlist",
+            "reviews",
             "notifications",
+            "notification_preferences",
             "disputes",
         }
         assert payload["profile"]["email"] == buyer.email
+
+    def test_collect_user_data_buyer_has_no_supplier_key(self, buyer):
+        payload = _collect_user_data(buyer)
+        assert "supplier" not in payload
+
+
+# ---------------------------------------------------------------------------
+# Purge task
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestPurgeExpiredExports:
+    def test_clears_payload_and_token_for_expired_exports(self, buyer):
+        expired = DataExportRequest.objects.create(
+            user=buyer,
+            status=DataExportStatus.COMPLETED,
+            token_hash="abc",
+            payload={"profile": {}},
+            expires_at=timezone.now() - timedelta(hours=1),
+            completed_at=timezone.now() - timedelta(hours=2),
+        )
+        purge_expired_exports()
+        expired.refresh_from_db()
+        assert expired.payload is None
+        assert expired.token_hash == ""
+
+    def test_does_not_touch_valid_exports(self, buyer):
+        valid = DataExportRequest.objects.create(
+            user=buyer,
+            status=DataExportStatus.COMPLETED,
+            token_hash="abc",
+            payload={"profile": {}},
+            expires_at=timezone.now() + timedelta(hours=23),
+            completed_at=timezone.now(),
+        )
+        purge_expired_exports()
+        valid.refresh_from_db()
+        assert valid.payload is not None
