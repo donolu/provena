@@ -133,6 +133,32 @@ class Command(BaseCommand):
             defaults={"quantity_available": 100, "quantity_reserved": 0},
         )
 
+        # ── Related products (same category + supplier) for the PDP grid ─────
+        for n in (1, 2):
+            rel, _ = Product.objects.update_or_create(
+                slug=f"e2e-related-product-{n}",
+                defaults={
+                    "supplier": supplier,
+                    "category": category,
+                    "name": f"E2E Related Product {n}",
+                    "description": "A related product for end-to-end tests.",
+                    "status": ProductStatus.ACTIVE,
+                },
+            )
+            rel_variant, _ = ProductVariant.objects.update_or_create(
+                sku=f"E2E-REL-{n:03d}",
+                defaults={
+                    "product": rel,
+                    "name": "Default",
+                    "price": Decimal("7.99"),
+                    "is_active": True,
+                },
+            )
+            StockLevel.objects.update_or_create(
+                variant=rel_variant,
+                defaults={"quantity_available": 50, "quantity_reserved": 0},
+            )
+
         # ── One deterministic order in a dispatchable state ──────────────────
         # A CONFIRMED sub-order for the approved supplier renders the "Dispatch"
         # control on /supplier/orders, so the supplier order-management spec

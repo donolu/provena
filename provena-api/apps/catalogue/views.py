@@ -1,5 +1,16 @@
 from django.db import models
-from django.db.models import Avg, Count, FloatField, IntegerField, OuterRef, Q, Subquery
+from django.db.models import (
+    Avg,
+    Case,
+    Count,
+    FloatField,
+    IntegerField,
+    OuterRef,
+    Q,
+    Subquery,
+    Value,
+    When,
+)
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
@@ -359,6 +370,53 @@ class ProductDetailView(APIView):
         s.is_valid(raise_exception=True)
         product = services.update_product(product, **s.validated_data)
         return Response(ProductSerializer(product).data)
+
+
+class RelatedProductsView(APIView):
+    permission_classes = [AllowAny]
+
+    RELATED_LIMIT = 8
+
+    @extend_schema(
+        tags=["Catalogue: Products"],
+        summary="Related products ('you might also like')",
+        description="Returns up to eight ACTIVE products related to the given product, "
+        "ranked by shared category and supplier (same category and supplier first, then "
+        "same category, then same supplier). Excludes the product itself.",
+        responses={
+            200: ProductSerializer(many=True),
+            404: OpenApiResponse(description="Not found or not active"),
+        },
+    )
+    def get(self, request: Request, slug: str) -> Response:
+        product = get_object_or_404(Product, slug=slug, status=ProductStatus.ACTIVE)
+
+        match = Q(supplier_id=product.supplier_id)
+        whens = []
+        if product.category_id is not None:
+            match |= Q(category_id=product.category_id)
+            whens.append(
+                When(
+                    category_id=product.category_id,
+                    supplier_id=product.supplier_id,
+                    then=Value(3),
+                )
+            )
+            whens.append(When(category_id=product.category_id, then=Value(2)))
+        whens.append(When(supplier_id=product.supplier_id, then=Value(1)))
+
+        related = (
+            _annotate_ratings(
+                Product.objects.filter(status=ProductStatus.ACTIVE)
+                .exclude(pk=product.pk)
+                .filter(match)
+                .select_related("supplier", "category")
+                .prefetch_related("variants", "variants__images", "images")
+            )
+            .annotate(relevance=Case(*whens, default=Value(0), output_field=IntegerField()))
+            .order_by("-relevance", "-is_featured", "-created_at")[: self.RELATED_LIMIT]
+        )
+        return Response(ProductSerializer(related, many=True).data)
 
 
 # ---------------------------------------------------------------------------

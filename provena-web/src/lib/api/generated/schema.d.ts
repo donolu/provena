@@ -1117,6 +1117,26 @@ export interface paths {
         patch: operations["catalogue_products_partial_update"];
         trace?: never;
     };
+    "/api/v1/catalogue/products/{slug}/related/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Related products ('you might also like')
+         * @description Returns up to eight ACTIVE products related to the given product, ranked by shared category and supplier (same category and supplier first, then same category, then same supplier). Excludes the product itself.
+         */
+        get: operations["catalogue_products_related_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/catalogue/products/{slug}/publish/": {
         parameters: {
             query?: never;
@@ -5698,6 +5718,34 @@ export interface operations {
                 content?: never;
             };
             /** @description Not found or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    catalogue_products_related_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"][];
+                };
+            };
+            /** @description Not found or not active */
             404: {
                 headers: {
                     [name: string]: unknown;
