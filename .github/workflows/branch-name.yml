@@ -4,6 +4,12 @@ on:
   pull_request:
     branches: [main]
     types: [opened, reopened, synchronize]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch or SHA to run against'
+        required: false
+        default: ''
 
 jobs:
   check:
