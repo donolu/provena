@@ -21,9 +21,12 @@ COPY . .
 
 # Production image: minimal, no dev tools
 FROM base AS production
-RUN pip install --require-hashes -r requirements.txt
+RUN pip install .
 COPY . .
-RUN python manage.py collectstatic --noinput
+RUN DJANGO_SECRET_KEY=dummy-build-only \
+    DATABASE_URL=sqlite:////tmp/build.db \
+    REDIS_URL=redis://localhost/0 \
+    python manage.py collectstatic --noinput
 
 EXPOSE 8000
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]

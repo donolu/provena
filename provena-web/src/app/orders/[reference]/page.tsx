@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/supplier/status-badge'
 import { getOrder, cancelOrder, raiseDispute, requestReturn } from '@/lib/api/orders'
 import { getCart } from '@/lib/api/cart'
 import { useAuthStore } from '@/store/auth'
+import { useOrderSocket } from '@/lib/hooks/useOrderSocket'
 import type { SubOrder } from '@/lib/api/types'
 
 function formatDate(iso: string) {
@@ -273,9 +274,11 @@ function SubOrderCard({
 
 export default function OrderDetailPage({ params }: { params: Promise<{ reference: string }> }) {
   const { reference } = use(params)
-  const { user } = useAuthStore()
+  const { user, accessToken } = useAuthStore()
   const qc = useQueryClient()
   const [cancelError, setCancelError] = useState<string | null>(null)
+
+  useOrderSocket(reference, accessToken)
 
   const { data: order, isPending } = useQuery({
     queryKey: ['order', reference],

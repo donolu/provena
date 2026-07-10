@@ -1,3 +1,6 @@
+import secrets
+
+from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
@@ -23,6 +26,33 @@ from .serializers import (
     SubOrderListSerializer,
     SubOrderSerializer,
 )
+
+WS_TICKET_PREFIX = "ws:ticket:"
+WS_TICKET_TTL = 30  # seconds
+
+# ---------------------------------------------------------------------------
+# WebSocket ticket
+# ---------------------------------------------------------------------------
+
+
+class WSTicketView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Orders (Buyer)"],
+        summary="Issue a short-lived WebSocket ticket",
+        description=(
+            "Returns a one-time token valid for 30 seconds. "
+            "Pass it as `?ticket=<token>` on the WebSocket handshake to avoid "
+            "placing the JWT access token in the URL."
+        ),
+        responses={200: {"type": "object", "properties": {"ticket": {"type": "string"}}}},
+    )
+    def post(self, request):
+        ticket = secrets.token_urlsafe(32)
+        cache.set(f"{WS_TICKET_PREFIX}{ticket}", str(request.user.pk), timeout=WS_TICKET_TTL)
+        return Response({"ticket": ticket})
+
 
 # ---------------------------------------------------------------------------
 # Buyer views

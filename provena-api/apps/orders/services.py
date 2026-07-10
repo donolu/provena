@@ -43,6 +43,24 @@ def _sync_order_status(order: Order) -> None:
     order.save(update_fields=["status", "updated_at"])
 
 
+def _push_order_status(reference: str, status: str) -> None:
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+
+        from .consumers import _order_group
+
+        layer = get_channel_layer()
+        if layer is None:
+            return
+        async_to_sync(layer.group_send)(
+            _order_group(reference),
+            {"type": "order.status", "status": status},
+        )
+    except Exception:
+        logger.exception("Failed to push order status via WebSocket")
+
+
 def _consume_cart_reservation(buyer, variant: ProductVariant, quantity: int) -> bool:
     """
     If the buyer holds a non-expired cart reservation for `variant` covering at least
@@ -173,6 +191,8 @@ def confirm_sub_order(sub_order: SubOrder) -> SubOrder:
     sub_order.status = OrderStatus.CONFIRMED
     sub_order.save(update_fields=["status", "updated_at"])
     _sync_order_status(sub_order.order)
+    ref, s = sub_order.order.reference, sub_order.order.status
+    transaction.on_commit(lambda: _push_order_status(ref, s))
     return sub_order
 
 
@@ -188,6 +208,8 @@ def dispatch_sub_order(sub_order: SubOrder, tracking_number: str = "") -> SubOrd
     sub_order.tracking_number = tracking_number
     sub_order.save(update_fields=["status", "tracking_number", "updated_at"])
     _sync_order_status(sub_order.order)
+    ref, s = sub_order.order.reference, sub_order.order.status
+    transaction.on_commit(lambda: _push_order_status(ref, s))
     transaction.on_commit(lambda: _safe_send_shipping_update(sub_order))
     return sub_order
 
@@ -201,6 +223,8 @@ def deliver_sub_order(sub_order: SubOrder) -> SubOrder:
     sub_order.save(update_fields=["status", "delivered_at", "updated_at"])
     _sync_order_status(sub_order.order)
     _trigger_sub_order_payout(sub_order)
+    ref, s = sub_order.order.reference, sub_order.order.status
+    transaction.on_commit(lambda: _push_order_status(ref, s))
     transaction.on_commit(lambda: _safe_send_delivery_confirmation(sub_order))
     return sub_order
 
@@ -255,6 +279,8 @@ def cancel_sub_order(sub_order: SubOrder) -> SubOrder:
     sub_order.status = OrderStatus.CANCELLED
     sub_order.save(update_fields=["status", "updated_at"])
     _sync_order_status(sub_order.order)
+    ref, s = sub_order.order.reference, sub_order.order.status
+    transaction.on_commit(lambda: _push_order_status(ref, s))
     return sub_order
 
 
