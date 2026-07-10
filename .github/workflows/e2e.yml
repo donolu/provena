@@ -67,6 +67,24 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref || github.head_ref || github.ref }}
 
+      # Install web dependencies BEFORE starting the stack. The dev compose
+      # web service bind-mounts ./provena-web and declares an anonymous
+      # /app/node_modules volume; bringing it up first would have Docker create
+      # a root-owned node_modules mount point on the host, breaking npm ci.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: provena-web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: provena-web
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+        working-directory: provena-web
+
       - name: Build and start the stack
         run: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
@@ -93,20 +111,6 @@ jobs:
 
       - name: Seed E2E data
         run: docker compose exec -T api python manage.py seed_e2e_data --password "$E2E_BUYER_PASSWORD"
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: provena-web/package-lock.json
-
-      - name: Install web dependencies
-        run: npm ci
-        working-directory: provena-web
-
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
-        working-directory: provena-web
 
       - name: Run Playwright tests
         run: npm run test:e2e
