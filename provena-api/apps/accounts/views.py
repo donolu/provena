@@ -658,14 +658,15 @@ class DataExportRequestView(APIView):
 
         from django.utils import timezone
 
+        user = cast(User, request.user)
         cutoff = timezone.now() - timedelta(days=DataExportRequest.RATE_LIMIT_DAYS)
-        if DataExportRequest.objects.filter(user=request.user, requested_at__gte=cutoff).exists():
+        if DataExportRequest.objects.filter(user=user, requested_at__gte=cutoff).exists():
             return Response(
                 {"detail": "A data export was already requested in the last 30 days."},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-        export = DataExportRequest.objects.create(user=request.user)
+        export = DataExportRequest.objects.create(user=user)
 
         from .tasks import generate_data_export
 
@@ -695,7 +696,7 @@ class DataExportDownloadView(APIView):
             400: OpenApiResponse(description="Invalid, expired, or already used token"),
         },
     )
-    def get(self, request: Request) -> Response:
+    def get(self, request: Request):  # type: ignore[override]
         import hashlib
         import json
 
