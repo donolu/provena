@@ -44,6 +44,7 @@ LOCAL_APPS = [
     "apps.notifications",
     "apps.analytics",
     "apps.disputes",
+    "apps.ops",
 ]
 
 INSTALLED_APPS = ["daphne", *DJANGO_APPS, *THIRD_PARTY_APPS, *LOCAL_APPS]
@@ -275,6 +276,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.accounts.tasks.purge_expired_exports",
         "schedule": 3600,  # hourly
     },
+    "backup-database": {
+        "task": "apps.ops.tasks.backup_database",
+        "schedule": 86400,  # daily
+    },
 }
 
 # Cache
@@ -298,6 +303,13 @@ AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="")
 AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="eu-west-2")
 AWS_S3_FILE_OVERWRITE = False
 AWS_DEFAULT_ACL = "private"
+# Custom endpoint for S3-compatible storage (e.g. Cloudflare R2, MinIO). Empty = AWS S3.
+AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default="")
+
+# Automated database backups (apps.ops)
+DB_BACKUP_BUCKET_NAME = env("DB_BACKUP_BUCKET_NAME", default="")  # falls back to storage bucket
+DB_BACKUP_PREFIX = env("DB_BACKUP_PREFIX", default="backups/")
+DB_BACKUP_RETENTION_DAYS = env.int("DB_BACKUP_RETENTION_DAYS", default=30)
 
 # Frontend
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
