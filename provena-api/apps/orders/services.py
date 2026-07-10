@@ -41,7 +41,6 @@ def _sync_order_status(order: Order) -> None:
         return
     order.status = new_status
     order.save(update_fields=["status", "updated_at"])
-    _push_order_status(order.reference, new_status)
 
 
 def _push_order_status(reference: str, status: str) -> None:
@@ -192,6 +191,8 @@ def confirm_sub_order(sub_order: SubOrder) -> SubOrder:
     sub_order.status = OrderStatus.CONFIRMED
     sub_order.save(update_fields=["status", "updated_at"])
     _sync_order_status(sub_order.order)
+    ref, s = sub_order.order.reference, sub_order.order.status
+    transaction.on_commit(lambda: _push_order_status(ref, s))
     return sub_order
 
 
@@ -207,6 +208,8 @@ def dispatch_sub_order(sub_order: SubOrder, tracking_number: str = "") -> SubOrd
     sub_order.tracking_number = tracking_number
     sub_order.save(update_fields=["status", "tracking_number", "updated_at"])
     _sync_order_status(sub_order.order)
+    ref, s = sub_order.order.reference, sub_order.order.status
+    transaction.on_commit(lambda: _push_order_status(ref, s))
     transaction.on_commit(lambda: _safe_send_shipping_update(sub_order))
     return sub_order
 
@@ -220,6 +223,8 @@ def deliver_sub_order(sub_order: SubOrder) -> SubOrder:
     sub_order.save(update_fields=["status", "delivered_at", "updated_at"])
     _sync_order_status(sub_order.order)
     _trigger_sub_order_payout(sub_order)
+    ref, s = sub_order.order.reference, sub_order.order.status
+    transaction.on_commit(lambda: _push_order_status(ref, s))
     transaction.on_commit(lambda: _safe_send_delivery_confirmation(sub_order))
     return sub_order
 
@@ -274,6 +279,8 @@ def cancel_sub_order(sub_order: SubOrder) -> SubOrder:
     sub_order.status = OrderStatus.CANCELLED
     sub_order.save(update_fields=["status", "updated_at"])
     _sync_order_status(sub_order.order)
+    ref, s = sub_order.order.reference, sub_order.order.status
+    transaction.on_commit(lambda: _push_order_status(ref, s))
     return sub_order
 
 
