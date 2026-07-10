@@ -271,6 +271,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.disputes.tasks.auto_escalate_overdue_disputes",
         "schedule": 3600,  # hourly
     },
+    "purge-expired-data-exports": {
+        "task": "apps.accounts.tasks.purge_expired_exports",
+        "schedule": 3600,  # hourly
+    },
 }
 
 # Cache

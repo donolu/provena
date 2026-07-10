@@ -91,6 +91,35 @@ class Address(models.Model):
         return f"{self.full_name}, {self.line1}, {self.city}"
 
 
+class DataExportStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    PROCESSING = "PROCESSING", "Processing"
+    COMPLETED = "COMPLETED", "Completed"
+    FAILED = "FAILED", "Failed"
+
+
+class DataExportRequest(models.Model):
+    RATE_LIMIT_DAYS = 30
+    DOWNLOAD_TTL_HOURS = 24
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="data_exports")
+    status = models.CharField(
+        max_length=12, choices=DataExportStatus.choices, default=DataExportStatus.PENDING
+    )
+    token_hash = models.CharField(max_length=64, blank=True)
+    payload = models.JSONField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-requested_at"]
+
+    def __str__(self) -> str:
+        return f"DataExport({self.user.email}, {self.status})"
+
+
 class PasswordResetToken(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="password_reset_tokens")

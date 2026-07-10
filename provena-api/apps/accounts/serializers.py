@@ -1,7 +1,7 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from .models import Address, User
+from .models import Address, DataExportRequest, User
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -156,5 +156,21 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "target_id",
             "metadata",
             "created_at",
+        ]
+        read_only_fields = fields
+
+
+class DataExportRequestSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+
+    class Meta:
+        model = DataExportRequest
+        fields = [
+            "id",
+            "user_email",
+            "status",
+            "requested_at",
+            "completed_at",
+            "expires_at",
         ]
         read_only_fields = fields

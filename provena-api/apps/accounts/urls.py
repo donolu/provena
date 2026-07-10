@@ -54,4 +54,10 @@ urlpatterns = [
         name="admin-user-delete",
     ),
     path("admin/audit-log/", views.AdminAuditLogView.as_view(), name="admin-audit-log"),
+    # GDPR data export
+    path("me/export/", views.DataExportRequestView.as_view(), name="data-export-request"),
+    path(
+        "me/export/download/", views.DataExportDownloadView.as_view(), name="data-export-download"
+    ),
+    path("admin/exports/", views.AdminDataExportListView.as_view(), name="admin-export-list"),
 ]
