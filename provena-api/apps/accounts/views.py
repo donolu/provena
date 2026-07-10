@@ -17,7 +17,7 @@ from apps.accounts.audit import audit_action
 from apps.pagination import PaginatedListMixin
 
 from . import services
-from .models import User
+from .models import DataExportRequest, DataExportStatus, User
 from .serializers import (
     AddressSerializer,
     AddressWriteSerializer,
@@ -629,3 +629,130 @@ class AdminAuditLogView(PaginatedListMixin, APIView):
         if action_filter:
             qs = qs.filter(action__icontains=action_filter)
         return self.paginate(qs, AuditLogSerializer, request)
+
+
+# ---------------------------------------------------------------------------
+# GDPR data export
+# ---------------------------------------------------------------------------
+
+
+class DataExportRequestView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["User Profile"],
+        summary="Request a personal data export (GDPR Article 20)",
+        description=(
+            "Queues an export of all personal data held for the authenticated user. "
+            "A download link valid for 24 hours is emailed on completion. "
+            "Limited to one request per 30 days."
+        ),
+        request=None,
+        responses={
+            202: {"type": "object", "properties": {"detail": {"type": "string"}}},
+            429: OpenApiResponse(description="Export already requested in the last 30 days"),
+        },
+    )
+    def post(self, request: Request) -> Response:
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        cutoff = timezone.now() - timedelta(days=DataExportRequest.RATE_LIMIT_DAYS)
+        if DataExportRequest.objects.filter(user=request.user, requested_at__gte=cutoff).exists():
+            return Response(
+                {"detail": "A data export was already requested in the last 30 days."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        export = DataExportRequest.objects.create(user=request.user)
+
+        from .tasks import generate_data_export
+
+        generate_data_export.delay(str(export.id))
+
+        return Response(
+            {
+                "detail": "Your data export has been queued. You will receive an email when it is ready."
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class DataExportDownloadView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["User Profile"],
+        summary="Download a completed data export",
+        description=(
+            "Returns the personal data archive as a JSON file. "
+            "Requires the one-time token emailed on export completion. "
+            "Token expires after 24 hours."
+        ),
+        responses={
+            200: {"type": "object"},
+            400: OpenApiResponse(description="Invalid, expired, or already used token"),
+        },
+    )
+    def get(self, request: Request) -> Response:
+        import hashlib
+        import json
+
+        from django.http import HttpResponse
+        from django.utils import timezone
+
+        token = request.query_params.get("token", "")
+        if not token:
+            return Response({"detail": "Token required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        export = DataExportRequest.objects.filter(
+            token_hash=token_hash, status=DataExportStatus.COMPLETED
+        ).first()
+
+        if not export or not export.expires_at or export.expires_at < timezone.now():
+            return Response(
+                {"detail": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        payload_bytes = json.dumps(export.payload, indent=2).encode()
+        response = HttpResponse(payload_bytes, content_type="application/json")
+        response["Content-Disposition"] = 'attachment; filename="provena-data-export.json"'
+        response["Content-Length"] = len(payload_bytes)
+
+        # Invalidate after download
+        export.token_hash = ""  # nosec B105
+        export.save(update_fields=["token_hash"])
+
+        return response
+
+
+class AdminDataExportListView(PaginatedListMixin, APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        tags=["Admin: Users"],
+        summary="List all data export requests",
+        responses={
+            200: {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "user_email": {"type": "string"},
+                        "status": {"type": "string"},
+                        "requested_at": {"type": "string"},
+                        "completed_at": {"type": "string"},
+                        "expires_at": {"type": "string"},
+                    },
+                },
+            }
+        },
+    )
+    def get(self, request: Request) -> Response:
+        from .serializers import DataExportRequestSerializer
+
+        qs = DataExportRequest.objects.select_related("user").order_by("-requested_at")
+        return self.paginate(qs, DataExportRequestSerializer, request)

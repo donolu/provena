@@ -413,6 +413,36 @@ def send_payout_received(payout) -> None:
     )
 
 
+def send_data_export_ready_email(user, token: str) -> None:
+    from django.conf import settings
+
+    download_url = (
+        f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}"
+        f"/account/data-export?token={token}"
+    )
+    body = (
+        _p("Your personal data export is ready.")
+        + _p("The download link below expires in 24 hours. For security, do not share this link.")
+        + _button("Download your data", download_url)
+        + _p(
+            "If you did not request this export, please contact support immediately.",
+            muted=True,
+        )
+    )
+    html = _base("Your data export is ready", body)
+    plain = (
+        f"Your personal data export is ready.\n\n"
+        f"Download your data (expires in 24 hours):\n{download_url}\n\n"
+        f"If you did not request this export, please contact support immediately."
+    )
+    _send(
+        subject="Your Provena data export is ready",
+        plain=plain,
+        html=html,
+        to=[user.email],
+    )
+
+
 def _send(subject: str, plain: str, html: str, to: list[str]) -> None:
     from django.conf import settings
 
