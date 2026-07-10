@@ -9,6 +9,11 @@ DEBUG = False
 
 # Security
 SECURE_SSL_REDIRECT = True
+# Internal probes/scrapers (Prometheus, load-balancer health checks) reach the
+# API over plain HTTP inside the network; exempt those paths from the HTTPS
+# redirect so they are not 301'd. The internal scrape hostname must still be in
+# DJANGO_ALLOWED_HOSTS.
+SECURE_REDIRECT_EXEMPT = [r"^metrics$", r"^api/v1/health/$"]
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True

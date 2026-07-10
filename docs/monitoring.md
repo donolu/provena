@@ -12,8 +12,10 @@ Provena exposes Prometheus metrics for infrastructure observability, complementi
 
 ## Running the stack locally
 
+Layer the monitoring stack on top of the development stack (development settings serve the API over plain HTTP and already allow the internal `api` host, so Prometheus can scrape it):
+
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.monitoring.yml up -d
 ```
 
 - Prometheus: http://localhost:9090 (check **Status → Targets** — all should be `UP`)
@@ -24,5 +26,10 @@ Grafana is provisioned automatically with the Prometheus datasource and the **Pr
 ## Production
 
 Point an existing Prometheus at `api:8000/metrics`, `celery-exporter:9808`, and `redis-exporter:9121` (see `monitoring/prometheus.yml` for the scrape config). Restrict network access to these targets to the monitoring system.
+
+Two things make the internal `/metrics` scrape work against the production API, which enforces HTTPS:
+
+- **Add the internal scrape hostname to `DJANGO_ALLOWED_HOSTS`** (e.g. `api`), or Django rejects the scrape with `400 DisallowedHost`.
+- `/metrics` and `/api/v1/health/` are already exempt from the HTTPS redirect (`SECURE_REDIRECT_EXEMPT`), so scraping/probing over plain HTTP inside the network is not `301`'d. All other paths still redirect to HTTPS.
 
 Under multiple API worker processes, use `prometheus_client` multiprocess mode (`PROMETHEUS_MULTIPROC_DIR`); the default daphne single-process container per service needs no extra configuration.
