@@ -161,7 +161,6 @@ export default function CheckoutPage() {
   const { data: cart, isPending: cartLoading } = useQuery({
     queryKey: ['cart'],
     queryFn: getCart,
-    enabled: !!user,
   })
 
   const { data: savedAddresses = [] } = useQuery({
@@ -212,6 +211,11 @@ export default function CheckoutPage() {
 
   const items = cart?.items ?? []
   const isEmpty = items.length === 0
+
+  if (!cartLoading && !user) {
+    router.replace('/login?next=/checkout')
+    return null
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

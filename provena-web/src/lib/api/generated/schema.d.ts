@@ -1837,6 +1837,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/marketplace/cart/merge/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge guest cart into user cart
+         * @description Reads the `provena_cart` session cookie and merges any guest cart items into the authenticated user's cart. Idempotent if no guest cart exists.
+         */
+        post: operations["marketplace_cart_merge_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/marketplace/cart/items/": {
         parameters: {
             query?: never;
@@ -6856,6 +6876,24 @@ export interface operations {
         responses: {
             /** @description No response body */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    marketplace_cart_merge_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -114,7 +114,6 @@ export default function CataloguePage({
   const { data: serverCart } = useQuery({
     queryKey: ['cart'],
     queryFn: getCart,
-    enabled: !!user,
   })
 
   const addMutation = useMutation({

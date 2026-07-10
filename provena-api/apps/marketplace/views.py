@@ -1,3 +1,4 @@
+from django.conf import settings
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
@@ -20,18 +21,62 @@ from .serializers import (
 )
 
 # ---------------------------------------------------------------------------
+# Cart helpers
+# ---------------------------------------------------------------------------
+
+_CART_COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
+
+
+def _cart_identity(request) -> dict | None:
+    """Return identity kwargs for service calls, or None if the request has no cart context."""
+    if request.user.is_authenticated:
+        return {"user": request.user}
+    key = request.COOKIES.get(services.CART_COOKIE)
+    if key:
+        return {"session_key": key}
+    return None
+
+
+def _cart_identity_or_create(request) -> dict:
+    """Like _cart_identity but generates a fresh session key for new anonymous users."""
+    if request.user.is_authenticated:
+        return {"user": request.user}
+    key = request.COOKIES.get(services.CART_COOKIE) or services.new_session_key()
+    return {"session_key": key}
+
+
+def _set_cart_cookie(response: Response, identity: dict) -> None:
+    key = identity.get("session_key")
+    if key:
+        response.set_cookie(
+            services.CART_COOKIE,
+            key,
+            max_age=_CART_COOKIE_MAX_AGE,
+            httponly=True,
+            samesite="Lax",
+            path="/",
+            secure=getattr(settings, "CART_COOKIE_SECURE", False),
+        )
+
+
+# ---------------------------------------------------------------------------
 # Cart
 # ---------------------------------------------------------------------------
 
 
 class CartView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     @extend_schema(responses={200: CartSerializer}, tags=["Marketplace: Cart"], summary="Get cart")
     def get(self, request):
-        cart = services.get_or_create_cart(request.user)
+        identity = _cart_identity(request)
+        if identity is None:
+            return Response({"id": None, "items": [], "total": "0.00", "item_count": 0})
+        cart = services.get_or_create_cart(**identity)
         cart_qs = Cart.objects.prefetch_related("items__variant__product").get(pk=cart.pk)
-        return Response(CartSerializer(cart_qs).data)
+        response = Response(CartSerializer(cart_qs).data)
+        _set_cart_cookie(response, identity)
+        return response
 
     @extend_schema(
         responses={204: None},
@@ -39,12 +84,14 @@ class CartView(APIView):
         summary="Clear cart",
     )
     def delete(self, request):
-        services.clear_cart(request.user)
+        identity = _cart_identity(request)
+        if identity:
+            services.clear_cart(**identity)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CartItemCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     @extend_schema(
         request=AddToCartSerializer,
@@ -56,19 +103,22 @@ class CartItemCreateView(APIView):
     def post(self, request):
         ser = AddToCartSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+        identity = _cart_identity_or_create(request)
         try:
             item = services.add_to_cart(
-                request.user,
-                ser.validated_data["variant_id"],
-                ser.validated_data["quantity"],
+                **identity,
+                variant_id=ser.validated_data["variant_id"],
+                quantity=ser.validated_data["quantity"],
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(CartItemSerializer(item).data, status=status.HTTP_201_CREATED)
+        response = Response(CartItemSerializer(item).data, status=status.HTTP_201_CREATED)
+        _set_cart_cookie(response, identity)
+        return response
 
 
 class CartItemDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     @extend_schema(
         request=UpdateCartItemSerializer,
@@ -77,13 +127,20 @@ class CartItemDetailView(APIView):
         summary="Update cart item quantity",
     )
     def patch(self, request, pk):
+        identity = _cart_identity(request)
+        if identity is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         ser = UpdateCartItemSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         try:
-            item = services.update_cart_item(request.user, pk, ser.validated_data["quantity"])
+            item = services.update_cart_item(
+                **identity, item_id=pk, quantity=ser.validated_data["quantity"]
+            )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(CartItemSerializer(item).data)
+        response = Response(CartItemSerializer(item).data)
+        _set_cart_cookie(response, identity)
+        return response
 
     @extend_schema(
         responses={204: None},
@@ -91,8 +148,31 @@ class CartItemDetailView(APIView):
         summary="Remove item from cart",
     )
     def delete(self, request, pk):
-        services.remove_from_cart(request.user, pk)
+        identity = _cart_identity(request)
+        if identity is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        services.remove_from_cart(**identity, item_id=pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CartMergeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Marketplace: Cart"],
+        summary="Merge guest cart into user cart",
+        description="Reads the `provena_cart` session cookie and merges any guest cart items "
+        "into the authenticated user's cart. Idempotent if no guest cart exists.",
+        request=None,
+        responses={200: None},
+    )
+    def post(self, request):
+        session_key = request.COOKIES.get(services.CART_COOKIE)
+        if session_key:
+            services.merge_guest_cart(session_key, request.user)
+        response = Response({"merged": bool(session_key)})
+        response.delete_cookie(services.CART_COOKIE, path="/")
+        return response
 
 
 # ---------------------------------------------------------------------------

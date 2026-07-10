@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta
 
 from django.db import transaction
@@ -10,6 +11,8 @@ from apps.orders.models import OrderStatus
 
 from .models import RESERVATION_MINUTES, Cart, CartItem, CartReservation, Review, WishlistItem
 
+CART_COOKIE = "provena_cart"
+
 
 def _reservation_expiry() -> datetime:
     return timezone.now() + timedelta(minutes=RESERVATION_MINUTES)
@@ -20,17 +23,34 @@ def _reservation_expiry() -> datetime:
 # ---------------------------------------------------------------------------
 
 
-def get_or_create_cart(user) -> Cart:
-    cart, _ = Cart.objects.get_or_create(buyer=user)
-    return cart
+def get_or_create_cart(*, user=None, session_key: str | None = None) -> Cart:
+    if user is not None:
+        cart, _ = Cart.objects.get_or_create(buyer=user)
+        return cart
+    if session_key:
+        cart, _ = Cart.objects.get_or_create(session_key=session_key)
+        return cart
+    raise ValueError("Either user or session_key is required.")
+
+
+def new_session_key() -> str:
+    return str(uuid.uuid4())
+
+
+def _item_filter(user=None, session_key: str | None = None) -> dict:
+    if user is not None:
+        return {"cart__buyer": user}
+    return {"cart__session_key": session_key}
 
 
 @transaction.atomic
-def add_to_cart(user, variant_id, quantity: int) -> CartItem:
+def add_to_cart(
+    *, user=None, session_key: str | None = None, variant_id, quantity: int
+) -> CartItem:
     if quantity <= 0:
         raise ValueError("Quantity must be at least 1.")
     variant = get_object_or_404(ProductVariant, id=variant_id, is_active=True)
-    cart = get_or_create_cart(user)
+    cart = get_or_create_cart(user=user, session_key=session_key)
     item, created = CartItem.objects.get_or_create(
         cart=cart, variant=variant, defaults={"quantity": quantity}
     )
@@ -52,10 +72,14 @@ def add_to_cart(user, variant_id, quantity: int) -> CartItem:
 
 
 @transaction.atomic
-def update_cart_item(user, item_id, quantity: int) -> CartItem:
+def update_cart_item(
+    *, user=None, session_key: str | None = None, item_id, quantity: int
+) -> CartItem:
     if quantity <= 0:
         raise ValueError("Quantity must be at least 1.")
-    item = get_object_or_404(CartItem.objects.select_for_update(), id=item_id, cart__buyer=user)
+    item = get_object_or_404(
+        CartItem.objects.select_for_update(), id=item_id, **_item_filter(user, session_key)
+    )
     old_qty = item.quantity
     delta = quantity - old_qty
     if delta > 0:
@@ -76,8 +100,10 @@ def update_cart_item(user, item_id, quantity: int) -> CartItem:
 
 
 @transaction.atomic
-def remove_from_cart(user, item_id) -> None:
-    item = get_object_or_404(CartItem.objects.select_for_update(), id=item_id, cart__buyer=user)
+def remove_from_cart(*, user=None, session_key: str | None = None, item_id) -> None:
+    item = get_object_or_404(
+        CartItem.objects.select_for_update(), id=item_id, **_item_filter(user, session_key)
+    )
     try:
         res = item.reservation
         inventory_services.release_reservation(
@@ -89,7 +115,7 @@ def remove_from_cart(user, item_id) -> None:
 
 
 @transaction.atomic
-def clear_cart(user) -> None:
+def clear_cart(*, user=None, session_key: str | None = None) -> None:
     # Materialise the locked set so we delete exactly these IDs, not any CartItems
     # inserted by a concurrent add_to_cart() after the lock was taken.
     # of=("self",) restricts the lock to marketplace_cartitem rows only; without it
@@ -97,7 +123,7 @@ def clear_cart(user) -> None:
     # LEFT OUTER JOIN on the nullable reverse-OneToOne and PG forbids locking on that.
     items = list(
         CartItem.objects.select_for_update(of=("self",))
-        .filter(cart__buyer=user)
+        .filter(**_item_filter(user, session_key))
         .select_related("reservation", "variant")
     )
     locked_ids = []
@@ -112,6 +138,51 @@ def clear_cart(user) -> None:
             pass
     if locked_ids:
         CartItem.objects.filter(id__in=locked_ids).delete()
+
+
+@transaction.atomic
+def merge_guest_cart(session_key: str, user) -> None:
+    """Move items from a guest cart into the authenticated user's cart.
+
+    Stock reservations are preserved: for items in both carts the quantities are summed
+    and the guest CartReservation is deleted without releasing stock (the units stay
+    reserved under the user's CartReservation). For guest-only items the CartItem row is
+    moved to the user cart so its CartReservation follows automatically.
+    """
+    try:
+        guest_cart = Cart.objects.select_for_update().get(session_key=session_key)
+    except Cart.DoesNotExist:
+        return
+
+    user_cart = get_or_create_cart(user=user)
+
+    for item in list(guest_cart.items.select_for_update(of=("self",)).select_related("variant")):
+        try:
+            existing = CartItem.objects.select_for_update().get(
+                cart=user_cart, variant=item.variant
+            )
+            existing.quantity += item.quantity
+            existing.save(update_fields=["quantity", "updated_at"])
+            CartReservation.objects.update_or_create(
+                cart_item=existing,
+                defaults={
+                    "variant": item.variant,
+                    "quantity": existing.quantity,
+                    "expires_at": _reservation_expiry(),
+                },
+            )
+            item.delete()
+        except CartItem.DoesNotExist:
+            item.cart = user_cart
+            item.save(update_fields=["cart"])
+            try:
+                res = item.reservation
+                res.expires_at = _reservation_expiry()
+                res.save(update_fields=["expires_at"])
+            except CartReservation.DoesNotExist:
+                pass
+
+    guest_cart.delete()
 
 
 # ---------------------------------------------------------------------------
