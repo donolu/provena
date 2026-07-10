@@ -1,0 +1,42 @@
+# E2E overrides: a production web build (next start, no on-demand route
+# compilation) for deterministic Playwright runs, paired with the API on
+# permissive development settings (CORS for :3000, no HTTPS redirect).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml \
+#     up -d --build db redis api web
+services:
+
+  db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      target: development
+    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_SECRET_KEY: dev-secret-key-not-for-production
+      DATABASE_URL: postgres://provena:provena@db:5432/provena
+      REDIS_URL: redis://redis:6379/0
+      STRIPE_SECRET_KEY: ""
+      STRIPE_PUBLISHABLE_KEY: ""
+      STRIPE_WEBHOOK_SECRET: ""
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ./provena-web
+      target: runner
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"

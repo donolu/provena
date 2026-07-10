@@ -49,6 +49,10 @@ jobs:
     if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     env:
+      # Production web build (next start) + permissive dev API, for a fast and
+      # deterministic run. COMPOSE_FILE makes every `docker compose` call below
+      # pick up the E2E override automatically.
+      COMPOSE_FILE: docker-compose.yml:docker-compose.e2e.yml
       # Deterministic test credentials. The stack is an ephemeral throwaway, so
       # these are not secrets; they mirror the defaults of seed_e2e_data.
       DJANGO_SECRET_KEY: e2e-ci-secret-key
@@ -67,10 +71,8 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref || github.head_ref || github.ref }}
 
-      # Install web dependencies BEFORE starting the stack. The dev compose
-      # web service bind-mounts ./provena-web and declares an anonymous
-      # /app/node_modules volume; bringing it up first would have Docker create
-      # a root-owned node_modules mount point on the host, breaking npm ci.
+      # Playwright itself runs on the runner (the web container only serves the
+      # app), so install the runner's web dependencies and browser here.
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
@@ -86,7 +88,7 @@ jobs:
         working-directory: provena-web
 
       - name: Build and start the stack
-        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+        run: docker compose up -d --build db redis api web
 
       - name: Wait for the API and web to be ready
         run: |
@@ -102,7 +104,7 @@ jobs:
             done
             echo "  timed out waiting for $url (last: $code)"; return 1
           }
-          # Django up + database reachable, then the Next.js dev server.
+          # Django up + database reachable, then the production web server.
           wait_for "http://localhost:8000/api/v1/health/"
           wait_for "http://localhost:3000/catalogue"
 
@@ -134,4 +136,4 @@ jobs:
 
       - name: Tear down
         if: always()
-        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
+        run: docker compose down -v

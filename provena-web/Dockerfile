@@ -15,6 +15,10 @@ CMD ["npm", "run", "dev"]
 
 # Build the application
 FROM base AS builder
+# NEXT_PUBLIC_* values are inlined into the client bundle at build time, so the
+# API origin the browser talks to must be provided here (not just at runtime).
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
