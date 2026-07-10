@@ -548,7 +548,12 @@ export default function ProductDetailPage({
           </section>
         )}
 
-        <RecentlyViewed excludeSlug={slug} />
+        <RecentlyViewed
+          excludeSlug={slug}
+          onAddToCart={(variantId) => relatedAddToCartMutation.mutate(variantId)}
+          onToggleWishlist={(variantId) => relatedWishlistMutation.mutate(variantId)}
+          isInWishlist={(p) => (p.variants[0] ? relatedInWishlist(p.variants[0].id) : false)}
+        />
       </main>
 
       <CartDrawer

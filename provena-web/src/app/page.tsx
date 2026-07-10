@@ -220,7 +220,11 @@ export default function Home() {
       )}
 
       <div className="max-w-6xl mx-auto px-6 pb-14">
-        <RecentlyViewed />
+        <RecentlyViewed
+          onAddToCart={handleAddToCart}
+          onToggleWishlist={handleToggleWishlist}
+          isInWishlist={(p) => p.variants.some((v) => wishlist.has(v.id))}
+        />
       </div>
 
       <CartDrawer

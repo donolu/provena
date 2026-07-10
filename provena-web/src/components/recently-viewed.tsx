@@ -1,11 +1,9 @@
 'use client'
 
 import { useSyncExternalStore } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ProductCard } from '@/components/product-card'
-import { addToCart, addToWishlist, getWishlist, removeFromWishlist } from '@/lib/api/cart'
-import { useAuthStore } from '@/store/auth'
 import { useRecentlyViewed } from '@/store/recently-viewed'
+import type { Product } from '@/lib/api/types'
 
 // Hydration-safe "is this the client?" flag: false during SSR and the first
 // client render (matching the server), true afterwards — without a hydration
@@ -18,39 +16,32 @@ const useHydrated = () =>
     () => false,
   )
 
+interface RecentlyViewedProps {
+  /** Drops the current product on the PDP. */
+  excludeSlug?: string
+  /**
+   * Cart/wishlist are delegated to the host page so the strip shares the same
+   * cart model (the homepage uses a local anonymous cart; the PDP uses the API
+   * cart). Passing these avoids a strip that silently diverges from the page.
+   */
+  onAddToCart: (variantId: string) => void
+  onToggleWishlist: (variantId: string) => void
+  isInWishlist: (product: Product) => boolean
+}
+
 /**
  * "Recently viewed" strip, backed by the client-side persisted store. Renders
  * nothing until mounted (the store is only available on the client) and when
- * there is nothing to show. `excludeSlug` drops the current product on the PDP.
+ * there is nothing to show.
  */
-export function RecentlyViewed({ excludeSlug }: { excludeSlug?: string }) {
-  const { user } = useAuthStore()
-  const qc = useQueryClient()
+export function RecentlyViewed({
+  excludeSlug,
+  onAddToCart,
+  onToggleWishlist,
+  isInWishlist,
+}: RecentlyViewedProps) {
   const products = useRecentlyViewed((s) => s.products)
   const hydrated = useHydrated()
-
-  const { data: wishlistData } = useQuery({
-    queryKey: ['wishlist'],
-    queryFn: () => getWishlist(),
-    enabled: !!user,
-  })
-  const wishlist = wishlistData?.results ?? []
-
-  const addToCartMutation = useMutation<void, Error, string>({
-    mutationFn: async (variantId) => {
-      await addToCart(variantId, 1)
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cart'] }),
-  })
-
-  const wishlistMutation = useMutation<void, Error, string>({
-    mutationFn: async (variantId) => {
-      const existing = wishlist.find((w) => w.variant === variantId)
-      if (existing) await removeFromWishlist(existing.id)
-      else await addToWishlist(variantId)
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['wishlist'] }),
-  })
 
   if (!hydrated) return null
 
@@ -65,11 +56,9 @@ export function RecentlyViewed({ excludeSlug }: { excludeSlug?: string }) {
           <ProductCard
             key={p.id}
             product={p}
-            inWishlist={
-              p.variants[0] ? wishlist.some((w) => w.variant === p.variants[0].id) : false
-            }
-            onAddToCart={(variantId) => addToCartMutation.mutate(variantId)}
-            onToggleWishlist={(variantId) => wishlistMutation.mutate(variantId)}
+            inWishlist={isInWishlist(p)}
+            onAddToCart={onAddToCart}
+            onToggleWishlist={onToggleWishlist}
           />
         ))}
       </div>
