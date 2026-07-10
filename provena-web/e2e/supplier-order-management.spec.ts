@@ -11,7 +11,7 @@ test.describe('Supplier order management', () => {
     const email = process.env.E2E_SUPPLIER_EMAIL
     const password = process.env.E2E_SUPPLIER_PASSWORD
     test.skip(!email || !password, 'E2E_SUPPLIER_EMAIL/PASSWORD not set')
-    await loginAs(page, email!, password!)
+    await loginAs(page, email!, password!, process.env.E2E_SUPPLIER_TOTP_SECRET)
   })
 
   test('supplier dashboard loads with key metrics', async ({ page }) => {

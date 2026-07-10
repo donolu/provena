@@ -11,7 +11,7 @@ test.describe('Admin supplier approval', () => {
     const email = process.env.E2E_ADMIN_EMAIL
     const password = process.env.E2E_ADMIN_PASSWORD
     test.skip(!email || !password, 'E2E_ADMIN_EMAIL/PASSWORD not set')
-    await loginAs(page, email!, password!)
+    await loginAs(page, email!, password!, process.env.E2E_ADMIN_TOTP_SECRET)
   })
 
   test('admin dashboard loads', async ({ page }) => {
