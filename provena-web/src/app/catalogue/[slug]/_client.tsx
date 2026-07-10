@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Heart, ShoppingBasket, Star } from 'lucide-react'
@@ -9,6 +9,8 @@ import { Nav } from '@/components/nav'
 import { CartDrawer } from '@/components/cart-drawer'
 import { getProduct, getProductReviews, getRelatedProducts, submitReview } from '@/lib/api/catalogue'
 import { ProductCard } from '@/components/product-card'
+import { RecentlyViewed } from '@/components/recently-viewed'
+import { useRecentlyViewed } from '@/store/recently-viewed'
 import { getCart, addToCart, updateCartItem, removeCartItem as deleteCartItem, getWishlist, addToWishlist, removeFromWishlist } from '@/lib/api/cart'
 import { useAuthStore } from '@/store/auth'
 import type { ProductVariant } from '@/lib/api/types'
@@ -154,6 +156,12 @@ export default function ProductDetailPage({
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['wishlist'] }),
   })
+
+  // Track this product as recently viewed (client-side, persisted).
+  const addRecentlyViewed = useRecentlyViewed((s) => s.addProduct)
+  useEffect(() => {
+    if (product) addRecentlyViewed(product)
+  }, [product, addRecentlyViewed])
 
   // Review form
   const [reviewRating, setReviewRating] = useState(0)
@@ -539,6 +547,13 @@ export default function ProductDetailPage({
             </div>
           </section>
         )}
+
+        <RecentlyViewed
+          excludeSlug={slug}
+          onAddToCart={(variantId) => relatedAddToCartMutation.mutate(variantId)}
+          onToggleWishlist={(variantId) => relatedWishlistMutation.mutate(variantId)}
+          isInWishlist={(p) => (p.variants[0] ? relatedInWishlist(p.variants[0].id) : false)}
+        />
       </main>
 
       <CartDrawer
