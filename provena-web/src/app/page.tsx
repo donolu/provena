@@ -9,7 +9,7 @@ import { Nav } from '@/components/nav'
 import { ProductCard } from '@/components/product-card'
 import { RecentlyViewed } from '@/components/recently-viewed'
 import { CartDrawer } from '@/components/cart-drawer'
-import { getProducts, getActiveBanners } from '@/lib/api/catalogue'
+import { getProducts, getActiveBanners, getRecommendedProducts } from '@/lib/api/catalogue'
 import { getCart, addToCart, updateCartItem, removeCartItem } from '@/lib/api/cart'
 import { useAuthStore } from '@/store/auth'
 import type { CartItem } from '@/lib/api/types'
@@ -29,6 +29,14 @@ export default function Home() {
   const { data: banners = [] } = useQuery({
     queryKey: ['banners', 'active'],
     queryFn: getActiveBanners,
+  })
+
+  // Personalised rail — only fetched for signed-in buyers, whose order history
+  // drives the recommendations.
+  const { data: recommended = [] } = useQuery({
+    queryKey: ['products', 'recommended'],
+    queryFn: getRecommendedProducts,
+    enabled: !!user,
   })
 
   const { data: serverCart } = useQuery({
@@ -216,6 +224,36 @@ export default function Home() {
           >
             Browse all products <ArrowRight size={13} strokeWidth={2} />
           </Link>
+        </section>
+      )}
+
+      {/* Recommended for you — personalised, signed-in buyers only */}
+      {user && recommended.length > 0 && (
+        <section className="max-w-6xl mx-auto px-6 py-14 border-t border-stone-200/60">
+          <div className="flex items-baseline justify-between mb-8">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-marigold font-sans mb-1">For you</p>
+              <h2 className="font-display italic text-2xl text-forest">Recommended for you</h2>
+            </div>
+            <Link
+              href="/catalogue"
+              className="text-xs font-sans text-soil hover:text-forest underline-offset-2 hover:underline transition-colors flex items-center gap-1"
+            >
+              All products <ArrowRight size={11} strokeWidth={2} />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {recommended.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                inWishlist={product.variants.some((v) => wishlist.has(v.id))}
+                onAddToCart={handleAddToCart}
+                onToggleWishlist={handleToggleWishlist}
+              />
+            ))}
+          </div>
         </section>
       )}
 

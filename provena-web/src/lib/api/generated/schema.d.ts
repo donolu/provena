@@ -1069,6 +1069,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalogue/products/recommendations/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Personalised product recommendations ('recommended for you')
+         * @description Returns up to twelve ACTIVE products recommended for the current user. Signed-in buyers get recommendations based on the categories and suppliers in their order history (excluding products they have already bought); anonymous or new users get a popularity-based cold-start list.
+         */
+        get: operations["catalogue_products_recommendations_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/catalogue/products/": {
         parameters: {
             query?: never;
@@ -5582,6 +5602,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaginatedProductList"];
+                };
+            };
+        };
+    };
+    catalogue_products_recommendations_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"][];
                 };
             };
         };
