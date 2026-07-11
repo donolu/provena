@@ -29,8 +29,14 @@ wait_healthy() {
     while [ "$i" -le "$tries" ]; do
         healthy=0
         for id in $(docker compose ps -q "$svc"); do
-            status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id" 2>/dev/null || echo gone)
-            [ "$status" = "healthy" ] && healthy=$((healthy + 1))
+            # Services with a healthcheck report starting/healthy/unhealthy; count
+            # only "healthy". Services without one have no health status, so fall
+            # back to the container's running state (best effort — no readiness
+            # signal to gate on).
+            status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id" 2>/dev/null || echo gone)
+            case "$status" in
+                healthy | running) healthy=$((healthy + 1)) ;;
+            esac
         done
         printf '\r     %s: %s/%s healthy   ' "$svc" "$healthy" "$want"
         if [ "$healthy" -ge "$want" ]; then printf '\n'; return 0; fi

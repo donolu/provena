@@ -7,6 +7,13 @@ env = environ.Env()
 
 DEBUG = False
 
+# Internal probes (the container healthcheck in docker-compose.yml, and any
+# load-balancer readiness check) reach the app over the pod-local loopback,
+# so Host: 127.0.0.1 must pass ALLOWED_HOSTS even when DJANGO_ALLOWED_HOSTS
+# only lists public hostnames. Loopback is not a useful Host-spoofing vector
+# (an injected 127.0.0.1 link is worthless to an attacker), so always allow it.
+ALLOWED_HOSTS += ["127.0.0.1", "localhost"]  # noqa: F405
+
 # Security
 SECURE_SSL_REDIRECT = True
 # Internal probes/scrapers (Prometheus, load-balancer health checks) reach the
