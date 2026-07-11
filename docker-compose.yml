@@ -76,6 +76,21 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Readiness gate for the rolling deploy (scripts/deploy.sh): the script waits
+    # for new replicas to report healthy before retiring the old ones. This does
+    # not gate Nginx routing (Docker DNS has no health awareness) — Nginx may
+    # briefly resolve a just-started replica, and proxy_next_upstream retries the
+    # request elsewhere. /api/v1/health/ also checks the DB is reachable.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/', timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   worker:
@@ -123,6 +138,18 @@ services:
       NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN:-}
     depends_on:
       - api
+    # Readiness gate for the rolling deploy (scripts/deploy.sh), same role as the
+    # api healthcheck. /healthz is a static route handler (no rendering/upstream).
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - require('http').get('http://127.0.0.1:3000/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   # ── Reverse proxy ─────────────────────────────────────────────────────────────

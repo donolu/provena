@@ -185,16 +185,30 @@ In the Stripe dashboard, add a webhook endpoint:
 
 The Nginx config proxies `/api/` to Django and `/` to Next.js. Nginx terminates connections on port 80; Cloudflare provides TLS.
 
-### Updating to a New Release
+### Updating to a New Release (zero-downtime)
+
+Nginx balances across multiple `api` (and `web`) replicas via Docker DNS and retries any request that hits a just-started replica (`proxy_next_upstream` in `nginx/nginx.conf`). `scripts/deploy.sh` uses this to roll the app with no downtime window: it builds the new image, starts new replicas alongside the running ones, waits until they report healthy (`/api/v1/health/`), then retires the old ones.
 
 ```bash
 git pull origin main
-docker compose build api web
-docker compose up -d
+
+# 1. Apply backward-compatible (expand) migrations first, against the DIRECT
+#    connection (migrations must not go through PgBouncer — see above).
 docker compose exec api sh -c 'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate --no-input'
+
+# 2. Roll api and web to the new image, health-gated, one batch at a time.
+scripts/deploy.sh            # or: scripts/deploy.sh api    /    TARGET_REPLICAS=3 scripts/deploy.sh
 ```
 
-Zero-downtime updates require a load balancer with blue-green deployment, which is not included in the base compose setup. For most traffic levels, the brief restart window (seconds) is acceptable.
+Deploy with `scripts/deploy.sh`, not `docker compose up` — the script manages the replica handover. Verified locally with thousands of requests through Nginx during a roll and zero failures.
+
+**Expand/contract migrations.** During a roll the old and new code run **simultaneously**, so every schema change must stay compatible with the currently-deployed version:
+
+- **Expand** (deploy first, safe): add nullable columns/tables, add indexes (`CREATE INDEX CONCURRENTLY`), add new code paths that tolerate old data.
+- Deploy the new application version (`scripts/deploy.sh`).
+- **Contract** (only in a *later* release, once the old version is fully retired): drop columns, enforce `NOT NULL`, remove old code.
+
+Never ship an incompatible schema change in the same release that needs it — split it across two deploys.
 
 ---
 
