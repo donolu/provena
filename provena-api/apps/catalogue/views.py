@@ -484,7 +484,7 @@ class RecommendedProductsView(APIView):
                     affinity_categories.add(category_id)
                 affinity_suppliers.add(supplier_id)
 
-        # How many (non-cancelled) times each product has been ordered — drives
+        # How many times each product has been ordered in a paid order; drives
         # popularity ordering and the whole cold-start list.
         order_count = Subquery(
             OrderItem.objects.filter(
