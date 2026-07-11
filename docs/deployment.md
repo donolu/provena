@@ -65,6 +65,9 @@ Without this, product image and KYC document uploads will fail. Django falls bac
 # Required
 DJANGO_SECRET_KEY=<50+ random chars>
 DJANGO_ALLOWED_HOSTS=api.yourdomain.com,yourdomain.com
+# On Render you can leave DJANGO_ALLOWED_HOSTS unset: production settings add
+# the public host automatically from RENDER_EXTERNAL_HOSTNAME (which Render
+# injects), so the render.yaml Blueprint works without it.
 CORS_ALLOWED_ORIGINS=https://yourdomain.com
 
 # Database and cache
