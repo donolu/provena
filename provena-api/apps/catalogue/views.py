@@ -445,17 +445,19 @@ class RecommendedProductsView(APIView):
         responses={200: ProductSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:
-        from apps.orders.models import OrderItem, OrderStatus
+        from apps.orders.models import OrderItem
+        from apps.payments.models import PaymentStatus
 
-        # Only orders that have actually been paid for are real commerce signal.
-        # place_order creates PENDING orders and items *before* payment, so a
-        # PENDING (or CANCELLED) order is a failed/abandoned checkout and must not
-        # drive affinity, exclusions or popularity. A sub-order reaches CONFIRMED
-        # only once its payment succeeds.
-        paid_statuses = (
-            OrderStatus.CONFIRMED,
-            OrderStatus.DISPATCHED,
-            OrderStatus.DELIVERED,
+        # Real commerce signal = the order was actually paid for. place_order
+        # creates PENDING orders and items *before* payment, and order/sub-order
+        # status tracks the supplier fulfilment workflow (CONFIRMED is a separate
+        # supplier action), not payment — a paid order can sit at PENDING while it
+        # awaits confirmation. So key off the payment status instead: a succeeded
+        # payment, or one refunded after a real payment.
+        paid_payment_statuses = (
+            PaymentStatus.SUCCEEDED,
+            PaymentStatus.PARTIALLY_REFUNDED,
+            PaymentStatus.REFUNDED,
         )
 
         affinity_categories: set = set()
@@ -466,7 +468,8 @@ class RecommendedProductsView(APIView):
         if user.is_authenticated:
             history = (
                 OrderItem.objects.filter(
-                    sub_order__order__buyer=user, sub_order__status__in=paid_statuses
+                    sub_order__order__buyer=user,
+                    sub_order__order__payment__status__in=paid_payment_statuses,
                 )
                 .values_list(
                     "variant__product_id",
@@ -485,7 +488,8 @@ class RecommendedProductsView(APIView):
         # popularity ordering and the whole cold-start list.
         order_count = Subquery(
             OrderItem.objects.filter(
-                variant__product=OuterRef("pk"), sub_order__status__in=paid_statuses
+                variant__product=OuterRef("pk"),
+                sub_order__order__payment__status__in=paid_payment_statuses,
             )
             .values("variant__product")
             .annotate(c=Count("id"))

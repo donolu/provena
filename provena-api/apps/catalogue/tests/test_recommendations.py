@@ -4,6 +4,7 @@ import pytest
 
 from apps.catalogue.models import Category, Product, ProductStatus, ProductVariant
 from apps.orders.models import Order, OrderItem, OrderStatus, SubOrder
+from apps.payments.models import Payment, PaymentStatus
 
 URL = "/api/v1/catalogue/products/recommendations/"
 
@@ -23,23 +24,28 @@ def _product(supplier, category, name, slug, *, featured=False, status=ProductSt
     return product
 
 
-def _buy(buyer, product, *, status=OrderStatus.DELIVERED):
-    """Give ``buyer`` a paid (DELIVERED by default) order line for ``product``.
+def _buy(
+    buyer, product, *, payment_status=PaymentStatus.SUCCEEDED, order_status=OrderStatus.PENDING
+):
+    """Give ``buyer`` an order line for ``product``.
 
-    ``status`` is applied to both the order and its sub-order; recommendations
-    key off the sub-order status.
+    Defaults model the real post-checkout state: the payment has SUCCEEDED while
+    the order still sits at PENDING awaiting supplier confirmation (CONFIRMED is a
+    separate supplier action). Pass ``payment_status=None`` for a never-paid,
+    abandoned order. Recommendations key off the payment status, not the order
+    workflow status.
     """
     order = Order.objects.create(
         buyer=buyer,
         reference=f"ORD-{product.slug}"[:24],
-        status=status,
+        status=order_status,
         shipping_name="Test Buyer",
         shipping_line1="1 Street",
         shipping_city="London",
         shipping_postcode="EC1A 1BB",
         shipping_country="GB",
     )
-    sub = SubOrder.objects.create(order=order, supplier=product.supplier, status=status)
+    sub = SubOrder.objects.create(order=order, supplier=product.supplier, status=order_status)
     variant = product.variants.first()
     OrderItem.objects.create(
         sub_order=sub,
@@ -50,6 +56,13 @@ def _buy(buyer, product, *, status=OrderStatus.DELIVERED):
         quantity=1,
         unit_price=variant.price,
     )
+    if payment_status is not None:
+        Payment.objects.create(
+            order=order,
+            stripe_payment_intent_id=f"pi_{product.slug}",
+            amount=variant.price,
+            status=payment_status,
+        )
     return order
 
 
@@ -109,30 +122,44 @@ class TestRecommendations:
         assert "draft" not in slugs
         assert active.slug in slugs
 
-    @pytest.mark.parametrize("status", [OrderStatus.PENDING, OrderStatus.CANCELLED])
+    @pytest.mark.parametrize("payment_status", [None, PaymentStatus.PENDING, PaymentStatus.FAILED])
     def test_unpaid_orders_do_not_exclude_or_drive_affinity(
-        self, api_client, buyer, approved_supplier, category, status
+        self, api_client, buyer, approved_supplier, category, payment_status
     ):
-        # PENDING = checkout started but never paid; CANCELLED = paid then voided.
-        # Neither is real purchase history, so the product stays recommendable.
+        # No payment / pending / failed = an abandoned checkout, not real history,
+        # so the product stays recommendable.
         unpaid = _product(approved_supplier, category, "Unpaid buy", "unpaid")
-        _buy(buyer, unpaid, status=status)
+        _buy(buyer, unpaid, payment_status=payment_status)
 
         api_client.force_authenticate(user=buyer)
         slugs = [p["slug"] for p in api_client.get(URL).json()]
         assert unpaid.slug in slugs
 
-    def test_pending_orders_do_not_count_towards_popularity(
+    def test_unpaid_orders_do_not_count_towards_popularity(
         self, api_client, buyer, approved_supplier, category
     ):
         # A never-paid order must not boost a product above a genuinely paid one.
         paid = _product(approved_supplier, category, "Paid popular", "paid-popular")
-        pending = _product(approved_supplier, category, "Pending popular", "pending-popular")
-        _buy(buyer, paid, status=OrderStatus.DELIVERED)
-        _buy(buyer, pending, status=OrderStatus.PENDING)
+        unpaid = _product(approved_supplier, category, "Unpaid popular", "unpaid-popular")
+        _buy(buyer, paid, payment_status=PaymentStatus.SUCCEEDED)
+        _buy(buyer, unpaid, payment_status=None)
 
         slugs = [p["slug"] for p in api_client.get(URL).json()]  # anonymous cold-start
-        assert slugs.index(paid.slug) < slugs.index(pending.slug)
+        assert slugs.index(paid.slug) < slugs.index(unpaid.slug)
+
+    def test_paid_order_awaiting_confirmation_counts_as_history(
+        self, api_client, buyer, approved_supplier, category
+    ):
+        # Payment succeeded but the supplier has not confirmed yet, so the order is
+        # still PENDING. It is a real purchase and must count (drive the signal).
+        bought = _product(approved_supplier, category, "Paid, unconfirmed", "paid-unconfirmed")
+        _buy(
+            buyer, bought, payment_status=PaymentStatus.SUCCEEDED, order_status=OrderStatus.PENDING
+        )
+
+        api_client.force_authenticate(user=buyer)
+        slugs = [p["slug"] for p in api_client.get(URL).json()]
+        assert bought.slug not in slugs  # recognised as already purchased -> excluded
 
     def test_caps_at_twelve(self, api_client, approved_supplier, category):
         for i in range(15):
