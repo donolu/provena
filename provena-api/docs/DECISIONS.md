@@ -172,3 +172,32 @@ Playwright specs for the three critical journeys already exist in `provena-web/e
 
 **Consequences:**
 PR CI gains several minutes of wall-clock time on changes that touch the app, since the Compose stack must boot before tests run. A seed fixture and its teardown must be maintained, and CI secrets for the seeded accounts must be managed. Because E2E is tied to Compose, drift in the Compose definition surfaces early as an E2E failure, which is desirable. Playwright is inherently more flake-prone than unit tests; the retry, trace, and artefact settings mitigate this, and the staged non-blocking-then-required rollout limits disruption while confidence is established. The alternative of leaving the specs skipped was rejected: unexecuted tests are worse than no tests because they imply coverage that does not exist.
+
+---
+
+## ADR-010: PgBouncer Connection Pooling
+
+**Date:** 2026-07-11
+**Status:** Accepted
+
+**Context:**
+Django opens a database connection per worker process (and, with `CONN_MAX_AGE`, holds it open). Under Daphne/Celery at higher concurrency this multiplies quickly and exhausts PostgreSQL's `max_connections` (default ~100), which becomes a hard ceiling well before the application itself is saturated. This is required before scaling beyond roughly 50 concurrent API workers (#12).
+
+**Decision:**
+
+**PgBouncer in transaction pooling mode**, fronting PostgreSQL. Self-hosted deployments run an `edoburu/pgbouncer` sidecar in `docker-compose.yml` (listening on `:6432`); Render's managed Postgres provides PgBouncer natively. The application, Celery worker, and beat all connect through the pooler (`DATABASE_URL` → `pgbouncer:6432`).
+
+Transaction pooling was chosen over session pooling because it returns a server connection to the pool at the **end of each transaction** rather than at disconnect, so a large fleet of client connections multiplexes onto a small pool of server connections — exactly the fan-in needed. Session pooling would pin a server connection for the life of each client and give little benefit here.
+
+Transaction pooling reassigns a backend between transactions, so anything bound to a single server connection is incompatible and is disabled:
+- **Server-side cursors** (`DISABLE_SERVER_SIDE_CURSORS = True`).
+- **psycopg server-side prepared statements** (`OPTIONS = {"prepare_threshold": None}`).
+
+Both are applied automatically for PostgreSQL and are harmless on a direct connection. `LISTEN/NOTIFY` and session-level `SET` are likewise avoided in application code.
+
+**Migrations use a direct connection** (`DIRECT_DATABASE_URL` → Postgres `:5432`), not the pooler: DDL, `CREATE INDEX CONCURRENTLY`, and advisory locks are unsafe under transaction pooling. CI and the documented commands run `migrate` with `DATABASE_URL` overridden to the direct URL.
+
+DB credentials in Compose are env-driven (`DB_USER` / `DB_PASSWORD` / `DB_NAME`, defaulting to `provena`) so the same definitions front Postgres, PgBouncer, and the application URLs without duplication.
+
+**Consequences:**
+Database connections now scale to hundreds of workers against a small server pool, removing the `max_connections` ceiling as the near-term scaling limit. The cost is a small per-query overhead from disabling prepared statements (acceptable at current volumes; revisit if profiling shows it matters) and a second connection string to manage. Migrations must remember the direct URL — enforced in CI and Compose, and documented in `deployment.md`. PgBouncer is one more moving part, but it is off-the-shelf, stateless, and low-maintenance. The transaction-pooling constraints (no server-side cursors/prepared statements) are a permanent design rule for this codebase, not a temporary workaround.

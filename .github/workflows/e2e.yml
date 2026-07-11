@@ -109,7 +109,11 @@ jobs:
           wait_for "http://localhost/catalogue"
 
       - name: Apply migrations
-        run: docker compose exec -T api python manage.py migrate --noinput
+        # Migrations run against Postgres directly (DIRECT_DATABASE_URL), not
+        # through PgBouncer's transaction pooling.
+        run: >-
+          docker compose exec -T api sh -c
+          'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate --noinput'
 
       - name: Seed E2E data
         run: docker compose exec -T api python manage.py seed_e2e_data --password "$E2E_BUYER_PASSWORD"

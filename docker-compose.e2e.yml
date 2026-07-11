@@ -23,7 +23,8 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.development
       DJANGO_SECRET_KEY: dev-secret-key-not-for-production
-      DATABASE_URL: postgres://provena:provena@db:5432/provena
+      DATABASE_URL: postgres://${DB_USER:-provena}:${DB_PASSWORD:-provena}@pgbouncer:6432/${DB_NAME:-provena}
+      DIRECT_DATABASE_URL: postgres://${DB_USER:-provena}:${DB_PASSWORD:-provena}@db:5432/${DB_NAME:-provena}
       REDIS_URL: redis://redis:6379/0
       STRIPE_SECRET_KEY: ""
       STRIPE_PUBLISHABLE_KEY: ""

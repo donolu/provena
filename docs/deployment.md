@@ -60,8 +60,12 @@ DJANGO_ALLOWED_HOSTS=api.yourdomain.com,yourdomain.com
 CORS_ALLOWED_ORIGINS=https://yourdomain.com
 
 # Database and cache
-DATABASE_URL=postgres://user:pass@host:5432/provena
+# App traffic goes through PgBouncer (transaction pooling); migrations use the
+# direct connection. See "Connection pooling (PgBouncer)" below.
+DATABASE_URL=postgres://user:pass@pgbouncer-host:6432/provena
+DIRECT_DATABASE_URL=postgres://user:pass@db-host:5432/provena
 REDIS_URL=redis://:pass@host:6379/0
+# Self-hosted compose also reads DB_USER / DB_PASSWORD / DB_NAME (default: provena).
 
 # Payments
 STRIPE_SECRET_KEY=sk_live_...
@@ -248,16 +252,39 @@ print('Categories created')
 
 ---
 
+## Connection pooling (PgBouncer)
+
+The app connects to Postgres through **PgBouncer in transaction pooling mode**, so many API and worker processes multiplex a small pool of server connections (required before scaling beyond ~50 concurrent workers). The self-hosted `docker-compose.yml` runs an `edoburu/pgbouncer` sidecar; Render's managed Postgres provides PgBouncer itself.
+
+Transaction pooling reassigns a server connection between transactions, so the Django settings disable the two things bound to a single backend:
+
+- `DISABLE_SERVER_SIDE_CURSORS = True`
+- psycopg server-side prepared statements (`OPTIONS = {"prepare_threshold": None}`)
+
+These are applied automatically for Postgres and are harmless on a direct connection.
+
+**Migrations must bypass the pooler** and use a direct Postgres connection (`DIRECT_DATABASE_URL`) — DDL, `CREATE INDEX CONCURRENTLY`, and advisory locks are unsafe under transaction pooling:
+
+```bash
+docker compose exec api sh -c 'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate --no-input'
+```
+
+Inspect the pool live via the admin console (`ADMIN_USERS` includes the DB user):
+
+```bash
+docker compose exec api psql "postgres://<user>:<pass>@pgbouncer:6432/pgbouncer" -c "SHOW POOLS;"
+```
+
 ## Database Migrations in Production
 
-Always run migrations before starting the new application version:
+Always run migrations before starting the new application version, against the **direct** connection (see above):
 
 ```bash
 # Check what will be applied (dry run)
-docker compose exec api python manage.py migrate --plan
+docker compose exec api sh -c 'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate --plan'
 
 # Apply
-docker compose exec api python manage.py migrate --no-input
+docker compose exec api sh -c 'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate --no-input'
 ```
 
 If a migration requires a table lock (adding a non-nullable column to a large table), schedule it during a maintenance window. Django's `SeparateDatabaseAndState` is available for zero-downtime column additions.

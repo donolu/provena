@@ -116,6 +116,16 @@ DATABASES["default"]["ENGINE"] = _DB_METRICS_ENGINES.get(
     DATABASES["default"]["ENGINE"], DATABASES["default"]["ENGINE"]
 )
 
+# PgBouncer transaction-pooling compatibility (Postgres only): a pooled server
+# connection is reassigned between transactions, so server-side cursors and
+# psycopg's server-side prepared statements (both bound to one backend) must be
+# off. These are safe on a direct connection too. Migrations use a direct
+# connection (DIRECT_DATABASE_URL) where these do not apply.
+if "postgresql" in DATABASES["default"]["ENGINE"]:
+    DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
+    DATABASES["default"].setdefault("OPTIONS", {})["prepare_threshold"] = None
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=0)
+
 AUTH_USER_MODEL = "accounts.User"
 
 AUTH_PASSWORD_VALIDATORS = [

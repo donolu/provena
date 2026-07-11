@@ -122,10 +122,16 @@ cp provena-web/.env.example provena-web/.env.local
 # Start all services
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
-# In a separate terminal: apply migrations and create a superuser
-docker compose exec api python manage.py migrate
+# In a separate terminal: apply migrations and create a superuser.
+# Migrations connect to Postgres directly (DIRECT_DATABASE_URL), bypassing the
+# PgBouncer transaction pooler that the app runs through — see docs/deployment.md.
+docker compose exec api sh -c 'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate'
 docker compose exec api python manage.py createsuperuser
 ```
+
+> The app connects through **PgBouncer** (transaction pooling) so many API/worker
+> processes multiplex a small Postgres connection pool. Schema migrations use the
+> direct connection instead. See [docs/deployment.md](docs/deployment.md#connection-pooling-pgbouncer).
 
 - API: `http://localhost:8000/api/v1/`
 - Django admin: `http://localhost:8000/admin/`
