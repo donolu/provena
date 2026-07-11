@@ -29,8 +29,8 @@ services:
       STRIPE_SECRET_KEY: ""
       STRIPE_PUBLISHABLE_KEY: ""
       STRIPE_WEBHOOK_SECRET: ""
-    ports:
-      - "8000:8000"
+    # No published port: reached through Nginx only, which also lets the api
+    # service scale to multiple replicas for the rolling-deploy check.
 
   web:
     build:

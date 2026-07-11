@@ -76,6 +76,18 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Gate for zero-downtime rolling deploys (scripts/deploy.sh): a replica is
+    # only routed to once /api/v1/health/ (which checks the DB) returns 200.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/', timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   worker:
