@@ -14,6 +14,13 @@ DEBUG = False
 # (an injected 127.0.0.1 link is worthless to an attacker), so always allow it.
 ALLOWED_HOSTS += ["127.0.0.1", "localhost"]  # noqa: F405
 
+# On Render the public hostname is injected as RENDER_EXTERNAL_HOSTNAME. Add it
+# so public traffic is not rejected with DisallowedHost; the render.yaml
+# Blueprint relies on this rather than hardcoding the host.
+_render_host = env("RENDER_EXTERNAL_HOSTNAME", default="")
+if _render_host:
+    ALLOWED_HOSTS.append(_render_host)
+
 # Security
 SECURE_SSL_REDIRECT = True
 # Internal probes/scrapers (Prometheus, load-balancer health checks) reach the
