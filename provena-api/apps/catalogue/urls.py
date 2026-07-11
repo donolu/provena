@@ -22,6 +22,7 @@ from .views import (
     ProductUploadTemplateView,
     ProductVariantDetailView,
     ProductVariantListCreateView,
+    RecommendedProductsView,
     RelatedProductsView,
     SupplierProductListView,
     VariantImageDetailView,
@@ -70,6 +71,12 @@ urlpatterns = [
     ),
     # Products — supplier-specific MUST come before <slug:slug> to prevent "me" matching
     path("products/me/", SupplierProductListView.as_view(), name="supplier-product-list"),
+    # Personalised recommendations — static path, must precede <slug:slug>
+    path(
+        "products/recommendations/",
+        RecommendedProductsView.as_view(),
+        name="product-recommendations",
+    ),
     path("products/", ProductListCreateView.as_view(), name="product-list-create"),
     path("products/<slug:slug>/", ProductDetailView.as_view(), name="product-detail"),
     path(

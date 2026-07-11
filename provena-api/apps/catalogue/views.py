@@ -11,6 +11,7 @@ from django.db.models import (
     Value,
     When,
 )
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
@@ -417,6 +418,116 @@ class RelatedProductsView(APIView):
             .order_by("-relevance", "-is_featured", "-created_at")[: self.RELATED_LIMIT]
         )
         return Response(ProductSerializer(related, many=True).data)
+
+
+class RecommendedProductsView(APIView):
+    """Personalised 'recommended for you' rail for the homepage.
+
+    Content-based, no external ML service. For a signed-in buyer it ranks ACTIVE
+    products by affinity with the categories and suppliers in their *paid* order
+    history (excluding products they have already bought), then fills the rail
+    with featured and most-ordered products. Anonymous or brand-new buyers have
+    no purchase signal, so it degrades to a sensible cold-start list: featured
+    first, then most-ordered, then newest.
+    """
+
+    permission_classes = [AllowAny]
+
+    LIMIT = 12
+
+    @extend_schema(
+        tags=["Catalogue: Products"],
+        summary="Personalised product recommendations ('recommended for you')",
+        description="Returns up to twelve ACTIVE products recommended for the current user. "
+        "Signed-in buyers get recommendations based on the categories and suppliers in their "
+        "order history (excluding products they have already bought); anonymous or new users "
+        "get a popularity-based cold-start list.",
+        responses={200: ProductSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        from apps.orders.models import OrderItem
+        from apps.payments.models import PaymentStatus
+
+        # Real commerce signal = the order was actually paid for. place_order
+        # creates PENDING orders and items *before* payment, and order/sub-order
+        # status tracks the supplier fulfilment workflow (CONFIRMED is a separate
+        # supplier action), not payment — a paid order can sit at PENDING while it
+        # awaits confirmation. So key off the payment status instead: a succeeded
+        # payment, or one refunded after a real payment.
+        paid_payment_statuses = (
+            PaymentStatus.SUCCEEDED,
+            PaymentStatus.PARTIALLY_REFUNDED,
+            PaymentStatus.REFUNDED,
+        )
+
+        affinity_categories: set = set()
+        affinity_suppliers: set = set()
+        purchased_product_ids: set = set()
+
+        user = request.user
+        if user.is_authenticated:
+            history = (
+                OrderItem.objects.filter(
+                    sub_order__order__buyer=user,
+                    sub_order__order__payment__status__in=paid_payment_statuses,
+                )
+                .values_list(
+                    "variant__product_id",
+                    "variant__product__category_id",
+                    "variant__product__supplier_id",
+                )
+                .distinct()
+            )
+            for product_id, category_id, supplier_id in history:
+                purchased_product_ids.add(product_id)
+                if category_id is not None:
+                    affinity_categories.add(category_id)
+                affinity_suppliers.add(supplier_id)
+
+        # How many (non-cancelled) times each product has been ordered — drives
+        # popularity ordering and the whole cold-start list.
+        order_count = Subquery(
+            OrderItem.objects.filter(
+                variant__product=OuterRef("pk"),
+                sub_order__order__payment__status__in=paid_payment_statuses,
+            )
+            .values("variant__product")
+            .annotate(c=Count("id"))
+            .values("c"),
+            output_field=IntegerField(),
+        )
+
+        # Affinity score: same category and supplier as something bought (3),
+        # same category (2), same supplier (1), otherwise 0. Empty for users with
+        # no history, which collapses the ordering to the cold-start tiebreaks.
+        whens = []
+        if affinity_categories and affinity_suppliers:
+            whens.append(
+                When(
+                    category_id__in=affinity_categories,
+                    supplier_id__in=affinity_suppliers,
+                    then=Value(3),
+                )
+            )
+        if affinity_categories:
+            whens.append(When(category_id__in=affinity_categories, then=Value(2)))
+        if affinity_suppliers:
+            whens.append(When(supplier_id__in=affinity_suppliers, then=Value(1)))
+
+        recommended = (
+            _annotate_ratings(
+                Product.objects.filter(status=ProductStatus.ACTIVE)
+                .exclude(pk__in=purchased_product_ids)
+                .select_related("supplier", "category")
+                .prefetch_related("variants", "variants__images", "images")
+            )
+            .annotate(
+                affinity=Case(*whens, default=Value(0), output_field=IntegerField()),
+                order_count=Coalesce(order_count, Value(0)),
+            )
+            .order_by("-affinity", "-is_featured", "-order_count", "-created_at")[: self.LIMIT]
+        )
+        return Response(ProductSerializer(recommended, many=True).data)
 
 
 # ---------------------------------------------------------------------------

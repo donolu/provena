@@ -37,6 +37,11 @@ export async function getRelatedProducts(slug: string): Promise<Product[]> {
   return data
 }
 
+export async function getRecommendedProducts(): Promise<Product[]> {
+  const { data } = await apiClient.get<Product[]>('/catalogue/products/recommendations/')
+  return data
+}
+
 export async function getMyProducts(): Promise<PaginatedResponse<Product>> {
   const { data } = await apiClient.get<PaginatedResponse<Product>>('/catalogue/products/me/')
   return data
