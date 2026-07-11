@@ -338,6 +338,18 @@ AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default="")
 # Automated database backups (apps.ops)
 DB_BACKUP_BUCKET_NAME = env("DB_BACKUP_BUCKET_NAME", default="")  # falls back to storage bucket
 DB_BACKUP_PREFIX = env("DB_BACKUP_PREFIX", default="backups/")
+
+# Typesense full-text search (apps.catalogue.search). When TYPESENSE_HOST is
+# unset the whole search pipeline is disabled: index-on-save signals no-op and
+# product search falls back to the Postgres ILIKE query, so dev/CI need no
+# Typesense instance.
+TYPESENSE_HOST = env("TYPESENSE_HOST", default="")
+TYPESENSE_PORT = env.int("TYPESENSE_PORT", default=8108)
+TYPESENSE_PROTOCOL = env("TYPESENSE_PROTOCOL", default="http")
+TYPESENSE_API_KEY = env("TYPESENSE_API_KEY", default="")
+TYPESENSE_PRODUCTS_COLLECTION = env("TYPESENSE_PRODUCTS_COLLECTION", default="products")
+TYPESENSE_TIMEOUT_SECONDS = env.int("TYPESENSE_TIMEOUT_SECONDS", default=3)
+TYPESENSE_ENABLED = bool(TYPESENSE_HOST)
 DB_BACKUP_RETENTION_DAYS = env.int("DB_BACKUP_RETENTION_DAYS", default=30)
 
 # Frontend

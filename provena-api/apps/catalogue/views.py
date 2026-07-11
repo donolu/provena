@@ -1,3 +1,6 @@
+import logging
+
+from django.conf import settings
 from django.db import models
 from django.db.models import (
     Avg,
@@ -26,7 +29,7 @@ from apps.accounts.permissions import IsAdmin
 from apps.pagination import PaginatedListMixin
 from apps.suppliers.permissions import IsApprovedSupplier
 
-from . import bulk_upload, services
+from . import bulk_upload, search, services
 from .models import (
     Banner,
     Category,
@@ -51,6 +54,8 @@ from .serializers import (
     VariantImageSerializer,
     VariantImageWriteSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _own_product(request: Request, slug: str) -> Product:
@@ -236,6 +241,22 @@ class ProductListCreateView(PaginatedListMixin, APIView):
         responses={200: ProductSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:
+        search_term = request.query_params.get("search", "").strip()
+
+        # Typesense handles the ranked, typo-tolerant text search when it is
+        # configured. Any failure (unconfigured, connection/timeout, malformed
+        # response) falls back to the Postgres query below, so browsing never
+        # stalls on the search engine.
+        if search_term and settings.TYPESENSE_ENABLED:
+            try:
+                return self._typesense_search(request, search_term)
+            except Exception:
+                logger.warning(
+                    "Typesense search failed for %r; falling back to Postgres.",
+                    search_term,
+                    exc_info=True,
+                )
+
         qs = (
             Product.objects.filter(status=ProductStatus.ACTIVE)
             .select_related("supplier", "category")
@@ -245,12 +266,12 @@ class ProductListCreateView(PaginatedListMixin, APIView):
             qs = qs.filter(category__slug=category_slug)
         if supplier_slug := request.query_params.get("supplier"):
             qs = qs.filter(supplier__slug=supplier_slug)
-        if search := request.query_params.get("search"):
+        if search_term:
             qs = qs.filter(
-                Q(name__icontains=search)
-                | Q(description__icontains=search)
-                | Q(category__name__icontains=search)
-                | Q(variants__name__icontains=search)
+                Q(name__icontains=search_term)
+                | Q(description__icontains=search_term)
+                | Q(category__name__icontains=search_term)
+                | Q(variants__name__icontains=search_term)
             ).distinct()
         if request.query_params.get("featured") == "true":
             qs = qs.filter(is_featured=True)
@@ -259,6 +280,66 @@ class ProductListCreateView(PaginatedListMixin, APIView):
         if max_price := request.query_params.get("max_price"):
             qs = qs.filter(variants__price__lte=max_price).distinct()
         return self.paginate(_annotate_ratings(qs), ProductSerializer, request)
+
+    def _typesense_search(self, request: Request, search_term: str) -> Response:
+        """Ranked search page from Typesense, hydrated from Postgres in rank order."""
+        paginator = self.pagination_class()
+        page_size = paginator.get_page_size(request) or paginator.page_size
+        try:
+            page_number = max(1, int(request.query_params.get(paginator.page_query_param, 1)))
+        except (TypeError, ValueError):
+            page_number = 1
+
+        ids, total = search.search_products(
+            search_term,
+            category_slug=request.query_params.get("category"),
+            supplier_slug=request.query_params.get("supplier"),
+            min_price=request.query_params.get("min_price"),
+            max_price=request.query_params.get("max_price"),
+            featured=request.query_params.get("featured") == "true",
+            page=page_number,
+            per_page=page_size,
+        )
+
+        results: list = []
+        if ids:
+            rank = Case(
+                *[When(id=pid, then=Value(pos)) for pos, pid in enumerate(ids)],
+                output_field=IntegerField(),
+            )
+            products = (
+                _annotate_ratings(
+                    Product.objects.filter(id__in=ids, status=ProductStatus.ACTIVE)
+                    .select_related("supplier", "category")
+                    .prefetch_related("variants", "variants__images", "images")
+                )
+                .annotate(_rank=rank)
+                .order_by("_rank")
+            )
+            results = list(ProductSerializer(products, many=True).data)
+        return self._search_response(request, results, total, page_number, page_size)
+
+    def _search_response(
+        self, request: Request, results: list, total: int, page: int, page_size: int
+    ) -> Response:
+        """Build the standard paginated envelope around a Typesense result page."""
+        from rest_framework.utils.urls import remove_query_param, replace_query_param
+
+        param = self.pagination_class.page_query_param
+        url = request.build_absolute_uri()
+        num_pages = max(1, (total + page_size - 1) // page_size)
+
+        next_link = replace_query_param(url, param, page + 1) if page < num_pages else None
+        if page <= 1:
+            previous_link = None
+        elif page == 2:
+            previous_link = remove_query_param(url, param)
+        else:
+            previous_link = replace_query_param(url, param, page - 1)
+
+        return Response(
+            {"count": total, "next": next_link, "previous": previous_link, "results": results}
+        )
 
     @extend_schema(
         tags=["Catalogue: Products"],

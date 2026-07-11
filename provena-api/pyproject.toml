@@ -32,6 +32,7 @@ dependencies = [
     "django-prometheus>=2.3",
     "openpyxl>=3.1",
     "xlrd>=2.0",
+    "typesense>=0.21",
 ]
 
 [project.optional-dependencies]

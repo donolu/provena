@@ -10,6 +10,10 @@ services:
     ports:
       - "6379:6379"
 
+  typesense:
+    ports:
+      - "8108:8108"
+
   api:
     build:
       target: development
