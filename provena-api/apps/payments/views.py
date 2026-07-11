@@ -215,7 +215,12 @@ class AdminRefundView(APIView):
 class AdminProcessPayoutView(APIView):
     permission_classes = [IsAdminUser]
 
-    @extend_schema(tags=["Admin: Payments"], summary="Process a pending payout")
+    @extend_schema(
+        tags=["Admin: Payments"],
+        summary="Process a pending payout",
+        request=None,
+        responses={200: PayoutSerializer},
+    )
     def post(self, request, payout_id):
         payout = get_object_or_404(Payout, id=payout_id)
         try:

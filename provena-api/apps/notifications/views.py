@@ -31,6 +31,7 @@ class NotificationMarkReadView(APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
+        request=None,
         responses={200: NotificationSerializer},
         tags=["Notifications"],
         summary="Mark notification as read",
@@ -44,6 +45,7 @@ class NotificationMarkAllReadView(APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
+        request=None,
         responses={200: None},
         tags=["Notifications"],
         summary="Mark all notifications as read",

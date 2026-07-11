@@ -293,6 +293,7 @@ class AdminReviewApproveView(APIView):
         responses={200: ReviewSerializer},
         tags=["Admin: Marketplace"],
         summary="Approve a review",
+        request=None,
     )
     def post(self, request, pk):
         from django.shortcuts import get_object_or_404

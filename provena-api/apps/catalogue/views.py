@@ -17,8 +17,13 @@ from django.db.models import (
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework import status
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers, status
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -42,6 +47,8 @@ from .models import (
 )
 from .serializers import (
     AdminProductSerializer,
+    BannerSerializer,
+    BannerWriteSerializer,
     BulkProductActionSerializer,
     CategorySerializer,
     CategoryWriteSerializer,
@@ -999,6 +1006,7 @@ class BannerListView(APIView):
         tags=["Catalogue"],
         summary="List active banners",
         description="Returns all active homepage banners ordered by position.",
+        responses={200: BannerSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:
         from .serializers import BannerSerializer
@@ -1010,7 +1018,11 @@ class BannerListView(APIView):
 class AdminBannerListCreateView(PaginatedListMixin, APIView):
     permission_classes = [IsAdmin]
 
-    @extend_schema(tags=["Admin: Banners"], summary="List all banners")
+    @extend_schema(
+        tags=["Admin: Banners"],
+        summary="List all banners",
+        responses={200: BannerSerializer(many=True)},
+    )
     def get(self, request: Request) -> Response:
         from .serializers import BannerSerializer
 
@@ -1019,7 +1031,8 @@ class AdminBannerListCreateView(PaginatedListMixin, APIView):
     @extend_schema(
         tags=["Admin: Banners"],
         summary="Create a banner",
-        responses={201: None},
+        request=BannerWriteSerializer,
+        responses={201: BannerSerializer},
     )
     def post(self, request: Request) -> Response:
         from .serializers import BannerSerializer, BannerWriteSerializer
@@ -1033,7 +1046,12 @@ class AdminBannerListCreateView(PaginatedListMixin, APIView):
 class AdminBannerDetailView(APIView):
     permission_classes = [IsAdmin]
 
-    @extend_schema(tags=["Admin: Banners"], summary="Update a banner")
+    @extend_schema(
+        tags=["Admin: Banners"],
+        summary="Update a banner",
+        request=BannerWriteSerializer,
+        responses={200: BannerSerializer},
+    )
     def patch(self, request: Request, pk: str) -> Response:
         from .serializers import BannerSerializer, BannerWriteSerializer
 
@@ -1043,7 +1061,11 @@ class AdminBannerDetailView(APIView):
         s.save()
         return Response(BannerSerializer(banner).data)
 
-    @extend_schema(tags=["Admin: Banners"], summary="Delete a banner")
+    @extend_schema(
+        tags=["Admin: Banners"],
+        summary="Delete a banner",
+        responses={204: None},
+    )
     def delete(self, request: Request, pk: str) -> Response:
         banner = get_object_or_404(Banner, pk=pk)
         banner.delete()
@@ -1087,6 +1109,9 @@ class ProductUploadPreviewView(APIView):
     @extend_schema(
         tags=["Supplier: Products"],
         summary="Preview a product upload file",
+        request=inline_serializer(
+            name="ProductUploadPreviewRequest", fields={"file": serializers.FileField()}
+        ),
         description=(
             "Parses and validates a CSV, XLSX, or XLS file. "
             "Format is detected by magic bytes, not file extension. "
@@ -1148,6 +1173,9 @@ class ProductUploadConfirmView(APIView):
     @extend_schema(
         tags=["Supplier: Products"],
         summary="Confirm and commit a product upload",
+        request=inline_serializer(
+            name="ProductUploadConfirmRequest", fields={"file": serializers.FileField()}
+        ),
         description=(
             "Accepts the same file as the preview endpoint. "
             "Runs full validation again before writing. "

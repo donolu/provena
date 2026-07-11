@@ -3,7 +3,9 @@ import io
 from datetime import date
 
 from django.http import StreamingHttpResponse
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
+from rest_framework import serializers
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,6 +13,37 @@ from rest_framework.views import APIView
 from apps.suppliers.permissions import IsApprovedSupplier
 
 from . import services
+
+# Response schemas for the list endpoints (the object endpoints document as a
+# generic object; their prose descriptions list the fields).
+_REVENUE_POINT = inline_serializer(
+    name="RevenuePoint",
+    fields={
+        "period": serializers.CharField(),
+        "revenue": serializers.DecimalField(max_digits=12, decimal_places=2),
+        "order_count": serializers.IntegerField(),
+    },
+    many=True,
+)
+_TOP_PRODUCT = inline_serializer(
+    name="TopProduct",
+    fields={
+        "variant_sku": serializers.CharField(),
+        "product_name": serializers.CharField(),
+        "units_sold": serializers.IntegerField(),
+        "revenue": serializers.DecimalField(max_digits=12, decimal_places=2),
+    },
+    many=True,
+)
+_SUPPLIER_PERFORMANCE = inline_serializer(
+    name="SupplierPerformance",
+    fields={
+        "supplier_name": serializers.CharField(),
+        "sub_order_count": serializers.IntegerField(),
+        "revenue": serializers.DecimalField(max_digits=12, decimal_places=2),
+    },
+    many=True,
+)
 
 
 def _parse_dates(request) -> tuple[date | None, date | None]:
@@ -45,6 +78,7 @@ class SalesSummaryView(APIView):
         tags=["Admin: Analytics"],
         summary="Sales summary",
         description="Aggregated revenue, order count, items sold, cancellations, and refunds for the given period.",
+        responses={200: OpenApiTypes.OBJECT},
     )
     def get(self, request):
         from_date, to_date = _parse_dates(request)
@@ -67,6 +101,7 @@ class RevenueOverTimeView(APIView):
         tags=["Admin: Analytics"],
         summary="Revenue over time",
         description="Per-period revenue and order count. Granularity: day | week | month.",
+        responses={200: _REVENUE_POINT},
     )
     def get(self, request):
         from_date, to_date = _parse_dates(request)
@@ -84,6 +119,7 @@ class TopProductsView(APIView):
         ],
         tags=["Admin: Analytics"],
         summary="Top products by revenue",
+        responses={200: _TOP_PRODUCT},
     )
     def get(self, request):
         from_date, to_date = _parse_dates(request)
@@ -102,6 +138,7 @@ class SupplierPerformanceView(APIView):
         tags=["Admin: Analytics"],
         summary="Supplier performance",
         description="Revenue and sub-order count per supplier, sorted by revenue descending.",
+        responses={200: _SUPPLIER_PERFORMANCE},
     )
     def get(self, request):
         from_date, to_date = _parse_dates(request)
@@ -115,6 +152,7 @@ class InventoryHealthView(APIView):
         tags=["Admin: Analytics"],
         summary="Inventory health",
         description="Variant counts: total, low-stock, and out-of-stock.",
+        responses={200: OpenApiTypes.OBJECT},
     )
     def get(self, request):
         return Response(services.inventory_health())
@@ -130,6 +168,7 @@ class ReviewsSummaryView(APIView):
         tags=["Admin: Analytics"],
         summary="Reviews summary",
         description="Totals for all reviews: approved, pending, verified-purchase, average rating.",
+        responses={200: OpenApiTypes.OBJECT},
     )
     def get(self, request):
         variant_id = request.query_params.get("variant_id") or None
@@ -143,6 +182,7 @@ class PayoutsSummaryView(APIView):
         tags=["Admin: Analytics"],
         summary="Payouts summary",
         description="Total net payout amounts grouped by status across all suppliers.",
+        responses={200: OpenApiTypes.OBJECT},
     )
     def get(self, request):
         return Response(services.payouts_summary())
@@ -156,6 +196,7 @@ class SupplierOwnSummaryView(APIView):
         tags=["Analytics (Supplier)"],
         summary="My performance summary",
         description="Revenue, sub-order count, and payout totals for the authenticated supplier.",
+        responses={200: OpenApiTypes.OBJECT},
     )
     def get(self, request):
         from_date, to_date = _parse_dates(request)
@@ -169,6 +210,7 @@ class SupplierPayoutsSummaryView(APIView):
         tags=["Analytics (Supplier)"],
         summary="My payouts summary",
         description="Net payout amounts by status for the authenticated supplier.",
+        responses={200: OpenApiTypes.OBJECT},
     )
     def get(self, request):
         return Response(services.payouts_summary(supplier=request.user.supplier))

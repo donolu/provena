@@ -98,15 +98,15 @@ class OrderSerializer(serializers.ModelSerializer):
     payment_status = serializers.SerializerMethodField()
     refunded_amount = serializers.SerializerMethodField()
 
-    def get_payment_id(self, obj):
+    def get_payment_id(self, obj) -> str | None:
         payment = getattr(obj, "payment", None)
         return str(payment.id) if payment else None
 
-    def get_payment_status(self, obj):
+    def get_payment_status(self, obj) -> str | None:
         payment = getattr(obj, "payment", None)
         return payment.status if payment else None
 
-    def get_refunded_amount(self, obj):
+    def get_refunded_amount(self, obj) -> str | None:
         payment = getattr(obj, "payment", None)
         return str(payment.refunded_amount) if payment else None
 

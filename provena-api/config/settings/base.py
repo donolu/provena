@@ -165,6 +165,12 @@ SPECTACULAR_SETTINGS = {
         "SupplierStatusEnum": "apps.suppliers.models.SupplierStatus",
         "DocumentStatusEnum": "apps.suppliers.models.DocumentStatus",
         "DocumentTypeEnum": "apps.suppliers.models.DocumentType",
+        # Several models expose a `status` field with distinct choice sets;
+        # name them explicitly so drf-spectacular does not fall back to
+        # collision-resolved names like "Status580Enum".
+        "OrderStatusEnum": "apps.orders.models.OrderStatus",
+        "ProductStatusEnum": "apps.catalogue.models.ProductStatus",
+        "DisputeStatusEnum": "apps.disputes.models.DisputeStatus",
     },
     "TAGS": [
         {"name": "Authentication", "description": "Register, login, logout, token refresh"},
