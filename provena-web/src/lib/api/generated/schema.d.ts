@@ -305,16 +305,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List all users
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** List all users */
         get: operations["auth_admin_users_list"];
         put?: never;
         post?: never;
@@ -462,16 +453,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List all data export requests
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** List all data export requests */
         get: operations["auth_admin_exports_retrieve"];
         put?: never;
         post?: never;
@@ -800,28 +782,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List all banners
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** List all banners */
         get: operations["catalogue_admin_banners_list"];
         put?: never;
-        /**
-         * Create a banner
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** Create a banner */
         post: operations["catalogue_admin_banners_create"];
         delete?: never;
         options?: never;
@@ -1416,16 +1380,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Audit log for a variant
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** Audit log for a variant */
         get: operations["inventory_movements_list"];
         put?: never;
         post?: never;
@@ -1442,16 +1397,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Stock lots for a variant
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** Stock lots for a variant */
         get: operations["inventory_lots_list"];
         put?: never;
         post?: never;
@@ -1488,16 +1434,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List own sub-orders
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** List own sub-orders */
         get: operations["orders_supplier_list"];
         put?: never;
         post?: never;
@@ -1514,16 +1451,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List return requests for own sub-orders
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** List return requests for own sub-orders */
         get: operations["orders_supplier_returns_list"];
         put?: never;
         post?: never;
@@ -1642,16 +1570,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List all return requests
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** List all return requests */
         get: operations["orders_admin_returns_list"];
         put?: never;
         post?: never;
@@ -1685,16 +1604,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * All orders
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** All orders */
         get: operations["orders_admin_list"];
         put?: never;
         post?: never;
@@ -1728,28 +1638,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List own orders
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** List own orders */
         get: operations["orders_list"];
         put?: never;
-        /**
-         * Place an order
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** Place an order */
         post: operations["orders_create"];
         delete?: never;
         options?: never;
@@ -2028,16 +1920,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List wishlist items
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** List wishlist items */
         get: operations["marketplace_wishlist_list"];
         put?: never;
         /**
@@ -2075,16 +1958,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List approved reviews for a variant
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
+        /** List approved reviews for a variant */
         get: operations["marketplace_products_reviews_list"];
         put?: never;
         /**
@@ -2447,26 +2321,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
         get: operations["disputes_list"];
         put?: never;
-        /**
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
         post: operations["disputes_create"];
         delete?: never;
         options?: never;
@@ -2593,15 +2449,6 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * @description Adds a paginate() helper to raw APIView subclasses.
-         *
-         *     Usage:
-         *         class MyListView(PaginatedListMixin, APIView):
-         *             def get(self, request):
-         *                 qs = MyModel.objects.all()
-         *                 return self.paginate(qs, MySerializer, request)
-         */
         get: operations["disputes_admin_list"];
         put?: never;
         post?: never;
