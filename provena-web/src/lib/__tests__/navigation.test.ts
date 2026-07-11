@@ -13,6 +13,12 @@ describe('safeNext', () => {
     expect(safeNext('//evil.com', '/home')).toBe('/home')
   })
 
+  it('falls back for backslash forms browsers normalise to external URLs', () => {
+    expect(safeNext('/\\evil.com', '/home')).toBe('/home')
+    expect(safeNext('/\\/evil.com', '/home')).toBe('/home')
+    expect(safeNext('\\\\evil.com', '/home')).toBe('/home')
+  })
+
   it('falls back for missing or non-path values', () => {
     expect(safeNext(null, '/home')).toBe('/home')
     expect(safeNext(undefined, '/home')).toBe('/home')
