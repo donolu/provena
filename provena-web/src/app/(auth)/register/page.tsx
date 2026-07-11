@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { register } from '@/lib/api/auth'
 import { mergeGuestCart } from '@/lib/api/cart'
+import { safeNext } from '@/lib/navigation'
 import { useAuthStore } from '@/store/auth'
 
 function RegisterForm() {
@@ -44,8 +45,7 @@ function RegisterForm() {
       })
       await mergeGuestCart(access).catch(() => {})
       storeLogin(user, access)
-      const next = searchParams.get('next')
-      router.push(next ?? '/catalogue')
+      router.push(safeNext(searchParams.get('next'), '/catalogue'))
     } catch (err: unknown) {
       const data = (err as {
         response?: { data?: Record<string, unknown> & { error?: { message?: string }; detail?: string } }
