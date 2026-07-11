@@ -22,7 +22,7 @@
 set -euo pipefail
 
 TARGET_REPLICAS="${TARGET_REPLICAS:-2}"
-if [ "$#" -gt 0 ]; then SERVICES="$*"; else SERVICES="api web"; fi
+if [ "$#" -gt 0 ]; then SERVICES=("$@"); else SERVICES=(api web); fi
 
 wait_healthy() {
     svc="$1"; want="$2"; tries=60; i=1
@@ -45,10 +45,10 @@ wait_healthy() {
     printf '\n'; echo "ERROR: $svc did not reach $want healthy replicas in time" >&2; return 1
 }
 
-echo "==> Building images: $SERVICES"
-docker compose build $SERVICES
+echo "==> Building images: ${SERVICES[*]}"
+docker compose build "${SERVICES[@]}"
 
-for svc in $SERVICES; do
+for svc in "${SERVICES[@]}"; do
     echo "==> Rolling '$svc' to $TARGET_REPLICAS new replica(s)"
     old=$(docker compose ps -q "$svc" || true)
     n=$(printf '%s\n' "$old" | grep -c . || true)
