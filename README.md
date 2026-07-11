@@ -145,7 +145,7 @@ For a full setup guide without Docker, see [docs/onboarding.md](docs/onboarding.
 | Document | Location | Description |
 |---|---|---|
 | Developer Onboarding | [docs/onboarding.md](docs/onboarding.md) | Local setup, prerequisites, running tests |
-| Production Deployment | [docs/deployment.md](docs/deployment.md) | Docker Compose, environment variables, external services |
+| Production Deployment | [docs/deployment.md](docs/deployment.md) | Self-host, Render, DigitalOcean, AWS; environment variables, external services |
 | Contributing | [docs/contributing.md](docs/contributing.md) | Branching, standards, PR process, adding endpoints/pages |
 | Backlog and Roadmap | [GitHub Issues](https://github.com/donolu/provena/issues) | Not yet implemented, known limitations, roadmap |
 | Business Requirements | [provena-api/docs/BRD.md](provena-api/docs/BRD.md) | Features, user stories, success metrics |
