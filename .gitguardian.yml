@@ -1,10 +1,21 @@
 version: 2
 
 ignore-paths:
-  # Dev-only compose file — credentials are intentional dev placeholders,
-  # not real secrets. Never used in production.
+  # Dev/E2E-only compose files — credentials are intentional dev placeholders
+  # (overridable ${DB_PASSWORD:-provena}, a labelled dev-only Django key), not
+  # real secrets. Never used in production.
   - docker-compose.dev.yml
+  - docker-compose.e2e.yml
 
-  # CI workflow — all credential values are dummy placeholders for test runs.
-  # No real keys are present.
+  # CI workflows — all credential values are dummy placeholders for ephemeral
+  # test runs (throwaway Postgres, seeded E2E accounts). Real secrets are always
+  # referenced via ${{ secrets.* }}, never committed literally.
   - .github/workflows/api.yml
+  - .github/workflows/e2e.yml
+  - .github/workflows/security-scan.yml
+
+  # Test fixtures and E2E seed data — deterministic passwords and canonical
+  # example TOTP seeds for accounts that only ever exist in the throwaway test
+  # database, so they grant no access to any real system.
+  - provena-api/**/tests/**
+  - provena-api/apps/accounts/management/commands/seed_e2e_data.py
