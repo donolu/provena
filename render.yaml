@@ -1,0 +1,163 @@
+# Render Blueprint for a Provena staging (or production) environment.
+#
+# One-click: in Render, New > Blueprint, point at this repo, then fill in the
+# env vars marked `sync: false` (Stripe, email, storage, CORS, and optionally
+# Typesense). See docs/deployment.md "Option B: Render + Vercel" for detail.
+#
+# This provisions the backend: the Django API, the Celery worker and beat, a
+# managed Postgres 16, and a Redis instance. The frontend (provena-web) deploys
+# separately to Vercel with NEXT_PUBLIC_API_URL set to the API service URL
+# (ADR-006). Plans below are modest defaults; adjust to your account/tier.
+
+databases:
+  - name: provena-db
+    databaseName: provena
+    postgresMajorVersion: "16"
+    plan: basic-256mb
+
+# Shared configuration and secrets. DJANGO_SECRET_KEY is generated once and
+# shared, so signing is consistent across the API, worker, and beat. Values
+# marked `sync: false` are entered per-environment in the Render dashboard.
+envVarGroups:
+  - name: provena-shared
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: PLATFORM_FEE_PERCENT
+        value: "10"
+      # Payments (Stripe)
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # Email (SMTP)
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      # Media storage (S3 / Spaces / R2). Set AWS_S3_ENDPOINT_URL for non-AWS.
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_S3_REGION_NAME
+        value: eu-west-2
+      - key: AWS_S3_ENDPOINT_URL
+        sync: false
+      # Frontend origin(s) for CORS, e.g. the Vercel URL
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      # Error reporting (optional; blank disables Sentry)
+      - key: SENTRY_DSN
+        sync: false
+      # Full-text search (optional). Leave TYPESENSE_HOST blank to disable
+      # search and fall back to Postgres. For Typesense Cloud set the host,
+      # TYPESENSE_PORT=443 and TYPESENSE_PROTOCOL=https.
+      - key: TYPESENSE_HOST
+        sync: false
+      - key: TYPESENSE_PORT
+        value: "443"
+      - key: TYPESENSE_PROTOCOL
+        value: https
+      - key: TYPESENSE_API_KEY
+        sync: false
+
+services:
+  # Redis: Celery broker, Channels (websockets), and cache. noeviction so the
+  # broker never drops queued tasks under memory pressure.
+  - type: redis
+    name: provena-redis
+    plan: starter
+    maxmemoryPolicy: noeviction
+    ipAllowList: [] # internal only
+
+  # Django API (Daphne / ASGI). Migrations run before each deploy against the
+  # direct connection (Render's connection string), never through a pooler.
+  - type: web
+    name: provena-api
+    runtime: docker
+    dockerfilePath: ./provena-api/Dockerfile
+    dockerContext: ./provena-api
+    plan: starter
+    healthCheckPath: /api/v1/health/
+    preDeployCommand: 'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate --no-input'
+    envVars:
+      - fromGroup: provena-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: provena-db
+          property: connectionString
+      - key: DIRECT_DATABASE_URL
+        fromDatabase:
+          name: provena-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: provena-redis
+          type: redis
+          property: connectionString
+      - key: DJANGO_ALLOWED_HOSTS
+        fromService:
+          name: provena-api
+          type: web
+          property: host
+
+  # Celery worker: search indexing, emails, payouts, data exports.
+  - type: worker
+    name: provena-worker
+    runtime: docker
+    dockerfilePath: ./provena-api/Dockerfile
+    dockerContext: ./provena-api
+    plan: starter
+    dockerCommand: celery -A config.celery worker --loglevel=info --concurrency=4 -E
+    envVars:
+      - fromGroup: provena-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: provena-db
+          property: connectionString
+      - key: DIRECT_DATABASE_URL
+        fromDatabase:
+          name: provena-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: provena-redis
+          type: redis
+          property: connectionString
+
+  # Celery beat: scheduled tasks (uses the database scheduler).
+  - type: worker
+    name: provena-beat
+    runtime: docker
+    dockerfilePath: ./provena-api/Dockerfile
+    dockerContext: ./provena-api
+    plan: starter
+    dockerCommand: celery -A config.celery beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    envVars:
+      - fromGroup: provena-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: provena-db
+          property: connectionString
+      - key: DIRECT_DATABASE_URL
+        fromDatabase:
+          name: provena-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: provena-redis
+          type: redis
+          property: connectionString

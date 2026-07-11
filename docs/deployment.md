@@ -283,7 +283,7 @@ DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate --no-input && pytho
 - **Connection pooling.** Render Postgres exposes both a direct and a pooled connection string. Set `DATABASE_URL` to the **pooled** URL and `DIRECT_DATABASE_URL` to the **direct** URL. (The bundled PgBouncer sidecar from `docker-compose.yml` is not used here; Render provides the pooler.)
 - **Media storage.** Render service disks are ephemeral, so uploads must go to object storage: set the `AWS_*` variables to an S3, Spaces, or R2 bucket.
 - **Search.** Render has no managed Typesense. Use [Typesense Cloud](https://cloud.typesense.org) (set `TYPESENSE_HOST`, `TYPESENSE_PORT=443`, `TYPESENSE_PROTOCOL=https`, `TYPESENSE_API_KEY`) or a Typesense private service, and run `python manage.py reindex_search` once after enabling it. Leave `TYPESENSE_HOST` unset to run without search (Postgres fallback).
-- **Blueprint.** These services can also be declared in a `render.yaml` blueprint for one-click provisioning.
+- **Blueprint (one-click).** The repo ships a [`render.yaml`](../render.yaml) Blueprint that declares all of the above (API, Celery worker + beat, managed Postgres 16, Redis). In Render choose **New > Blueprint**, point it at the repo, and fill in the env vars marked `sync: false` (Stripe, email, storage, `CORS_ALLOWED_ORIGINS`, and optionally Typesense). `DJANGO_SECRET_KEY` is generated once and shared across services; migrations run automatically as a pre-deploy command against the direct connection. The frontend still deploys to Vercel with `NEXT_PUBLIC_API_URL` pointing at the API service. Render auto-redeploys on push, which makes this a self-updating staging environment.
 
 ### Frontend on Vercel
 
