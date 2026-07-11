@@ -42,9 +42,25 @@ def _bucket() -> str:
     return bucket
 
 
+def _direct_db_config() -> dict:
+    """Connection config for backups.
+
+    pg_dump needs a single, consistent session, which PgBouncer's transaction
+    pooling breaks, so backups (like migrations) use the direct Postgres
+    connection (DIRECT_DATABASE_URL) when it is set, falling back to the default
+    database otherwise.
+    """
+    import environ
+
+    direct = os.environ.get("DIRECT_DATABASE_URL")
+    if direct:
+        return dict(environ.Env.db_url_config(direct))
+    return dict(settings.DATABASES["default"])
+
+
 def _dump_to_gzip(path: str) -> None:
-    """Run pg_dump for the default database and write gzipped output to `path`."""
-    db = settings.DATABASES["default"]
+    """Run pg_dump against the direct database and write gzipped output to `path`."""
+    db = _direct_db_config()
     cmd = [
         "pg_dump",
         "--no-owner",

@@ -146,7 +146,7 @@ EOF
 docker compose up -d
 
 # Apply database migrations
-docker compose exec api python manage.py migrate --no-input
+docker compose exec api sh -c 'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate --no-input'
 
 # Collect static files
 docker compose exec api python manage.py collectstatic --no-input
@@ -191,7 +191,7 @@ The Nginx config proxies `/api/` to Django and `/` to Next.js. Nginx terminates 
 git pull origin main
 docker compose build api web
 docker compose up -d
-docker compose exec api python manage.py migrate --no-input
+docker compose exec api sh -c 'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate --no-input'
 ```
 
 Zero-downtime updates require a load balancer with blue-green deployment, which is not included in the base compose setup. For most traffic levels, the brief restart window (seconds) is acceptable.
@@ -304,7 +304,7 @@ The following tasks are scheduled via Celery Beat. Confirm they are running by c
 If periodic tasks are not appearing in the admin, run:
 
 ```bash
-docker compose exec api python manage.py migrate django_celery_beat
+docker compose exec api sh -c 'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate django_celery_beat'
 ```
 
 ---

@@ -92,8 +92,8 @@ docker compose logs -f api
 # Run a Django management command
 docker compose exec api python manage.py shell
 
-# Run migrations after pulling new code
-docker compose exec api python manage.py migrate
+# Run migrations after pulling new code (direct connection, bypassing PgBouncer)
+docker compose exec api sh -c 'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate'
 
 # Rebuild after Dockerfile or dependency changes
 docker compose build api
