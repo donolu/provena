@@ -46,6 +46,7 @@ class WSTicketView(APIView):
             "Pass it as `?ticket=<token>` on the WebSocket handshake to avoid "
             "placing the JWT access token in the URL."
         ),
+        request=None,
         responses={200: {"type": "object", "properties": {"ticket": {"type": "string"}}}},
     )
     def post(self, request):

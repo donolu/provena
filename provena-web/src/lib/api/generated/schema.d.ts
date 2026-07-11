@@ -406,7 +406,7 @@ export interface paths {
          * Admin audit log
          * @description Paginated list of admin actions (approve, suspend, refund, etc.) ordered newest first.
          */
-        get: operations["auth_admin_audit_log_retrieve"];
+        get: operations["auth_admin_audit_log_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -784,7 +784,7 @@ export interface paths {
          * List active banners
          * @description Returns all active homepage banners ordered by position.
          */
-        get: operations["catalogue_banners_retrieve"];
+        get: operations["catalogue_banners_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -810,7 +810,7 @@ export interface paths {
          *                 qs = MyModel.objects.all()
          *                 return self.paginate(qs, MySerializer, request)
          */
-        get: operations["catalogue_admin_banners_retrieve"];
+        get: operations["catalogue_admin_banners_list"];
         put?: never;
         /**
          * Create a banner
@@ -2274,7 +2274,7 @@ export interface paths {
          * Revenue over time
          * @description Per-period revenue and order count. Granularity: day | week | month.
          */
-        get: operations["analytics_sales_over_time_retrieve"];
+        get: operations["analytics_sales_over_time_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2291,7 +2291,7 @@ export interface paths {
             cookie?: never;
         };
         /** Top products by revenue */
-        get: operations["analytics_products_top_retrieve"];
+        get: operations["analytics_products_top_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2311,7 +2311,7 @@ export interface paths {
          * Supplier performance
          * @description Revenue and sub-order count per supplier, sorted by revenue descending.
          */
-        get: operations["analytics_suppliers_retrieve"];
+        get: operations["analytics_suppliers_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2685,7 +2685,7 @@ export interface components {
             name: string;
             slug: string;
             description?: string;
-            status?: components["schemas"]["Status37cEnum"];
+            status?: components["schemas"]["ProductStatusEnum"];
             is_featured?: boolean;
             readonly supplier_name: string;
             readonly supplier_slug: string;
@@ -2738,6 +2738,43 @@ export interface components {
             readonly totp_enabled: boolean;
             /** Format: date-time */
             readonly created_at: string;
+        };
+        AuditLog: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly actor_email: string | null;
+            readonly action: string;
+            readonly target_type: string;
+            readonly target_id: string;
+            readonly metadata: unknown;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        Banner: {
+            /** Format: uuid */
+            readonly id: string;
+            title: string;
+            subtitle?: string;
+            /** Format: uri */
+            image_url: string;
+            link?: string;
+            is_active?: boolean;
+            /** Format: int64 */
+            position?: number;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        BannerWriteRequest: {
+            title: string;
+            subtitle?: string;
+            /** Format: uri */
+            image_url: string;
+            link?: string;
+            is_active?: boolean;
+            /** Format: int64 */
+            position?: number;
         };
         /** @enum {unknown} */
         BlankEnum: "";
@@ -2859,7 +2896,7 @@ export interface components {
             dispute_type: components["schemas"]["DisputeTypeEnum"];
             description: string;
             resolution_requested: components["schemas"]["ResolutionRequestedEnum"];
-            status?: components["schemas"]["Status3beEnum"];
+            status?: components["schemas"]["DisputeStatusEnum"];
             outcome?: components["schemas"]["OutcomeEnum"] | components["schemas"]["BlankEnum"];
             /** Format: int64 */
             outcome_amount_pence?: number | null;
@@ -2897,7 +2934,7 @@ export interface components {
             /** Format: uuid */
             sub_order: string;
             dispute_type: components["schemas"]["DisputeTypeEnum"];
-            status?: components["schemas"]["Status3beEnum"];
+            status?: components["schemas"]["DisputeStatusEnum"];
             resolution_requested: components["schemas"]["ResolutionRequestedEnum"];
             outcome?: components["schemas"]["OutcomeEnum"] | components["schemas"]["BlankEnum"];
             /** Format: email */
@@ -2936,6 +2973,16 @@ export interface components {
          * @enum {string}
          */
         DisputeRefundStatusEnum: "PENDING" | "SUCCEEDED" | "FAILED";
+        /**
+         * @description * `OPEN` - Open
+         *     * `RESPONDENT_REPLIED` - Respondent replied
+         *     * `ESCALATED` - Escalated to admin
+         *     * `RESOLVING` - Resolving
+         *     * `RESOLVED` - Resolved
+         *     * `CLOSED` - Closed
+         * @enum {string}
+         */
+        DisputeStatusEnum: "OPEN" | "RESPONDENT_REPLIED" | "ESCALATED" | "RESOLVING" | "RESOLVED" | "CLOSED";
         /**
          * @description * `NOT_RECEIVED` - Item not received
          *     * `DAMAGED` - Item damaged or spoiled
@@ -3041,7 +3088,7 @@ export interface components {
             /** Format: uuid */
             readonly id: string;
             reference: string;
-            status?: components["schemas"]["Status580Enum"];
+            status?: components["schemas"]["OrderStatusEnum"];
             /** Format: email */
             readonly buyer_email: string;
             shipping_name: string;
@@ -3053,9 +3100,9 @@ export interface components {
             /** Format: decimal */
             total_amount?: string;
             notes?: string;
-            readonly payment_id: string;
-            readonly payment_status: string;
-            readonly refunded_amount: string;
+            readonly payment_id: string | null;
+            readonly payment_status: string | null;
+            readonly refunded_amount: string | null;
             readonly sub_orders: components["schemas"]["SubOrder"][];
             /** Format: date-time */
             readonly created_at: string;
@@ -3108,6 +3155,15 @@ export interface components {
          */
         OrderReturnStatusEnum: "REQUESTED" | "APPROVED" | "REFUNDING" | "REJECTED" | "REFUNDED";
         /**
+         * @description * `PENDING` - Pending
+         *     * `CONFIRMED` - Confirmed
+         *     * `DISPATCHED` - Dispatched
+         *     * `DELIVERED` - Delivered
+         *     * `CANCELLED` - Cancelled
+         * @enum {string}
+         */
+        OrderStatusEnum: "PENDING" | "CONFIRMED" | "DISPATCHED" | "DELIVERED" | "CANCELLED";
+        /**
          * @description * `FULL_REFUND` - Full refund
          *     * `PARTIAL_REFUND` - Partial refund
          *     * `REPLACEMENT` - Replacement
@@ -3145,6 +3201,36 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["AdminUser"][];
+        };
+        PaginatedAuditLogList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["AuditLog"][];
+        };
+        PaginatedBannerList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["Banner"][];
         };
         PaginatedDisputeListList: {
             /** @example 123 */
@@ -3402,6 +3488,16 @@ export interface components {
             /** Format: decimal */
             commission_rate?: string;
         };
+        PatchedBannerWriteRequest: {
+            title?: string;
+            subtitle?: string;
+            /** Format: uri */
+            image_url?: string;
+            link?: string;
+            is_active?: boolean;
+            /** Format: int64 */
+            position?: number;
+        };
         PatchedCategoryWriteRequest: {
             name?: string;
             description?: string;
@@ -3554,7 +3650,7 @@ export interface components {
             name: string;
             readonly slug: string;
             description?: string;
-            readonly status: components["schemas"]["Status37cEnum"];
+            readonly status: components["schemas"]["ProductStatusEnum"];
             readonly is_featured: boolean;
             readonly supplier_slug: string;
             readonly supplier_name: string;
@@ -3589,6 +3685,21 @@ export interface components {
             position?: number | null;
             /** @default false */
             is_primary: boolean;
+        };
+        /**
+         * @description * `DRAFT` - Draft
+         *     * `ACTIVE` - Active
+         *     * `ARCHIVED` - Archived
+         * @enum {string}
+         */
+        ProductStatusEnum: "DRAFT" | "ACTIVE" | "ARCHIVED";
+        ProductUploadConfirmRequestRequest: {
+            /** Format: binary */
+            file: string;
+        };
+        ProductUploadPreviewRequestRequest: {
+            /** Format: binary */
+            file: string;
         };
         ProductVariant: {
             /** Format: uuid */
@@ -3682,6 +3793,12 @@ export interface components {
             /** Format: decimal */
             amount?: string | null;
         };
+        RevenuePoint: {
+            period: string;
+            /** Format: decimal */
+            revenue: string;
+            order_count: number;
+        };
         Review: {
             /** Format: uuid */
             readonly id: string;
@@ -3706,32 +3823,6 @@ export interface components {
          * @enum {string}
          */
         RoleEnum: "BUYER" | "SUPPLIER" | "ADMIN";
-        /**
-         * @description * `DRAFT` - Draft
-         *     * `ACTIVE` - Active
-         *     * `ARCHIVED` - Archived
-         * @enum {string}
-         */
-        Status37cEnum: "DRAFT" | "ACTIVE" | "ARCHIVED";
-        /**
-         * @description * `OPEN` - Open
-         *     * `RESPONDENT_REPLIED` - Respondent replied
-         *     * `ESCALATED` - Escalated to admin
-         *     * `RESOLVING` - Resolving
-         *     * `RESOLVED` - Resolved
-         *     * `CLOSED` - Closed
-         * @enum {string}
-         */
-        Status3beEnum: "OPEN" | "RESPONDENT_REPLIED" | "ESCALATED" | "RESOLVING" | "RESOLVED" | "CLOSED";
-        /**
-         * @description * `PENDING` - Pending
-         *     * `CONFIRMED` - Confirmed
-         *     * `DISPATCHED` - Dispatched
-         *     * `DELIVERED` - Delivered
-         *     * `CANCELLED` - Cancelled
-         * @enum {string}
-         */
-        Status580Enum: "PENDING" | "CONFIRMED" | "DISPATCHED" | "DELIVERED" | "CANCELLED";
         StockLevel: {
             /** Format: uuid */
             readonly id: string;
@@ -3777,7 +3868,7 @@ export interface components {
             readonly id: string;
             readonly supplier_name: string;
             readonly supplier_slug: string;
-            status?: components["schemas"]["Status580Enum"];
+            status?: components["schemas"]["OrderStatusEnum"];
             /** Format: decimal */
             subtotal?: string;
             tracking_number?: string;
@@ -3798,7 +3889,7 @@ export interface components {
             /** Format: email */
             readonly buyer_email: string;
             readonly supplier_name: string;
-            status?: components["schemas"]["Status580Enum"];
+            status?: components["schemas"]["OrderStatusEnum"];
             /** Format: decimal */
             subtotal?: string;
             tracking_number?: string;
@@ -3840,6 +3931,12 @@ export interface components {
             document_type: components["schemas"]["DocumentTypeEnum"];
             /** Format: uri */
             file_url: string;
+        };
+        SupplierPerformance: {
+            supplier_name: string;
+            sub_order_count: number;
+            /** Format: decimal */
+            revenue: string;
         };
         SupplierProfile: {
             /** Format: uuid */
@@ -3902,6 +3999,13 @@ export interface components {
         };
         TOTPVerifyRequest: {
             code: string;
+        };
+        TopProduct: {
+            variant_sku: string;
+            product_name: string;
+            units_sold: number;
+            /** Format: decimal */
+            revenue: string;
         };
         TriggerRefundRequest: {
             stripe_refund_id: string;
@@ -4572,21 +4676,27 @@ export interface operations {
             };
         };
     };
-    auth_admin_audit_log_retrieve: {
+    auth_admin_audit_log_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PaginatedAuditLogList"];
+                };
             };
         };
     };
@@ -5159,7 +5269,7 @@ export interface operations {
             };
         };
     };
-    catalogue_banners_retrieve: {
+    catalogue_banners_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -5168,30 +5278,37 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Banner"][];
+                };
             };
         };
     };
-    catalogue_admin_banners_retrieve: {
+    catalogue_admin_banners_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PaginatedBannerList"];
+                };
             };
         };
     };
@@ -5202,14 +5319,21 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BannerWriteRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["BannerWriteRequest"];
+                "multipart/form-data": components["schemas"]["BannerWriteRequest"];
+            };
+        };
         responses: {
-            /** @description No response body */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Banner"];
+                };
             };
         };
     };
@@ -5242,14 +5366,21 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedBannerWriteRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedBannerWriteRequest"];
+                "multipart/form-data": components["schemas"]["PatchedBannerWriteRequest"];
+            };
+        };
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Banner"];
+                };
             };
         };
     };
@@ -5530,7 +5661,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ProductUploadPreviewRequestRequest"];
+            };
+        };
         responses: {
             /** @description Parsed products (valid=true) or validation errors (valid=false) */
             200: {
@@ -5555,7 +5690,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ProductUploadConfirmRequestRequest"];
+            };
+        };
         responses: {
             /** @description Products created */
             201: {
@@ -7008,12 +7147,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Payout"];
+                };
             };
         };
     };
@@ -7575,16 +7715,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
             };
         };
     };
-    analytics_sales_over_time_retrieve: {
+    analytics_sales_over_time_list: {
         parameters: {
             query?: {
                 /** @description Start date (YYYY-MM-DD). Default: 30 days ago. */
@@ -7600,16 +7743,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RevenuePoint"][];
+                };
             };
         };
     };
-    analytics_products_top_retrieve: {
+    analytics_products_top_list: {
         parameters: {
             query?: {
                 /** @description Start date (YYYY-MM-DD). Default: 30 days ago. */
@@ -7625,16 +7769,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TopProduct"][];
+                };
             };
         };
     };
-    analytics_suppliers_retrieve: {
+    analytics_suppliers_list: {
         parameters: {
             query?: {
                 /** @description Start date (YYYY-MM-DD). Default: 30 days ago. */
@@ -7648,12 +7793,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SupplierPerformance"][];
+                };
             };
         };
     };
@@ -7666,12 +7812,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
             };
         };
     };
@@ -7687,12 +7836,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
             };
         };
     };
@@ -7705,12 +7857,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
             };
         };
     };
@@ -7728,12 +7883,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
             };
         };
     };
@@ -7746,12 +7904,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
             };
         };
     };

@@ -22,6 +22,7 @@ from .serializers import (
     AddressSerializer,
     AddressWriteSerializer,
     AdminUserSerializer,
+    AuditLogSerializer,
     ChangePasswordSerializer,
     LoginSerializer,
     PasswordResetConfirmSerializer,
@@ -394,6 +395,7 @@ class AdminUnlockUserView(APIView):
     @extend_schema(
         tags=["User Profile"],
         summary="Unlock a locked account (admin)",
+        request=None,
         description="Clears the failed-login attempt counter for a user, allowing them to log in again immediately.",
         responses={200: OpenApiResponse(description="`{unlocked: true}`")},
     )
@@ -459,6 +461,7 @@ class AdminSuspendUserView(APIView):
     @extend_schema(
         tags=["Admin: Users"],
         summary="Suspend a user account",
+        request=None,
         responses={200: AdminUserSerializer},
     )
     @audit_action(
@@ -484,6 +487,7 @@ class AdminActivateUserView(APIView):
     @extend_schema(
         tags=["Admin: Users"],
         summary="Re-activate a suspended user account",
+        request=None,
         responses={200: AdminUserSerializer},
     )
     @audit_action(
@@ -620,6 +624,7 @@ class AdminAuditLogView(PaginatedListMixin, APIView):
         tags=["Admin: Users"],
         summary="Admin audit log",
         description="Paginated list of admin actions (approve, suspend, refund, etc.) ordered newest first.",
+        responses={200: AuditLogSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:
         from apps.accounts.models import AuditLog
