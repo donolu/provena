@@ -1,6 +1,6 @@
 # Production Deployment
 
-This guide covers everything required to deploy Provena to a production environment. The current hosting model uses Render (API and workers) plus Vercel (frontend), with Cloudflare in front for DNS, TLS, and CDN. A Docker Compose self-hosted path is also documented for teams that want to own the infrastructure.
+This guide covers everything required to deploy Provena to a production environment. It documents four options: self-hosted Docker Compose, Render + Vercel (the current hosting), DigitalOcean (App Platform or a Droplet), and AWS (ECS Fargate or EC2). See [Choosing a deployment option](#choosing-a-deployment-option) for a comparison and the shared requirements, then follow the section for your target. The current model uses Render (API and workers) plus Vercel (frontend), with Cloudflare in front for DNS, TLS, and CDN.
 
 ---
 
@@ -50,6 +50,14 @@ Without this, product image and KYC document uploads will fail. Django falls bac
 ---
 
 ## Environment Variables Reference
+
+### How environment variables are handled
+
+- **Backend.** Settings are read with `django-environ`. It loads `provena-api/.env` if that file exists, but **real process environment variables always take precedence**. So local and self-hosted setups use a `.env` file, while managed platforms (Render, DigitalOcean, AWS) set the same keys in their dashboard or secret store and ship no `.env` file at all.
+- **Template.** `provena-api/.env.example` (and `provena-web/.env.example`) list every key with a sample value. Copy to `.env` / `.env.local` for local work; both `.env` files are git-ignored and must never be committed.
+- **Required vs optional.** In production, missing required keys fail fast at boot (for example `DJANGO_SECRET_KEY`, `DATABASE_URL`, `CORS_ALLOWED_ORIGINS`, the `AWS_*` storage keys, and the `EMAIL_*` keys). Optional integrations degrade gracefully when unset: no `SENTRY_DSN` disables error reporting, and no `TYPESENSE_HOST` disables search (Postgres fallback). `DIRECT_DATABASE_URL` falls back to `DATABASE_URL` when absent.
+- **Frontend (`NEXT_PUBLIC_*`).** These are inlined into the client bundle at **build time** and are therefore **public**: never put a secret in a `NEXT_PUBLIC_*` variable. Changing one requires rebuilding and redeploying the frontend, not just a restart.
+- **Where secrets live.** Per platform: Render / DigitalOcean App Platform app secrets, Vercel environment variables, AWS Secrets Manager or SSM Parameter Store, or a locked-down `.env` on a self-hosted box. See [Backup Strategy → Secrets](#secrets).
 
 ### Backend (`provena-api/.env` or host environment)
 
@@ -112,6 +120,35 @@ NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api/v1
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
 NEXT_PUBLIC_SENTRY_DSN=https://...@sentry.io/...
 ```
+
+---
+
+## Choosing a deployment option
+
+| Option | Best for | Ops effort | Notes |
+|---|---|---|---|
+| **A. Docker Compose (self-host)** | Full control, lowest cost per unit of compute | Highest | One host runs everything, Typesense included; zero-downtime via `scripts/deploy.sh`. Runs on a DigitalOcean Droplet, AWS EC2, Hetzner, or on-prem. |
+| **B. Render + Vercel** | Fastest managed setup (current hosting) | Lowest | Managed Postgres/Redis; search via Typesense Cloud. |
+| **C. DigitalOcean** | Managed PaaS (App Platform) or a plain Droplet | Low to Medium | App Platform mirrors Render; a Droplet is Option A on DigitalOcean. |
+| **D. AWS** | Scale, compliance, an existing AWS estate | Medium to High | ECS Fargate for the containers, RDS + RDS Proxy, ElastiCache, S3 + CloudFront. |
+
+Whatever the target, the application is the same set of processes and backing services. The managed options (B, C1, D1) differ mainly in which button provisions each one.
+
+### What every production deployment needs
+
+- **Three app processes** from the one `provena-api` image (all `target: production`):
+  - **API / web** (the compose `api` service).
+  - **Celery worker**: `celery -A config.celery worker --loglevel=info --concurrency=4 -E`.
+  - **Celery beat**: `celery -A config.celery beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler`.
+  The worker is not optional: search indexing, emails, payouts and data exports all run on it.
+- **PostgreSQL 16**, reached two ways:
+  - `DATABASE_URL` points at the **pooler** (PgBouncer, RDS Proxy, or the platform's connection pool) for application traffic.
+  - `DIRECT_DATABASE_URL` points at a **direct** connection for migrations and backups, because DDL and advisory locks are unsafe through a transaction pooler. If your platform has no pooler, point both at the same direct URL.
+- **Redis** for the Celery broker, Channels (websockets) and the cache.
+- **Object storage** for uploaded media (`AWS_*` settings): S3, DigitalOcean Spaces, or Cloudflare R2. All are S3-compatible; set `AWS_S3_ENDPOINT_URL` for the non-AWS ones. Managed platforms have ephemeral local disks, so object storage is required, not optional.
+- **Typesense** for search (optional): Typesense Cloud or a self-run instance. Leave `TYPESENSE_HOST` unset to disable search and fall back to the Postgres query.
+- **Frontend** (`provena-web`): Vercel or any Next.js host; set `NEXT_PUBLIC_API_URL` to the public API origin.
+- **TLS and CDN** in front: Cloudflare, CloudFront, or the platform's built-in edge.
 
 ---
 
@@ -233,13 +270,20 @@ This is the setup described in [ADR-006](../provena-api/docs/DECISIONS.md). It i
 3. Add all backend environment variables in the Render dashboard
 4. Create a managed **PostgreSQL** database on Render; copy the `DATABASE_URL` into the web service
 5. Create a managed **Redis** instance; copy the `REDIS_URL`
-6. Create a **Background Worker** for the Celery worker: same Docker image, command `celery -A config.celery worker --loglevel=info --concurrency=4`
+6. Create a **Background Worker** for the Celery worker: same Docker image, command `celery -A config.celery worker --loglevel=info --concurrency=4 -E`
 7. Create a second **Background Worker** for Celery Beat: command `celery -A config.celery beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler`
 
-Run migrations via Render's shell or by adding a deploy command:
+Run migrations as a **pre-deploy command**, against the **direct** database URL (not the pooled one):
 ```
-python manage.py migrate --no-input && python manage.py collectstatic --no-input
+DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate --no-input && python manage.py collectstatic --no-input
 ```
+
+**Render specifics:**
+
+- **Connection pooling.** Render Postgres exposes both a direct and a pooled connection string. Set `DATABASE_URL` to the **pooled** URL and `DIRECT_DATABASE_URL` to the **direct** URL. (The bundled PgBouncer sidecar from `docker-compose.yml` is not used here; Render provides the pooler.)
+- **Media storage.** Render service disks are ephemeral, so uploads must go to object storage: set the `AWS_*` variables to an S3, Spaces, or R2 bucket.
+- **Search.** Render has no managed Typesense. Use [Typesense Cloud](https://cloud.typesense.org) (set `TYPESENSE_HOST`, `TYPESENSE_PORT=443`, `TYPESENSE_PROTOCOL=https`, `TYPESENSE_API_KEY`) or a Typesense private service, and run `python manage.py reindex_search` once after enabling it. Leave `TYPESENSE_HOST` unset to run without search (Postgres fallback).
+- **Blueprint.** These services can also be declared in a `render.yaml` blueprint for one-click provisioning.
 
 ### Frontend on Vercel
 
@@ -249,6 +293,63 @@ python manage.py migrate --no-input && python manage.py collectstatic --no-input
 4. Deploy
 
 Vercel handles TLS, CDN, and automatic ISR revalidation. No Nginx is needed when using Vercel.
+
+---
+
+## Option C: DigitalOcean
+
+Two routes, depending on how much you want managed for you.
+
+### C1. App Platform (managed PaaS)
+
+Mirrors the Render setup. From the repository:
+
+1. **Web** component from the Dockerfile (`provena-api`, `target: production`): the API. App Platform terminates TLS and provides the public URL.
+2. Two **Worker** components from the same image: the Celery worker and Celery beat (commands as in Option B).
+3. **Frontend**: a **Static Site**/Next.js component for `provena-web`, or keep the frontend on Vercel.
+4. Attach a **Managed PostgreSQL 16** database and a **Managed Redis/Valkey** instance. App Platform exposes a connection pool: use the **pooled** URI for `DATABASE_URL` and the **direct** URI for `DIRECT_DATABASE_URL`.
+5. **Media**: create a **Spaces** bucket and set the `AWS_*` variables with `AWS_S3_ENDPOINT_URL` set to the Spaces endpoint (e.g. `https://lon1.digitaloceanspaces.com`).
+6. **Search**: Typesense Cloud, or skip it (Postgres fallback).
+7. Run migrations as a **pre-deploy job** with `DATABASE_URL="$DIRECT_DATABASE_URL"`.
+
+### C2. Droplet (VPS)
+
+This is **Option A** on a DigitalOcean Droplet. A 4 GB / 2 vCPU Droplet runs the whole `docker compose` stack (Typesense included), with Spaces for media and Cloudflare or a DigitalOcean Load Balancer for TLS. It is the cheapest and most self-contained option; in exchange you own OS patching, backups, and the zero-downtime rollout (`scripts/deploy.sh`).
+
+---
+
+## Option D: AWS
+
+Two routes: managed containers (ECS Fargate) or a single EC2 box running Compose.
+
+### D1. ECS Fargate (managed, scalable)
+
+The application maps onto AWS services as follows. Task definitions mirror `docker-compose.yml`.
+
+| Provena piece | AWS service |
+|---|---|
+| API / web | ECS Fargate service behind an Application Load Balancer |
+| Celery worker | ECS Fargate service (separate task) |
+| Celery beat | ECS Fargate service (single task) |
+| PostgreSQL 16 | RDS PostgreSQL (Multi-AZ for production) |
+| Connection pooling | RDS Proxy in front of the RDS instance |
+| Redis | ElastiCache for Redis |
+| Media | S3 (with CloudFront as the CDN origin) |
+| Search | Typesense on ECS (EFS/EBS volume) or Typesense Cloud |
+| Frontend | Vercel, or Amplify Hosting / S3 + CloudFront |
+| CDN / TLS | CloudFront + ACM certificate |
+| Secrets | AWS Secrets Manager or SSM Parameter Store |
+
+Key points:
+
+- Run **three ECS services** from the one image: `api` (behind the ALB), the Celery worker, and Celery beat.
+- Put **RDS Proxy** in front of RDS for pooling. Set `DATABASE_URL` to the RDS Proxy endpoint and `DIRECT_DATABASE_URL` to the RDS instance endpoint. Run migrations as a **one-off ECS task** (or a CodePipeline pre-deploy step) against the direct endpoint.
+- Prefer an **IAM task role** for S3 access over static `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` keys (django-storages picks up the role automatically).
+- Inject secrets from **Secrets Manager / SSM** as task environment, rather than plain env vars.
+
+### D2. EC2 + Docker Compose
+
+**Option A** on an EC2 instance (e.g. `t3.large`). The simplest AWS path: one box runs the Compose stack. RDS and ElastiCache are optional; you can run Postgres and Redis in Compose for a demo and switch to managed services for production by changing only `DATABASE_URL` / `DIRECT_DATABASE_URL` / `REDIS_URL`.
 
 ---
 
@@ -390,21 +491,11 @@ Django production settings also set:
 
 ---
 
-## AWS Migration Path
+## Migrating between options
 
-The current Render setup can be migrated to AWS without application code changes. The infrastructure equivalents are:
+The application code does not change between options; only the connection strings and where each process runs. Moving Render to AWS, for example, is the mapping in **[Option D: AWS](#option-d-aws)** above, applied without touching the app. The infrastructure rationale is in [provena-api/docs/TRD.md](../provena-api/docs/TRD.md) under the Infrastructure section and [ADR-006](../provena-api/docs/DECISIONS.md).
 
-| Render / Vercel | AWS |
-|---|---|
-| Render Web Service (API) | ECS Fargate (task definition mirrors `docker-compose.yml`) |
-| Render Background Worker (Celery) | ECS Fargate (separate task) |
-| Render Managed PostgreSQL | RDS PostgreSQL 16 (multi-AZ for production) |
-| Render Managed Redis | ElastiCache for Redis (cluster mode off, single node initially) |
-| Vercel (Next.js) | ECS Fargate or AWS Amplify |
-| Cloudflare (CDN) | CloudFront + ACM certificate |
-| S3 / R2 (media) | S3 with CloudFront origin |
-
-The migration is documented further in [provena-api/docs/TRD.md](../provena-api/docs/TRD.md) under the Infrastructure section.
+Because every option reads the same environment variables, a migration is: stand up the new backing services, copy the data (`pg_dump`/restore over the direct connection, and re-sync the media bucket), repoint `DATABASE_URL` / `DIRECT_DATABASE_URL` / `REDIS_URL` / `AWS_*` / `TYPESENSE_*`, run migrations against the direct connection, and `reindex_search` if search is enabled.
 
 ---
 
@@ -429,7 +520,7 @@ AWS S3 and Cloudflare R2 both provide 11-nines durability. Enable bucket version
 ### Secrets
 
 Never commit secrets to git. Store them in:
-- Render environment variables
+- Render environment variables / DigitalOcean App Platform app-level secrets
 - Vercel environment variables
-- AWS Secrets Manager (AWS path)
+- AWS Secrets Manager or SSM Parameter Store (AWS path)
 - A `.env` file on the server, excluded from git (`provena-api/.env` is in `.gitignore`)

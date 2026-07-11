@@ -32,7 +32,19 @@ cd provena
 
 ## 2. Path A: Docker Compose (Recommended)
 
-This runs the full stack — PostgreSQL, Redis, Django API, Celery worker, Celery Beat, Next.js, and Nginx — in one command.
+This runs the full stack (PostgreSQL, PgBouncer, Redis, Typesense, Django API, Celery worker, Celery Beat, Next.js, and Nginx).
+
+### Quickstart: `scripts/up.sh`
+
+For a demo-ready environment in one command, use the helper. It builds and starts everything, migrates, seeds demo data, indexes the catalogue for search, and prints the URLs and demo logins:
+
+```bash
+scripts/up.sh                # then open http://localhost
+scripts/up.sh --monitoring   # also start Prometheus + Grafana
+scripts/up.sh down           # stop     (reset wipes data volumes; logs tails logs)
+```
+
+The manual steps below (2a-2d) are equivalent and useful when you want to drive the stack yourself.
 
 ### 2a. Configure environment
 
