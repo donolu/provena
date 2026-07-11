@@ -120,6 +120,24 @@ class TestDumpToGzip:
         assert "--no-owner" in cmd and "--no-privileges" in cmd
 
     @patch("apps.ops.backups.subprocess.Popen")
+    def test_targets_direct_connection_not_pgbouncer(self, mock_popen, tmp_path, monkeypatch):
+        # With both URLs present (app runs through PgBouncer), pg_dump must use
+        # the direct Postgres connection, not the pooler.
+        monkeypatch.setenv("DIRECT_DATABASE_URL", "postgres://provena:pw@db:5432/provena")
+        proc = MagicMock()
+        proc.stdout = io.BytesIO(b"-- dump")
+        proc.returncode = 0
+        mock_popen.return_value.__enter__.return_value = proc
+
+        backups._dump_to_gzip(str(tmp_path / "out.sql.gz"))
+
+        cmd = mock_popen.call_args.args[0]
+        assert cmd[cmd.index("--host") + 1] == "db"
+        assert cmd[cmd.index("--port") + 1] == "5432"
+        assert cmd[-1] == "provena"  # database name
+        assert mock_popen.call_args.kwargs["env"]["PGPASSWORD"] == "pw"
+
+    @patch("apps.ops.backups.subprocess.Popen")
     def test_raises_on_nonzero_exit(self, mock_popen, tmp_path):
         proc = MagicMock()
         proc.stdout = io.BytesIO(b"")

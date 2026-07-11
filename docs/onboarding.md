@@ -67,8 +67,10 @@ The first run downloads images and builds both Dockerfiles. This takes 3-5 minut
 ### 2c. Apply migrations and create a superuser
 
 ```bash
-# In a separate terminal (leave the compose stack running)
-docker compose exec api python manage.py migrate
+# In a separate terminal (leave the compose stack running).
+# Migrations use the direct DB connection, bypassing PgBouncer's transaction
+# pooling (see docs/deployment.md).
+docker compose exec api sh -c 'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate'
 docker compose exec api python manage.py createsuperuser
 ```
 
@@ -90,8 +92,8 @@ docker compose logs -f api
 # Run a Django management command
 docker compose exec api python manage.py shell
 
-# Run migrations after pulling new code
-docker compose exec api python manage.py migrate
+# Run migrations after pulling new code (direct connection, bypassing PgBouncer)
+docker compose exec api sh -c 'DATABASE_URL="$DIRECT_DATABASE_URL" python manage.py migrate'
 
 # Rebuild after Dockerfile or dependency changes
 docker compose build api

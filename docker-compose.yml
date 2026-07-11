@@ -5,13 +5,13 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: provena
-      POSTGRES_USER: provena
+      POSTGRES_DB: ${DB_NAME:-provena}
+      POSTGRES_USER: ${DB_USER:-provena}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-provena}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U provena"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-provena}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,6 +24,37 @@ services:
       timeout: 5s
       retries: 5
 
+  # Connection pooler (transaction mode). The app connects here instead of
+  # Postgres directly, so many API/worker processes multiplex a small pool of
+  # server connections. Migrations use DIRECT_DATABASE_URL (Postgres directly),
+  # since DDL/advisory locks are unsafe under transaction pooling.
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.23.1-p3
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-provena}
+      DB_PASSWORD: ${DB_PASSWORD:-provena}
+      DB_NAME: ${DB_NAME:-provena}
+      LISTEN_PORT: "6432"
+      POOL_MODE: transaction
+      AUTH_TYPE: scram-sha-256
+      ADMIN_USERS: ${DB_USER:-provena}
+      MAX_CLIENT_CONN: "1000"
+      DEFAULT_POOL_SIZE: "25"
+      # psycopg/Django send these startup params; PgBouncer must be told to
+      # ignore them in transaction mode or it refuses the connection.
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits,options
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U ${DB_USER:-provena}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # ── Django API ────────────────────────────────────────────────────────────────
 
   api:
@@ -33,14 +64,15 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.production
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
-      DATABASE_URL: postgres://provena:${DB_PASSWORD:-provena}@db:5432/provena
+      DATABASE_URL: postgres://${DB_USER:-provena}:${DB_PASSWORD:-provena}@pgbouncer:6432/${DB_NAME:-provena}
+      DIRECT_DATABASE_URL: postgres://${DB_USER:-provena}:${DB_PASSWORD:-provena}@db:5432/${DB_NAME:-provena}
       REDIS_URL: redis://redis:6379/0
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
     depends_on:
-      db:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -55,7 +87,8 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.production
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
-      DATABASE_URL: postgres://provena:${DB_PASSWORD:-provena}@db:5432/provena
+      DATABASE_URL: postgres://${DB_USER:-provena}:${DB_PASSWORD:-provena}@pgbouncer:6432/${DB_NAME:-provena}
+      DIRECT_DATABASE_URL: postgres://${DB_USER:-provena}:${DB_PASSWORD:-provena}@db:5432/${DB_NAME:-provena}
       REDIS_URL: redis://redis:6379/0
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
@@ -71,7 +104,8 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.production
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
-      DATABASE_URL: postgres://provena:${DB_PASSWORD:-provena}@db:5432/provena
+      DATABASE_URL: postgres://${DB_USER:-provena}:${DB_PASSWORD:-provena}@pgbouncer:6432/${DB_NAME:-provena}
+      DIRECT_DATABASE_URL: postgres://${DB_USER:-provena}:${DB_PASSWORD:-provena}@db:5432/${DB_NAME:-provena}
       REDIS_URL: redis://redis:6379/0
     depends_on:
       - api
