@@ -32,9 +32,10 @@ export default function Home() {
   })
 
   // Personalised rail — only fetched for signed-in buyers, whose order history
-  // drives the recommendations.
+  // drives the recommendations. Keyed by user id so one browser session never
+  // shows a previous user's cached recommendations after a re-login.
   const { data: recommended = [] } = useQuery({
-    queryKey: ['products', 'recommended'],
+    queryKey: ['products', 'recommended', user?.id],
     queryFn: getRecommendedProducts,
     enabled: !!user,
   })

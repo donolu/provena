@@ -24,7 +24,11 @@ def _product(supplier, category, name, slug, *, featured=False, status=ProductSt
 
 
 def _buy(buyer, product, *, status=OrderStatus.DELIVERED):
-    """Give ``buyer`` a (non-cancelled by default) order line for ``product``."""
+    """Give ``buyer`` a paid (DELIVERED by default) order line for ``product``.
+
+    ``status`` is applied to both the order and its sub-order; recommendations
+    key off the sub-order status.
+    """
     order = Order.objects.create(
         buyer=buyer,
         reference=f"ORD-{product.slug}"[:24],
@@ -105,16 +109,30 @@ class TestRecommendations:
         assert "draft" not in slugs
         assert active.slug in slugs
 
-    def test_cancelled_orders_do_not_exclude_or_drive_affinity(
-        self, api_client, buyer, approved_supplier, category
+    @pytest.mark.parametrize("status", [OrderStatus.PENDING, OrderStatus.CANCELLED])
+    def test_unpaid_orders_do_not_exclude_or_drive_affinity(
+        self, api_client, buyer, approved_supplier, category, status
     ):
-        cancelled = _product(approved_supplier, category, "Cancelled buy", "cancelled")
-        _buy(buyer, cancelled, status=OrderStatus.CANCELLED)
+        # PENDING = checkout started but never paid; CANCELLED = paid then voided.
+        # Neither is real purchase history, so the product stays recommendable.
+        unpaid = _product(approved_supplier, category, "Unpaid buy", "unpaid")
+        _buy(buyer, unpaid, status=status)
 
         api_client.force_authenticate(user=buyer)
         slugs = [p["slug"] for p in api_client.get(URL).json()]
-        # A cancelled purchase is not real history: the product stays recommendable.
-        assert cancelled.slug in slugs
+        assert unpaid.slug in slugs
+
+    def test_pending_orders_do_not_count_towards_popularity(
+        self, api_client, buyer, approved_supplier, category
+    ):
+        # A never-paid order must not boost a product above a genuinely paid one.
+        paid = _product(approved_supplier, category, "Paid popular", "paid-popular")
+        pending = _product(approved_supplier, category, "Pending popular", "pending-popular")
+        _buy(buyer, paid, status=OrderStatus.DELIVERED)
+        _buy(buyer, pending, status=OrderStatus.PENDING)
+
+        slugs = [p["slug"] for p in api_client.get(URL).json()]  # anonymous cold-start
+        assert slugs.index(paid.slug) < slugs.index(pending.slug)
 
     def test_caps_at_twelve(self, api_client, approved_supplier, category):
         for i in range(15):

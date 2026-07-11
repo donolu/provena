@@ -424,10 +424,10 @@ class RecommendedProductsView(APIView):
     """Personalised 'recommended for you' rail for the homepage.
 
     Content-based, no external ML service. For a signed-in buyer it ranks ACTIVE
-    products by affinity with the categories and suppliers in their order history
-    (excluding products they have already bought), then fills the rail with
-    featured and most-ordered products. Anonymous or brand-new buyers have no
-    purchase signal, so it degrades to a sensible cold-start list: featured
+    products by affinity with the categories and suppliers in their *paid* order
+    history (excluding products they have already bought), then fills the rail
+    with featured and most-ordered products. Anonymous or brand-new buyers have
+    no purchase signal, so it degrades to a sensible cold-start list: featured
     first, then most-ordered, then newest.
     """
 
@@ -447,6 +447,17 @@ class RecommendedProductsView(APIView):
     def get(self, request: Request) -> Response:
         from apps.orders.models import OrderItem, OrderStatus
 
+        # Only orders that have actually been paid for are real commerce signal.
+        # place_order creates PENDING orders and items *before* payment, so a
+        # PENDING (or CANCELLED) order is a failed/abandoned checkout and must not
+        # drive affinity, exclusions or popularity. A sub-order reaches CONFIRMED
+        # only once its payment succeeds.
+        paid_statuses = (
+            OrderStatus.CONFIRMED,
+            OrderStatus.DISPATCHED,
+            OrderStatus.DELIVERED,
+        )
+
         affinity_categories: set = set()
         affinity_suppliers: set = set()
         purchased_product_ids: set = set()
@@ -454,8 +465,9 @@ class RecommendedProductsView(APIView):
         user = request.user
         if user.is_authenticated:
             history = (
-                OrderItem.objects.filter(sub_order__order__buyer=user)
-                .exclude(sub_order__order__status=OrderStatus.CANCELLED)
+                OrderItem.objects.filter(
+                    sub_order__order__buyer=user, sub_order__status__in=paid_statuses
+                )
                 .values_list(
                     "variant__product_id",
                     "variant__product__category_id",
@@ -472,8 +484,9 @@ class RecommendedProductsView(APIView):
         # How many (non-cancelled) times each product has been ordered — drives
         # popularity ordering and the whole cold-start list.
         order_count = Subquery(
-            OrderItem.objects.filter(variant__product=OuterRef("pk"))
-            .exclude(sub_order__order__status=OrderStatus.CANCELLED)
+            OrderItem.objects.filter(
+                variant__product=OuterRef("pk"), sub_order__status__in=paid_statuses
+            )
             .values("variant__product")
             .annotate(c=Count("id"))
             .values("c"),
