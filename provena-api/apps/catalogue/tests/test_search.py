@@ -158,6 +158,17 @@ class TestSearchIndexing:
         _product(approved_supplier, category, "A", "a")
         assert reindex_all_products() == 0
 
+    def test_shared_task_uses_configured_redis_broker(self):
+        # Regression: config/__init__ must load the Celery app so a shared_task's
+        # .delay() reaches the configured Redis broker. Without it the web and
+        # management processes fall back to Celery's default broker and every
+        # enqueue (search indexing, data exports, payouts) raises ConnectionError.
+        from django.conf import settings
+
+        broker = index_product.app.conf.broker_url
+        assert broker == settings.CELERY_BROKER_URL
+        assert broker and "redis" in broker
+
     @override_settings(TYPESENSE_ENABLED=True)
     @patch("apps.catalogue.tasks.reindex_all_products", return_value=3)
     def test_reindex_command_runs_when_enabled(self, mock_reindex):
