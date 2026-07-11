@@ -3,16 +3,16 @@
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Heart, ShoppingBasket, Trash2 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Nav } from '@/components/nav'
 import { CartDrawer } from '@/components/cart-drawer'
 import { getCart, addToCart, updateCartItem, removeCartItem, getWishlist, removeFromWishlist } from '@/lib/api/cart'
 import { useAuthStore } from '@/store/auth'
+import { useAuthGuard } from '@/hooks/use-auth-guard'
 import { useState } from 'react'
 
 export default function WishlistPage() {
   const { user } = useAuthStore()
-  const router = useRouter()
+  useAuthGuard()
   const qc = useQueryClient()
   const [cartOpen, setCartOpen] = useState(false)
   const [loadedPages, setLoadedPages] = useState([1])
@@ -66,10 +66,10 @@ export default function WishlistPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cart'] }),
   })
 
-  if (!user) {
-    router.push('/login')
-    return null
-  }
+  // Auth is enforced by middleware and useAuthGuard (redirects in an effect);
+  // render nothing here rather than calling router.push during render, which
+  // would touch `location` during static generation.
+  if (!user) return null
 
   return (
     <>

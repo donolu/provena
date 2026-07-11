@@ -1,10 +1,10 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Bell } from 'lucide-react'
 import { getNotificationPreferences, updateNotificationPreferences } from '@/lib/api/notifications'
 import { useAuthStore } from '@/store/auth'
+import { useAuthGuard } from '@/hooks/use-auth-guard'
 import type { NotificationPreferences } from '@/lib/api/types'
 
 type PrefKey = keyof Omit<NotificationPreferences, 'updated_at'>
@@ -76,8 +76,8 @@ function Toggle({
 }
 
 export default function NotificationPreferencesPage() {
-  const router = useRouter()
   const { user } = useAuthStore()
+  useAuthGuard()
   const qc = useQueryClient()
 
   const { data: prefs, isPending } = useQuery({
@@ -94,10 +94,9 @@ export default function NotificationPreferencesPage() {
     },
   })
 
-  if (!user) {
-    router.push('/login')
-    return null
-  }
+  // Auth is enforced by middleware and useAuthGuard (redirects in an effect);
+  // render nothing here rather than calling router.push during render.
+  if (!user) return null
 
   function handleToggle(key: PrefKey, value: boolean) {
     mutation.mutate({ [key]: value })
