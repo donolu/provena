@@ -29,6 +29,9 @@ services:
       STRIPE_SECRET_KEY: ""
       STRIPE_PUBLISHABLE_KEY: ""
       STRIPE_WEBHOOK_SECRET: ""
+      # Search disabled for E2E: exercises the Postgres fallback path, so the
+      # E2E stack needs no Typesense container.
+      TYPESENSE_HOST: ""
     # No published port: reached through Nginx only, which also lets the api
     # service scale to multiple replicas for the rolling-deploy check.
 

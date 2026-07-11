@@ -55,6 +55,23 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # Full-text search engine. The API and worker use it for product search and
+  # indexing; if it is unreachable the API falls back to Postgres search.
+  typesense:
+    image: typesense/typesense:27.1
+    command:
+      - "--data-dir=/data"
+      - "--api-key=${TYPESENSE_API_KEY:-devsearchkey}"
+      - "--enable-cors"
+    volumes:
+      - typesense_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8108/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # ── Django API ────────────────────────────────────────────────────────────────
 
   api:
@@ -71,6 +88,10 @@ services:
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      TYPESENSE_HOST: ${TYPESENSE_HOST:-typesense}
+      TYPESENSE_PORT: "8108"
+      TYPESENSE_PROTOCOL: http
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-devsearchkey}
     depends_on:
       pgbouncer:
         condition: service_healthy
@@ -107,6 +128,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      TYPESENSE_HOST: ${TYPESENSE_HOST:-typesense}
+      TYPESENSE_PORT: "8108"
+      TYPESENSE_PROTOCOL: http
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-devsearchkey}
     depends_on:
       - api
     restart: unless-stopped
@@ -167,3 +192,4 @@ services:
 
 volumes:
   postgres_data:
+  typesense_data:
