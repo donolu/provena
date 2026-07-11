@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { login, loginTotp } from '@/lib/api/auth'
 import { mergeGuestCart } from '@/lib/api/cart'
+import { safeNext } from '@/lib/navigation'
 import { useAuthStore } from '@/store/auth'
 import type { LoginResponse, TOTPLoginRequired } from '@/lib/api/types'
 
@@ -39,9 +40,8 @@ function LoginForm() {
         const { access, user } = result as LoginResponse
         await mergeGuestCart(access).catch(() => {})
         storeLogin(user, access)
-        const next = searchParams.get('next')
-        const dest = next ?? (user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue')
-        router.push(dest)
+        const fallback = user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue'
+        router.push(safeNext(searchParams.get('next'), fallback))
       }
     } catch (err: unknown) {
       const data = (err as { response?: { data?: { error?: { message?: string }; detail?: string } } }).response?.data
@@ -61,9 +61,8 @@ function LoginForm() {
       const { access, user } = await loginTotp(totpToken, totpCode)
       await mergeGuestCart(access).catch(() => {})
       storeLogin(user, access)
-      const next = searchParams.get('next')
-      const dest = next ?? (user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue')
-      router.push(dest)
+      const fallback = user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue'
+      router.push(safeNext(searchParams.get('next'), fallback))
     } catch {
       setTotpError('Invalid code. Please try again.')
     } finally {
