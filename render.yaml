@@ -2,22 +2,32 @@
 #
 # One-click: in Render, New > Blueprint, point at this repo, then fill in the
 # env vars marked `sync: false` (Stripe, email, storage, CORS, and optionally
-# Typesense). See docs/deployment.md "Option B: Render + Vercel" for detail.
+# Typesense) when prompted. See docs/deployment.md "Option B: Render + Vercel".
 #
 # This provisions the backend: the Django API, the Celery worker and beat, a
-# managed Postgres 16, and a Redis instance. The frontend (provena-web) deploys
-# separately to Vercel with NEXT_PUBLIC_API_URL set to the API service URL
-# (ADR-006). Plans below are modest defaults; adjust to your account/tier.
+# managed Postgres 16 (with the PgBouncer pool enabled), and a Redis instance.
+# The frontend (provena-web) deploys separately to Vercel with NEXT_PUBLIC_API_URL
+# set to the API service URL (ADR-006). Plans below are modest defaults; adjust
+# to your account/tier.
+#
+# Note: `sync: false` variables must live on each service, not in an env group
+# (Render ignores `sync: false` inside envVarGroups). Every service loads the
+# production settings, which require the storage/email/CORS values at import, so
+# each service carries the full secret set.
 
 databases:
   - name: provena-db
     databaseName: provena
     postgresMajorVersion: "16"
     plan: basic-256mb
+    # Enable the PgBouncer pool; the app connects via connectionPoolString and
+    # migrations use the direct connectionString.
+    connectionPool: pgbouncer
 
-# Shared configuration and secrets. DJANGO_SECRET_KEY is generated once and
-# shared, so signing is consistent across the API, worker, and beat. Values
-# marked `sync: false` are entered per-environment in the Render dashboard.
+# Static and generated values shared across services. DJANGO_SECRET_KEY is
+# generated once here so signing is consistent across the API, worker, and beat.
+# Secrets are NOT here (env groups ignore `sync: false`); they are on each
+# service below.
 envVarGroups:
   - name: provena-shared
     envVars:
@@ -27,52 +37,14 @@ envVarGroups:
         generateValue: true
       - key: PLATFORM_FEE_PERCENT
         value: "10"
-      # Payments (Stripe)
-      - key: STRIPE_SECRET_KEY
-        sync: false
-      - key: STRIPE_PUBLISHABLE_KEY
-        sync: false
-      - key: STRIPE_WEBHOOK_SECRET
-        sync: false
-      # Email (SMTP)
-      - key: EMAIL_HOST
-        sync: false
       - key: EMAIL_PORT
         value: "587"
-      - key: EMAIL_HOST_USER
-        sync: false
-      - key: EMAIL_HOST_PASSWORD
-        sync: false
-      - key: DEFAULT_FROM_EMAIL
-        sync: false
-      # Media storage (S3 / Spaces / R2). Set AWS_S3_ENDPOINT_URL for non-AWS.
-      - key: AWS_ACCESS_KEY_ID
-        sync: false
-      - key: AWS_SECRET_ACCESS_KEY
-        sync: false
-      - key: AWS_STORAGE_BUCKET_NAME
-        sync: false
       - key: AWS_S3_REGION_NAME
         value: eu-west-2
-      - key: AWS_S3_ENDPOINT_URL
-        sync: false
-      # Frontend origin(s) for CORS, e.g. the Vercel URL
-      - key: CORS_ALLOWED_ORIGINS
-        sync: false
-      # Error reporting (optional; blank disables Sentry)
-      - key: SENTRY_DSN
-        sync: false
-      # Full-text search (optional). Leave TYPESENSE_HOST blank to disable
-      # search and fall back to Postgres. For Typesense Cloud set the host,
-      # TYPESENSE_PORT=443 and TYPESENSE_PROTOCOL=https.
-      - key: TYPESENSE_HOST
-        sync: false
       - key: TYPESENSE_PORT
         value: "443"
       - key: TYPESENSE_PROTOCOL
         value: https
-      - key: TYPESENSE_API_KEY
-        sync: false
 
 services:
   # Redis: Celery broker, Channels (websockets), and cache. noeviction so the
@@ -84,7 +56,8 @@ services:
     ipAllowList: [] # internal only
 
   # Django API (Daphne / ASGI). Migrations run before each deploy against the
-  # direct connection (Render's connection string), never through a pooler.
+  # direct connection, never through the pool. The public hostname reaches
+  # ALLOWED_HOSTS via RENDER_EXTERNAL_HOSTNAME (handled in production settings).
   - type: web
     name: provena-api
     runtime: docker
@@ -98,7 +71,7 @@ services:
       - key: DATABASE_URL
         fromDatabase:
           name: provena-db
-          property: connectionString
+          property: connectionPoolString
       - key: DIRECT_DATABASE_URL
         fromDatabase:
           name: provena-db
@@ -108,11 +81,36 @@ services:
           name: provena-redis
           type: redis
           property: connectionString
-      - key: DJANGO_ALLOWED_HOSTS
-        fromService:
-          name: provena-api
-          type: web
-          property: host
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_S3_ENDPOINT_URL
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: TYPESENSE_HOST
+        sync: false
+      - key: TYPESENSE_API_KEY
+        sync: false
 
   # Celery worker: search indexing, emails, payouts, data exports.
   - type: worker
@@ -127,7 +125,7 @@ services:
       - key: DATABASE_URL
         fromDatabase:
           name: provena-db
-          property: connectionString
+          property: connectionPoolString
       - key: DIRECT_DATABASE_URL
         fromDatabase:
           name: provena-db
@@ -137,8 +135,38 @@ services:
           name: provena-redis
           type: redis
           property: connectionString
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_S3_ENDPOINT_URL
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: TYPESENSE_HOST
+        sync: false
+      - key: TYPESENSE_API_KEY
+        sync: false
 
-  # Celery beat: scheduled tasks (uses the database scheduler).
+  # Celery beat: scheduled tasks (database scheduler).
   - type: worker
     name: provena-beat
     runtime: docker
@@ -151,7 +179,7 @@ services:
       - key: DATABASE_URL
         fromDatabase:
           name: provena-db
-          property: connectionString
+          property: connectionPoolString
       - key: DIRECT_DATABASE_URL
         fromDatabase:
           name: provena-db
@@ -161,3 +189,33 @@ services:
           name: provena-redis
           type: redis
           property: connectionString
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_S3_ENDPOINT_URL
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: TYPESENSE_HOST
+        sync: false
+      - key: TYPESENSE_API_KEY
+        sync: false
