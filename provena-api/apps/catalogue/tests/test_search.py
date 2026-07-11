@@ -212,12 +212,24 @@ class TestSearchModule:
         assert doc["min_price"] == 2.0 and doc["max_price"] == 6.0
 
     def test_delete_product_swallows_missing(self):
+        from typesense.exceptions import ObjectNotFound
+
         client = MagicMock()
-        self._collection(client).documents.__getitem__.return_value.delete.side_effect = Exception(
-            "not found"
-        )
+        self._collection(
+            client
+        ).documents.__getitem__.return_value.delete.side_effect = ObjectNotFound("not found")
         with patch("apps.catalogue.search.get_client", return_value=client):
             search.delete_product("does-not-exist")  # must not raise
+
+    def test_delete_product_reraises_transport_error(self):
+        # A real outage must propagate so the Celery task retries it.
+        client = MagicMock()
+        self._collection(
+            client
+        ).documents.__getitem__.return_value.delete.side_effect = ConnectionError("typesense down")
+        with patch("apps.catalogue.search.get_client", return_value=client):
+            with pytest.raises(ConnectionError):
+                search.delete_product("some-id")
 
     def test_search_products_parses_hits_and_total(self):
         client = MagicMock()

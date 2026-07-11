@@ -89,12 +89,15 @@ AWS_S3_REGION_NAME=eu-west-2        # or auto for Cloudflare R2
 # Monitoring
 SENTRY_DSN=https://...@sentry.io/...
 
-# Full-text search (Typesense). Leave TYPESENSE_HOST unset to disable search
-# and fall back to Postgres. See "Full-text search (Typesense)" below.
+# Full-text search (Typesense). The self-host compose defaults TYPESENSE_HOST
+# to the bundled `typesense` service, so search is ON by default there; set
+# TYPESENSE_HOST="" to disable it and fall back to Postgres. On other hosting
+# (no bundled service) an unset host disables search. Always override the API
+# key in production. See "Full-text search (Typesense)" below.
 TYPESENSE_HOST=typesense
 TYPESENSE_PORT=8108
 TYPESENSE_PROTOCOL=http
-TYPESENSE_API_KEY=<generate a strong key>
+TYPESENSE_API_KEY=<generate a strong key; do not ship the compose default>
 
 # Platform
 FRONTEND_URL=https://yourdomain.com
@@ -299,6 +302,8 @@ docker compose exec api psql "postgres://<user>:<pass>@pgbouncer:6432/pgbouncer"
 ## Full-text search (Typesense)
 
 Product search uses **Typesense** for ranked, typo-tolerant results. The self-hosted `docker-compose.yml` runs a `typesense` service; the API and worker read it via `TYPESENSE_HOST`/`TYPESENSE_PORT`/`TYPESENSE_PROTOCOL`/`TYPESENSE_API_KEY`.
+
+In the self-hosted compose, `TYPESENSE_HOST` defaults to the bundled `typesense` service, so **search is enabled by default** there; set `TYPESENSE_HOST=""` to turn it off. On hosting without a bundled service (e.g. Render), an unset host disables it. **Always override `TYPESENSE_API_KEY`** in production; the compose default (`devsearchkey`) is for local use only.
 
 Search **degrades gracefully**: if `TYPESENSE_HOST` is unset, or Typesense is unreachable or returns an error, the API falls back to the Postgres `ILIKE` query and logs a warning. Browsing and filtering never stall on the search engine, so this is safe to enable incrementally.
 

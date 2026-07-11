@@ -124,16 +124,22 @@ def index_product(product: Product) -> None:
 
 
 def delete_product(product_id: str) -> None:
-    """Remove one product document by id."""
+    """Remove one product document by id.
+
+    A missing document is fine (never indexed, or an unpublished product), but
+    transport/auth/server errors propagate so the calling Celery task retries
+    instead of silently leaving a stale document in the index.
+    """
     client = get_client()
     if client is None:
         return
+    from typesense.exceptions import ObjectNotFound
+
     try:
         client.collections[settings.TYPESENSE_PRODUCTS_COLLECTION].documents[
             str(product_id)
         ].delete()
-    except Exception:
-        # Already absent (e.g. never indexed, or an unpublished product) — fine.
+    except ObjectNotFound:
         logger.debug("Typesense delete: document %s not found", product_id)
 
 
