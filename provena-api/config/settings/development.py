@@ -11,6 +11,10 @@ DEBUG = True
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "api"]
 
 CORS_ALLOWED_ORIGINS = [
+    # Nginx single origin (scripts/up.sh serves the app here on port 80).
+    "http://localhost",
+    "http://127.0.0.1",
+    # Next.js dev server reached directly.
     "http://localhost:3000",
     "http://localhost:3001",
 ]

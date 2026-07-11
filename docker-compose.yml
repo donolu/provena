@@ -65,8 +65,10 @@ services:
       - "--enable-cors"
     volumes:
       - typesense_data:/data
+    # The Typesense image has no curl/wget, so probe the port with bash's
+    # /dev/tcp instead of hitting /health over HTTP.
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8108/health || exit 1"]
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/8108"]
       interval: 10s
       timeout: 5s
       retries: 5
