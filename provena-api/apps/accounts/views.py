@@ -19,6 +19,7 @@ from apps.pagination import PaginatedListMixin
 from . import services
 from .models import DataExportRequest, DataExportStatus, User
 from .serializers import (
+    AccountDeletionSerializer,
     AddressSerializer,
     AddressWriteSerializer,
     AdminUserSerializer,
@@ -236,6 +237,45 @@ class LogoutView(APIView):
                 RefreshToken(raw).blacklist()  # type: ignore[arg-type]
             except (TokenError, Exception):  # noqa: S110
                 pass  # Expired tokens don't need blacklisting
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        _clear_refresh_cookie(response)
+        return response
+
+
+class AccountDeletionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["User Profile"],
+        summary="Delete (erase) your account",
+        description="Anonymises the account's personal data and disables it "
+        "(UK GDPR right to erasure). Requires the current password, and the "
+        "authenticator code when 2FA is enabled. Order and payment records are "
+        "retained under legal obligation but stripped of identifying data.",
+        request=AccountDeletionSerializer,
+        responses={
+            204: OpenApiResponse(description="Account erased"),
+            400: OpenApiResponse(description="Wrong password or code"),
+            403: OpenApiResponse(description="Not a buyer account"),
+        },
+    )
+    def post(self, request: Request) -> Response:
+        from .models import Role
+
+        if request.user.role != Role.BUYER:  # type: ignore[union-attr]
+            return Response(
+                {"detail": "Supplier and admin accounts must be closed via support."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        s = AccountDeletionSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        ok, error = services.erase_account(
+            request.user,  # type: ignore[arg-type]
+            s.validated_data["password"],
+            s.validated_data.get("totp_code", ""),
+        )
+        if not ok:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
         response = Response(status=status.HTTP_204_NO_CONTENT)
         _clear_refresh_cookie(response)
         return response

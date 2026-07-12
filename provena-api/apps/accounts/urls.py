@@ -23,6 +23,7 @@ urlpatterns = [
     path("totp/disable/", views.TOTPDisableView.as_view(), name="auth-totp-disable"),
     # User profile
     path("me/", views.UserProfileView.as_view(), name="auth-me"),
+    path("me/delete/", views.AccountDeletionView.as_view(), name="auth-account-delete"),
     # Address book
     path("addresses/", views.AddressListCreateView.as_view(), name="address-list"),
     path("addresses/<uuid:pk>/", views.AddressDetailView.as_view(), name="address-detail"),
