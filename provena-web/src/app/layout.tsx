@@ -3,6 +3,7 @@ import { Fraunces, Plus_Jakarta_Sans, DM_Mono } from 'next/font/google'
 import { QueryProvider } from '@/providers/query-provider'
 import { AuthProvider } from '@/providers/auth-provider'
 import { CookieConsent } from '@/components/cookie-consent'
+import { Footer } from '@/components/footer'
 import './globals.css'
 
 const fraunces = Fraunces({
@@ -41,7 +42,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <QueryProvider>
           <AuthProvider>
-            {children}
+            <div className="min-h-screen flex flex-col">
+              <div className="flex-1">{children}</div>
+              <Footer />
+            </div>
             <CookieConsent />
           </AuthProvider>
         </QueryProvider>
