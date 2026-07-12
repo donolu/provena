@@ -86,3 +86,11 @@ export async function enableTotp(code: string): Promise<void> {
 export async function disableTotp(code: string): Promise<void> {
   await apiClient.post('/auth/totp/disable/', { code })
 }
+
+export async function deleteAccount(password: string, totpCode?: string): Promise<void> {
+  await apiClient.post(
+    '/auth/me/delete/',
+    { password, totp_code: totpCode ?? '' },
+    { withCredentials: true },
+  )
+}

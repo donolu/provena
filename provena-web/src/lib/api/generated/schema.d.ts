@@ -245,6 +245,26 @@ export interface paths {
         patch: operations["auth_me_partial_update"];
         trace?: never;
     };
+    "/api/v1/auth/me/delete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete (erase) your account
+         * @description Anonymises the account's personal data and disables it (UK GDPR right to erasure). Requires the current password, and the authenticator code when 2FA is enabled. Order and payment records are retained under legal obligation but stripped of identifying data.
+         */
+        post: operations["auth_me_delete_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/addresses/": {
         parameters: {
             query?: never;
@@ -2478,6 +2498,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccountDeletionRequest: {
+            password: string;
+            /** @default  */
+            totp_code: string;
+        };
         /**
          * @description * `set_status` - set_status
          *     * `set_category` - set_category
@@ -4263,6 +4288,44 @@ export interface operations {
             };
             /** @description Validation error */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_me_delete_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountDeletionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AccountDeletionRequest"];
+                "multipart/form-data": components["schemas"]["AccountDeletionRequest"];
+            };
+        };
+        responses: {
+            /** @description Account erased */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Wrong password or code */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a buyer account */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

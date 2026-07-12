@@ -201,3 +201,23 @@ DB credentials in Compose are env-driven (`DB_USER` / `DB_PASSWORD` / `DB_NAME`,
 
 **Consequences:**
 Database connections now scale to hundreds of workers against a small server pool, removing the `max_connections` ceiling as the near-term scaling limit. The cost is a small per-query overhead from disabling prepared statements (acceptable at current volumes; revisit if profiling shows it matters) and a second connection string to manage. Migrations must remember the direct URL — enforced in CI and Compose, and documented in `deployment.md`. PgBouncer is one more moving part, but it is off-the-shelf, stateless, and low-maintenance. The transaction-pooling constraints (no server-side cursors/prepared statements) are a permanent design rule for this codebase, not a temporary workaround.
+
+## ADR-011: Account Erasure by Anonymisation
+
+**Date:** 2026-07-12
+**Status:** Accepted
+
+**Context:**
+UK GDPR Article 17 gives users the right to erasure. Provena already offers data **export** (#41). The complication is that a buyer's `User` row is referenced by orders and payments under `on_delete=PROTECT`, and those financial records must be retained to meet tax, accounting, and anti-fraud obligations. A hard delete is therefore impossible without destroying records we are legally required to keep, and cascading the delete would be unlawful.
+
+**Decision:**
+Implement erasure as **anonymisation**, not deletion (`POST /api/v1/auth/me/delete/`, `services.erase_account`).
+
+On erasure we: blacklist every outstanding refresh token; delete the user's saved addresses (directly identifying); and scrub the `User` row in place — email set to `deleted-<id>@deleted.invalid`, names cleared, password made unusable, TOTP disabled, `is_active=False`, and `erased_at` timestamped. The row survives so orders/payments stay referentially intact, but it no longer identifies a person; the original email is freed for reuse.
+
+The action **re-authenticates** the caller (current password, plus the TOTP code when 2FA is enabled) to prevent hijacked-session or CSRF-driven deletion. It is restricted to **buyer** accounts in this iteration; suppliers and admins have business/financial entanglements (KYC, Connect payouts, listings) and are directed to support. Order shipping snapshots are retained under legal basis and documented as such in the privacy policy.
+
+**Consequences:**
+- Erasure is compliant and reversible-proof (data is gone) without breaking retained financial records.
+- Suppliers/admins are out of scope for self-service erasure for now; a follow-up can handle the supplier lifecycle.
+- Retained order snapshots still contain shipping details entered at purchase time; a later pass can anonymise those beyond the statutory retention window.

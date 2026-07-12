@@ -38,6 +38,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     totp_enabled = models.BooleanField(default=False)
     totp_secret = models.CharField(max_length=64, blank=True)
+    # Set when the user erases their account (GDPR right to erasure). The row is
+    # kept (orders/payments reference it under PROTECT) but its PII is scrubbed.
+    erased_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
