@@ -63,7 +63,7 @@ jobs:
           timeout 30 bash -c 'until curl -sf http://localhost:8000/api/v1/catalogue/products/; do sleep 1; done'
 
       - name: ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.13.0
+        uses: zaproxy/action-baseline@v0.15.0
         with:
           target: 'http://localhost:8000'
           rules_file_name: '.zap/rules.tsv'
