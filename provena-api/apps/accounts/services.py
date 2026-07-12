@@ -232,3 +232,53 @@ def delete_address(address: Address) -> None:
         if next_address:
             next_address.is_default = True
             next_address.save(update_fields=["is_default", "updated_at"])
+
+
+def erase_account(user: User, password: str, totp_code: str = "") -> tuple[bool, str]:
+    """Anonymise a user's personal data and disable the account (GDPR erasure).
+
+    Re-authenticates with the password (and TOTP when enabled). Order and payment
+    records are retained under legal obligation but stripped of the user's
+    directly identifying data; saved addresses and auth material are removed.
+    """
+    from rest_framework_simplejwt.token_blacklist.models import (
+        BlacklistedToken,
+        OutstandingToken,
+    )
+
+    if not user.check_password(password):
+        return False, "Password is incorrect."
+    if user.totp_enabled and not _verify_totp_code(user, totp_code):
+        return False, "Invalid authentication code."
+
+    # Revoke every outstanding refresh token so existing sessions cannot continue.
+    for token in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token)
+
+    # Remove saved addresses (directly identifying).
+    Address.objects.filter(user=user).delete()
+
+    # Scrub the user record; the row itself is kept for order/payment integrity.
+    user.email = f"deleted-{user.id}@deleted.invalid"
+    user.first_name = ""
+    user.last_name = ""
+    user.totp_enabled = False
+    user.totp_secret = ""  # nosec B105 - clearing secret on erasure, not hardcoding
+    user.is_active = False
+    user.erased_at = timezone.now()
+    user.set_unusable_password()
+    user.save(
+        update_fields=[
+            "email",
+            "first_name",
+            "last_name",
+            "totp_enabled",
+            "totp_secret",
+            "is_active",
+            "erased_at",
+            "password",
+            "updated_at",
+        ]
+    )
+    logger.info("Account erased for user %s", user.id)
+    return True, ""

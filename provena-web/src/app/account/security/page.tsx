@@ -1,10 +1,10 @@
 'use client'
 
 import { Suspense, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useMutation } from '@tanstack/react-query'
-import { ShieldCheck, ShieldOff, KeyRound, AlertTriangle } from 'lucide-react'
-import { getTotpSetupUri, enableTotp, disableTotp, getMe } from '@/lib/api/auth'
+import { ShieldCheck, ShieldOff, KeyRound, AlertTriangle, Trash2 } from 'lucide-react'
+import { getTotpSetupUri, enableTotp, disableTotp, getMe, deleteAccount } from '@/lib/api/auth'
 import { useAuthStore } from '@/store/auth'
 
 function extractSecret(otpauthUri: string): string {
@@ -20,10 +20,28 @@ function SecurityContent() {
   const searchParams = useSearchParams()
   const enforce = searchParams.get('enforce') === '1'
 
-  const { user, setUser } = useAuthStore()
+  const router = useRouter()
+  const { user, setUser, logout } = useAuthStore()
   const [setupUri, setSetupUri] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
+
+  const [showDelete, setShowDelete] = useState(false)
+  const [delPassword, setDelPassword] = useState('')
+  const [delCode, setDelCode] = useState('')
+  const [delError, setDelError] = useState('')
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteAccount(delPassword, delCode),
+    onSuccess: () => {
+      logout()
+      router.push('/')
+    },
+    onError: (err: unknown) => {
+      const data = (err as { response?: { data?: { detail?: string } } }).response?.data
+      setDelError(data?.detail ?? 'Could not delete your account. Please try again.')
+    },
+  })
 
   const setupMutation = useMutation({
     mutationFn: getTotpSetupUri,
@@ -179,6 +197,62 @@ function SecurityContent() {
             </button>
           </div>
         )}
+
+        <div className="border-t border-stone-200 mt-8 pt-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Trash2 size={16} className="text-red-600" />
+            <h2 className="font-sans font-semibold text-forest text-sm">Delete account</h2>
+          </div>
+          <p className="text-xs font-sans text-soil mb-3 max-w-md">
+            Permanently erase your personal data and close your account. Order and payment records are kept as required by law but stripped of your details. This cannot be undone.
+          </p>
+          {!showDelete ? (
+            <button
+              onClick={() => setShowDelete(true)}
+              className="px-4 py-2 border border-red-300 text-red-700 text-sm font-sans rounded-lg hover:bg-red-50 transition-colors"
+            >
+              Delete my account
+            </button>
+          ) : (
+            <div className="space-y-3 max-w-xs">
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={delPassword}
+                onChange={(e) => { setDelPassword(e.target.value); setDelError('') }}
+                placeholder="Confirm your password"
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+              />
+              {totpEnabled && (
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={delCode}
+                  onChange={(e) => { setDelCode(e.target.value.replace(/\D/g, '')); setDelError('') }}
+                  placeholder="2FA code"
+                  className="w-32 px-3 py-2 border border-stone-300 rounded-lg font-mono text-sm text-center focus:outline-none focus:ring-2 focus:ring-red-300"
+                />
+              )}
+              {delError && <p className="text-xs text-red-600 font-sans">{delError}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => deleteMutation.mutate()}
+                  disabled={deleteMutation.isPending || !delPassword || (totpEnabled && delCode.length < 6)}
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-sans rounded-lg hover:bg-red-700 disabled:opacity-60 transition-colors"
+                >
+                  {deleteMutation.isPending ? 'Deleting…' : 'Permanently delete'}
+                </button>
+                <button
+                  onClick={() => { setShowDelete(false); setDelPassword(''); setDelCode(''); setDelError('') }}
+                  className="px-4 py-2 text-sm font-sans text-soil hover:text-forest transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

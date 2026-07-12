@@ -174,3 +174,8 @@ class DataExportRequestSerializer(serializers.ModelSerializer):
             "expires_at",
         ]
         read_only_fields = fields
+
+
+class AccountDeletionSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True)
+    totp_code = serializers.CharField(required=False, allow_blank=True, default="")
