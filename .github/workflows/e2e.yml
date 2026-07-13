@@ -23,7 +23,7 @@ jobs:
     outputs:
       run: ${{ steps.check.outputs.run }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: check
@@ -67,13 +67,13 @@ jobs:
       E2E_ADMIN_PASSWORD: E2ePassw0rd!
       E2E_ADMIN_TOTP_SECRET: KRSXG5CTMVRXEZLUKRSXG5CTMVRXEZLU
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.inputs.ref || github.head_ref || github.ref }}
 
       # Playwright itself runs on the runner (the web container only serves the
       # app), so install the runner's web dependencies and browser here.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: npm
