@@ -245,7 +245,7 @@ The three features all mutate the same money path and interact: a discount chang
 
 2. **VAT is inclusive and per line; the supplier is the merchant of record.** Listed prices are VAT-inclusive (the UK B2C norm), so accounting for VAT does not change what the buyer pays: VAT is *extracted* from the gross for the receipt and for the supplier's VAT return, not added on top. Each product carries a VAT rate (STANDARD 20% / REDUCED 5% / ZERO), defaulting to STANDARD and snapshotted onto `OrderItem` at checkout; VAT on shipping follows the standard rate. Each supplier is the principal for their own goods and the platform acts as agent, collecting through Stripe Connect and rendering a VAT breakdown per sub-order under the supplier's VAT details, plus its own VAT invoice to the supplier for commission. Non-UK-established sellers, where marketplace "deemed supplier" rules would make the platform liable, stay out of scope; suppliers remain UK-established per KYC.
 
-3. **Shipping is per supplier.** Each supplier owns a shipping policy (flat rate, free over a threshold, or per-item), stored on the supplier and snapshotted per sub-order at checkout. Shipping revenue belongs to the supplier who fulfils, so it is added to that supplier's payout gross in full; platform commission is charged on goods only, never on shipping.
+3. **Shipping is per supplier.** Each supplier owns a shipping policy (flat rate, free over a threshold, or per-item), stored on the supplier and snapshotted per sub-order at checkout. Shipping revenue belongs to the supplier who fulfils, so it is added to that supplier's payout gross in full; platform commission is charged on goods only, never on shipping. This assumes the supplier fulfils their own delivery. So that a future platform-brokered courier model (a third party delivers and is paid separately) does not re-open the money path, the payout logic reads *who the shipping money is attributed to* off the snapshot rather than assuming it is always the supplier; #140 must not hard-code shipping into supplier payout gross. See ADR-013.
 
 4. **Discounts are order-level codes, allocated pro rata, with explicit funding.** A `DiscountCode` (percentage or fixed amount, with minimum spend, a validity window, and global plus per-buyer usage limits) reduces the goods subtotal and is allocated across sub-orders in proportion to their goods value. A `DiscountRedemption` row records each use for enforcement and idempotency. Each code declares `funded_by`: PLATFORM (the supplier is paid on pre-discount goods and the platform absorbs the discount out of its fee) or SUPPLIER (the supplier's payout gross is reduced by their allocated share). Free-shipping thresholds are evaluated on the pre-discount goods value.
 
@@ -261,3 +261,32 @@ The three features all mutate the same money path and interact: a discount chang
 - Suppliers gain a shipping-policy surface and a `commission_rate` that finally drives payouts; the global setting becomes only the default.
 - Per-sub-order VAT breakdowns and per-supplier VAT numbers become new onboarding and KYC requirements; B2B VAT-exclusive invoicing and non-UK sellers are explicitly deferred.
 - Existing orders predate the breakdown columns, so a data migration backfills `goods_subtotal = subtotal`, zero shipping and discount, and VAT extracted at the standard rate, so historical receipts still render.
+
+---
+
+## ADR-013: Platform-Brokered Delivery (Third-Party Courier)
+
+**Date:** 2026-07-16
+**Status:** Proposed
+
+**Context:**
+ADR-012 §3 assumes a supplier fulfils their own delivery: the shipping fee is the supplier's revenue and is added to their payout gross in full. Some suppliers have no delivery capability of their own (the "Lidl" case). To serve them, the platform would broker a third-party courier (Uber Direct / Stuart-style, Tesco Whoosh-like same-day), quote the fee at checkout, and have the courier deliver. This is not another entry in the flat/free-over/per-item shipping menu; it is a different fulfilment model with a different money path and a different merchant of record, so it gets its own decision rather than being smuggled into #140.
+
+**Decision (to be settled):**
+The direction, with the details deferred until the base pipeline (#140/#141/#142) has shipped:
+
+1. **A per-sub-order fulfilment model.** `SUPPLIER_SHIP` (ADR-012 today: supplier's own policy, fee attributed to the supplier) versus `PLATFORM_DELIVERY` (a courier quote, fee attributed to the platform). The ADR-012 snapshot columns (`shipping_amount`) are reused unchanged; only the *attribution* of the shipping money differs. ADR-012 §3 already requires payout logic to read attribution off the snapshot, so this slots in without re-opening the money path.
+
+2. **The delivery fee is a pass-through, not supplier income.** Under `PLATFORM_DELIVERY` the fee must not enter the supplier's payout gross. The buyer pays it, the platform collects it, and the platform remits to the courier. A courier billed through its own API is not a Stripe Connect account, so this is not a three-way Connect split: it is platform revenue in and a courier cost out, a leg the platform owns.
+
+**Open questions:**
+- **VAT.** For the delivery leg the platform is likely the principal / merchant of record (a standard-rated service), which is a different principal than ADR-012's "supplier is principal for goods and their own shipping". How does this render on the receipt and the platform's VAT return?
+- **Quote lifecycle.** Courier quotes are time-bound (valid ~minutes). How are expiry and refresh handled between checkout and payment confirmation, and what happens when a snapshotted quote has lapsed by capture?
+- **Serviceability.** Not every address is deliverable same-day. Where does the serviceability check run, and on failure do we fall back to `SUPPLIER_SHIP` / standard shipping or block the line?
+- **Margin.** Does the platform pass the courier fee at cost or mark it up? Commercial call, but it changes whether there is a delivery-margin line to account for.
+- **Refunds.** How does a cancelled or failed delivery reconcile against a courier already dispatched and billed?
+
+**Consequences (anticipated):**
+- Suppliers with no delivery capability become servable, widening supply.
+- The platform takes on a new operational and financial relationship (courier billing, SLAs, failed-delivery handling) and a delivery-leg VAT position it did not have before.
+- The money path gains a third recipient class (external couriers) distinct from suppliers on Connect.
