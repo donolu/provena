@@ -221,3 +221,43 @@ The action **re-authenticates** the caller (current password, plus the TOTP code
 - Erasure is compliant and reversible-proof (data is gone) without breaking retained financial records.
 - Suppliers/admins are out of scope for self-service erasure for now; a follow-up can handle the supplier lifecycle.
 - Retained order snapshots still contain shipping details entered at purchase time; a later pass can anonymise those beyond the statutory retention window.
+
+## ADR-012: Order Pricing Pipeline (Shipping, VAT, Discounts)
+
+**Date:** 2026-07-16
+**Status:** Accepted
+
+**Context:**
+Today an order's price is only the goods subtotal. `orders.services.create_order` sums `variant.price * quantity` into `Order.total_amount` and per-supplier `SubOrder.subtotal`; `payments.services.create_payment_intent` charges `order.total_amount`; and `_create_payouts` pays each supplier `subtotal` minus a flat `PLATFORM_FEE_PERCENT`. There is no shipping (#140), no VAT accounting (#141), and no discount codes (#142). For a UK marketplace this is both a commercial gap (we cannot charge delivery or run promotions) and a compliance gap (no VAT breakdown on receipts, no basis for a supplier's VAT return).
+
+The three features all mutate the same money path and interact: a discount changes the VAT base, shipping is itself taxed, and payouts must reflect all three. Building them ad hoc would produce rounding drift between the charged total and the sum of the payouts, and an order that cannot be reconstructed once live config moves on. This ADR settles the pipeline once so the three issues slot into it rather than each re-opening the money path.
+
+**Decision:**
+
+1. **One deterministic pipeline, computed at checkout and snapshotted.** Pricing is computed in a single pass and the results are stored on the order; nothing is recomputed later from live product, shipping or VAT config, which changes over time. Order of operations, per sub-order (one supplier):
+   1. `goods_subtotal` = sum of `unit_price * quantity` over the lines
+   2. `discount_amount` = the order discount allocated to this sub-order (see 4)
+   3. `shipping_amount` = the supplier's shipping rule applied to the sub-order (see 3)
+   4. `sub_order.total` = `goods_subtotal - discount_amount + shipping_amount`
+   5. `vat_amount` = the VAT component extracted from the post-discount goods and the shipping (see 2)
+
+   `Order.total_amount` = the sum of the `sub_order.total` values. The charged amount is always the sum of the stored parts, so the PaymentIntent, the payouts and any refund reconcile to the penny by construction.
+
+2. **VAT is inclusive and per line; the supplier is the merchant of record.** Listed prices are VAT-inclusive (the UK B2C norm), so accounting for VAT does not change what the buyer pays: VAT is *extracted* from the gross for the receipt and for the supplier's VAT return, not added on top. Each product carries a VAT rate (STANDARD 20% / REDUCED 5% / ZERO), defaulting to STANDARD and snapshotted onto `OrderItem` at checkout; VAT on shipping follows the standard rate. Each supplier is the principal for their own goods and the platform acts as agent, collecting through Stripe Connect and rendering a VAT breakdown per sub-order under the supplier's VAT details, plus its own VAT invoice to the supplier for commission. Non-UK-established sellers, where marketplace "deemed supplier" rules would make the platform liable, stay out of scope; suppliers remain UK-established per KYC.
+
+3. **Shipping is per supplier.** Each supplier owns a shipping policy (flat rate, free over a threshold, or per-item), stored on the supplier and snapshotted per sub-order at checkout. Shipping revenue belongs to the supplier who fulfils, so it is added to that supplier's payout gross in full; platform commission is charged on goods only, never on shipping.
+
+4. **Discounts are order-level codes, allocated pro rata, with explicit funding.** A `DiscountCode` (percentage or fixed amount, with minimum spend, a validity window, and global plus per-buyer usage limits) reduces the goods subtotal and is allocated across sub-orders in proportion to their goods value. A `DiscountRedemption` row records each use for enforcement and idempotency. Each code declares `funded_by`: PLATFORM (the supplier is paid on pre-discount goods and the platform absorbs the discount out of its fee) or SUPPLIER (the supplier's payout gross is reduced by their allocated share). Free-shipping thresholds are evaluated on the pre-discount goods value.
+
+5. **Rounding is defined, not incidental.** Money stays `Decimal`, quantised to 0.01 with ROUND_HALF_UP at each stored boundary. Pro-rata allocations (the discount split, and any future split) use the largest-remainder method so the parts sum exactly to the whole, with no lost or invented pennies.
+
+6. **Data model.** Add breakdown columns `goods_subtotal`, `discount_amount`, `shipping_amount` and `vat_amount` to `Order` and `SubOrder` (keeping `total_amount` / `subtotal`); snapshot `vat_rate` and `vat_amount` onto `OrderItem`; add a VAT-rate field to `Product`; add a shipping policy to `Supplier`; and add `DiscountCode` and `DiscountRedemption`. Payout gross becomes `sub_order.total - platform_fee`, where the fee is based on the discounted goods (excluding shipping) and the fee source moves from the global `PLATFORM_FEE_PERCENT` to the supplier's existing but currently-unused `commission_rate`, with the setting as the default.
+
+7. **Sequencing.** Land it safe-to-risky, as the pipeline implies: **#141 VAT first** (inclusive, so it changes neither totals nor payouts: lowest risk, and it unlocks receipts and the breakdown columns), then **#140 shipping** (which changes totals and payout gross), then **#142 discounts** (allocation, funding and redemption: the most involved). Each ships behind the same pipeline function.
+
+**Consequences:**
+- The charged total, the payouts and any refund reconcile by construction, and the order becomes a self-contained financial snapshot independent of later config changes.
+- `create_order`, `create_payment_intent`, `_create_payouts` and the refund path all move to consume the stored breakdown; refunds become breakdown-aware (refunding the correct VAT and shipping proportion and reversing the right transfer share), tracked within #140 and #142.
+- Suppliers gain a shipping-policy surface and a `commission_rate` that finally drives payouts; the global setting becomes only the default.
+- Per-sub-order VAT breakdowns and per-supplier VAT numbers become new onboarding and KYC requirements; B2B VAT-exclusive invoicing and non-UK sellers are explicitly deferred.
+- Existing orders predate the breakdown columns, so a data migration backfills `goods_subtotal = subtotal`, zero shipping and discount, and VAT extracted at the standard rate, so historical receipts still render.
