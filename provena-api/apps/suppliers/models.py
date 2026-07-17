@@ -19,6 +19,11 @@ class ShippingPolicy(models.TextChoices):
     PER_ITEM = "PER_ITEM", "Per item"
 
 
+class FulfilmentMode(models.TextChoices):
+    SUPPLIER_SHIP = "SUPPLIER_SHIP", "Supplier ships"
+    PLATFORM_DELIVERY = "PLATFORM_DELIVERY", "Platform-brokered delivery"
+
+
 class DocumentType(models.TextChoices):
     IDENTITY = "IDENTITY", "Identity Document"
     BUSINESS_REG = "BUSINESS_REG", "Business Registration"
@@ -72,6 +77,15 @@ class Supplier(models.Model):
     free_shipping_threshold = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
+    # Platform-brokered delivery (ADR-013): a commercial arrangement the platform configures.
+    # When PLATFORM_DELIVERY, the flat platform_delivery_fee replaces the supplier's own policy
+    # and the fee is kept by the platform (not added to the supplier's payout gross).
+    fulfilment_mode = models.CharField(
+        max_length=20, choices=FulfilmentMode.choices, default=FulfilmentMode.SUPPLIER_SHIP
+    )
+    platform_delivery_fee = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal("0.00")
+    )
     stripe_account_id = models.CharField(max_length=100, blank=True)
     stripe_onboarding_complete = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -93,6 +107,10 @@ class Supplier(models.Model):
         FREE_OVER_THRESHOLD is evaluated on the pre-discount goods value (ADR-012 §4).
         The pricing pass quantises the result at the stored boundary.
         """
+        # Platform-brokered delivery: a flat platform-set fee (a real courier cost), so no
+        # free-over-threshold and the supplier's own policy does not apply (ADR-013).
+        if self.fulfilment_mode == FulfilmentMode.PLATFORM_DELIVERY:
+            return self.platform_delivery_fee
         if self.shipping_policy == ShippingPolicy.PER_ITEM:
             return self.shipping_per_item_rate * total_quantity
         if (

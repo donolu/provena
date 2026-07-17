@@ -143,6 +143,36 @@ class TestHandlePaymentSucceeded:
             discounted_goods * approved_supplier.commission_rate / Decimal("100")
         ).quantize(Decimal("0.01"))
 
+    def test_platform_delivery_keeps_fee_off_supplier_gross(
+        self, buyer, approved_supplier, variant, mock_stripe_services
+    ):
+        from apps.orders import services as order_services
+        from apps.payments.tests.conftest import SHIPPING
+        from apps.suppliers.models import FulfilmentMode
+
+        approved_supplier.fulfilment_mode = FulfilmentMode.PLATFORM_DELIVERY
+        approved_supplier.platform_delivery_fee = Decimal("4.00")
+        approved_supplier.save(update_fields=["fulfilment_mode", "platform_delivery_fee"])
+
+        order = order_services.place_order(
+            buyer=buyer, items=[{"variant": variant, "quantity": 2}], shipping=SHIPPING
+        )
+        payment = services.create_payment_intent(order)
+        services.handle_payment_succeeded(payment.stripe_payment_intent_id)
+
+        sub = order.sub_orders.first()
+        payout = Payout.objects.get(sub_order=sub)
+        goods = variant.price * 2  # 5.00
+
+        # Buyer paid goods + the £4 delivery fee...
+        assert sub.shipping_amount == Decimal("4.00")
+        assert sub.subtotal == goods + Decimal("4.00")
+        # ...but the platform keeps the delivery fee: supplier gross is goods only.
+        assert payout.gross_amount == goods
+        assert payout.platform_fee == (
+            goods * approved_supplier.commission_rate / Decimal("100")
+        ).quantize(Decimal("0.01"))
+
     def test_payout_linked_to_supplier(self, payment, sub_order, approved_supplier):
         services.handle_payment_succeeded(payment.stripe_payment_intent_id)
         payout = Payout.objects.get(sub_order=sub_order)

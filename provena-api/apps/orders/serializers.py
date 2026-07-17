@@ -69,6 +69,7 @@ class SubOrderSerializer(serializers.ModelSerializer):
             "shipping_amount",
             "vat_amount",
             "subtotal",
+            "fulfilment_mode",
             "tracking_number",
             "delivered_at",
             "items",

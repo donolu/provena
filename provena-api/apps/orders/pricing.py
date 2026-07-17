@@ -78,6 +78,7 @@ class SubOrderPricing:
     shipping_amount: Decimal
     vat_amount: Decimal
     total: Decimal
+    fulfilment_mode: str = ""
 
 
 @dataclass
@@ -167,6 +168,7 @@ def compute_order_pricing(
             # Per-line and shipping VAT are each quantised, so the sub-order VAT reconciles exactly.
             vat_amount=sub_vat,
             total=_quantise(total),
+            fulfilment_mode=supplier.fulfilment_mode,
         )
         order.sub_orders.append(sub)
         order.goods_subtotal += sub.goods_subtotal

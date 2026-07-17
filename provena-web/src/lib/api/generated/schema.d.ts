@@ -2588,6 +2588,9 @@ export interface components {
             status?: components["schemas"]["SupplierStatusEnum"];
             /** Format: decimal */
             commission_rate?: string;
+            fulfilment_mode?: components["schemas"]["FulfilmentModeEnum"];
+            /** Format: decimal */
+            platform_delivery_fee?: string;
             shipping_policy?: components["schemas"]["ShippingPolicyEnum"];
             /** Format: decimal */
             shipping_flat_rate?: string;
@@ -2910,6 +2913,12 @@ export interface components {
          * @enum {string}
          */
         EventTypeEnum: "OPENED" | "RESPONDED" | "ESCALATED" | "AUTO_ESCALATED" | "RESOLVED" | "CLOSED" | "ADMIN_NOTE" | "ATTACHMENT";
+        /**
+         * @description * `SUPPLIER_SHIP` - Supplier ships
+         *     * `PLATFORM_DELIVERY` - Platform-brokered delivery
+         * @enum {string}
+         */
+        FulfilmentModeEnum: "SUPPLIER_SHIP" | "PLATFORM_DELIVERY";
         LoginRequest: {
             /** Format: email */
             email: string;
@@ -3378,6 +3387,9 @@ export interface components {
             status?: components["schemas"]["SupplierStatusEnum"];
             /** Format: decimal */
             commission_rate?: string;
+            fulfilment_mode?: components["schemas"]["FulfilmentModeEnum"];
+            /** Format: decimal */
+            platform_delivery_fee?: string;
             shipping_policy?: components["schemas"]["ShippingPolicyEnum"];
             /** Format: decimal */
             shipping_flat_rate?: string;
@@ -3796,6 +3808,7 @@ export interface components {
             vat_amount?: string;
             /** Format: decimal */
             subtotal?: string;
+            fulfilment_mode?: components["schemas"]["FulfilmentModeEnum"];
             tracking_number?: string;
             /** Format: date-time */
             delivered_at?: string | null;
@@ -3887,6 +3900,9 @@ export interface components {
             readonly commission_rate: string;
             readonly vat_registered: boolean;
             vat_number?: string;
+            readonly fulfilment_mode: components["schemas"]["FulfilmentModeEnum"];
+            /** Format: decimal */
+            readonly platform_delivery_fee: string;
             shipping_policy?: components["schemas"]["ShippingPolicyEnum"];
             /** Format: decimal */
             shipping_flat_rate?: string;
@@ -3909,6 +3925,9 @@ export interface components {
             logo_url?: string;
             website?: string;
             readonly address: components["schemas"]["SupplierAddress"];
+            fulfilment_mode?: components["schemas"]["FulfilmentModeEnum"];
+            /** Format: decimal */
+            platform_delivery_fee?: string;
             shipping_policy?: components["schemas"]["ShippingPolicyEnum"];
             /** Format: decimal */
             shipping_flat_rate?: string;

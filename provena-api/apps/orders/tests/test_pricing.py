@@ -15,7 +15,7 @@ from apps.orders.models import (
 )
 from apps.orders.pricing import allocate_largest_remainder, compute_order_pricing, extract_vat
 from apps.orders.tests.conftest import SHIPPING
-from apps.suppliers.models import ShippingPolicy, Supplier
+from apps.suppliers.models import FulfilmentMode, ShippingPolicy, Supplier
 
 
 def _fake_variant(price: str, vat_rate: str) -> SimpleNamespace:
@@ -407,3 +407,35 @@ class TestDiscountViaPlaceOrder:
                 SHIPPING,
                 discount_code="SAVE10",
             )
+
+
+class TestPlatformDeliveryPricing:
+    def test_flat_platform_fee_ignores_policy_and_threshold(self):
+        supplier = Supplier(
+            fulfilment_mode=FulfilmentMode.PLATFORM_DELIVERY,
+            platform_delivery_fee=Decimal("6.00"),
+            # These would say "free" under SUPPLIER_SHIP; platform delivery must ignore them.
+            shipping_policy=ShippingPolicy.FREE_OVER_THRESHOLD,
+            shipping_flat_rate=Decimal("99.00"),
+            free_shipping_threshold=Decimal("10.00"),
+        )
+        groups = {
+            1: {
+                "supplier": supplier,
+                "items": [
+                    {
+                        "variant": _fake_variant("100.00", VatRate.STANDARD),
+                        "quantity": 1,
+                        "line_total": Decimal("100.00"),
+                    }
+                ],
+            }
+        }
+        sub = compute_order_pricing(groups).sub_orders[0]
+        assert sub.shipping_amount == Decimal("6.00")  # flat platform fee, not free
+        assert sub.fulfilment_mode == FulfilmentMode.PLATFORM_DELIVERY
+        assert sub.total == Decimal("106.00")
+        # VAT still extracted from goods + the delivery fee at the standard rate.
+        assert sub.vat_amount == extract_vat(Decimal("100.00"), VatRate.STANDARD) + extract_vat(
+            Decimal("6.00"), VatRate.STANDARD
+        )
