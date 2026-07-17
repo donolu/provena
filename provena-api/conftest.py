@@ -1,4 +1,7 @@
+import threading
+
 import pytest
+from django.db import connection
 from rest_framework.test import APIClient
 
 from apps.accounts.models import Role, User
@@ -7,6 +10,46 @@ from apps.accounts.models import Role, User
 @pytest.fixture
 def api_client():
     return APIClient()
+
+
+@pytest.fixture
+def requires_postgres():
+    """Skip a test unless the DB is PostgreSQL (real row locking, not sqlite's serialisation)."""
+    if connection.vendor != "postgresql":
+        pytest.skip("Concurrency tests require PostgreSQL row locking")
+
+
+@pytest.fixture
+def run_concurrently():
+    """Run ``target`` in ``n`` threads that all enter the critical section together.
+
+    Each thread waits on a barrier before calling ``target`` (to maximise contention),
+    captures its return value or exception, and closes its own DB connection afterwards.
+    Returns a list of ``("ok", value)`` / ``("error", exc)`` tuples, one per thread.
+    Use with ``@pytest.mark.django_db(transaction=True)`` so the threads see committed rows.
+    """
+
+    def _run(target, n: int = 2):
+        barrier = threading.Barrier(n)
+        results: list = [None] * n
+
+        def worker(i: int) -> None:
+            try:
+                barrier.wait()
+                results[i] = ("ok", target())
+            except Exception as exc:
+                results[i] = ("error", exc)
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        return results
+
+    return _run
 
 
 @pytest.fixture
