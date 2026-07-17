@@ -413,7 +413,7 @@ export interface StockMovement {
 
 // ── Payments ──────────────────────────────────────────────────────────────────
 
-export type PayoutStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED'
+export type PayoutStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED' | 'REVERSED'
 
 export interface Payout {
   id: string

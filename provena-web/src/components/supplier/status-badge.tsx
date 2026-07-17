@@ -13,6 +13,7 @@ const STYLES: Record<string, string> = {
   PROCESSING: 'bg-marigold/10 text-[#7A5A08]',
   PAID:       'bg-meadow/20 text-[#1A4530]',
   FAILED:     'bg-red-50 text-red-700',
+  REVERSED:   'bg-soil/10 text-soil',
 }
 
 const LABELS: Record<string, string> = {
@@ -27,6 +28,7 @@ const LABELS: Record<string, string> = {
   PROCESSING: 'Processing',
   PAID:       'Paid',
   FAILED:     'Failed',
+  REVERSED:   'Reversed',
 }
 
 export function StatusBadge({ status }: { status: string }) {

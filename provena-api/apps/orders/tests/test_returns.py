@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from apps.orders import services
 from apps.orders.models import OrderReturn, ReturnStatus
+from apps.orders.tests.conftest import SHIPPING
 
 # ---------------------------------------------------------------------------
 # Service tests
@@ -143,6 +144,40 @@ class TestProcessReturnRefund:
             result = services.process_return_refund(ret, refund_amount=Decimal("3.99"))
 
         assert result.refund_amount == Decimal("3.99")
+
+    def test_default_refund_is_sub_order_total_not_whole_order(
+        self, buyer, variant, second_variant
+    ):
+        # A return concerns one supplier; the default refund is that sub-order's total,
+        # not the whole (multi-supplier) order.
+        from apps.payments.models import Payment, PaymentStatus
+
+        order = services.place_order(
+            buyer,
+            [{"variant": variant, "quantity": 2}, {"variant": second_variant, "quantity": 1}],
+            SHIPPING,
+        )
+        Payment.objects.create(
+            order=order,
+            stripe_payment_intent_id="pi_multi_default",
+            amount=order.total_amount,
+            status=PaymentStatus.SUCCEEDED,
+        )
+        sub = order.sub_orders.get(supplier=variant.product.supplier)
+        assert sub.subtotal < order.total_amount  # there is another supplier's portion
+
+        services.dispatch_sub_order(sub)
+        services.deliver_sub_order(sub)
+        ret = services.request_return(sub, buyer, "Faulty")
+        services.approve_return(ret)
+
+        pi_patch, refund_patch = self._stripe_mocks()
+        with pi_patch, refund_patch as mock_refund:
+            result = services.process_return_refund(ret)
+
+        assert result.refund_amount == sub.subtotal
+        # Stripe was asked to refund the sub-order total, not the whole order.
+        assert mock_refund.call_args[1]["amount"] == int(sub.subtotal * 100)
 
     def test_refunding_retry_uses_claimed_amount(self, buyer, placed_order, dispatched_sub_order):
         """A REFUNDING retry ignores the caller's new amount; uses the already-claimed value."""

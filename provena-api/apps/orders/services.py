@@ -401,7 +401,13 @@ def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderR
             raise ValueError("No payment found for this order.")
 
         if locked.status == ReturnStatus.APPROVED:
-            amount = Decimal(str(refund_amount)) if refund_amount is not None else payment.amount
+            # Default to this sub-order's own VAT-inclusive total (goods - discount + shipping),
+            # not the whole order — a return only concerns one supplier's items (ADR-012).
+            amount = (
+                Decimal(str(refund_amount))
+                if refund_amount is not None
+                else locked.sub_order.subtotal
+            )
             locked.refund_amount = amount
             locked.status = ReturnStatus.REFUNDING
             locked.save(update_fields=["status", "refund_amount", "updated_at"])
@@ -429,6 +435,13 @@ def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderR
                     status=ReturnStatus.APPROVED
                 )
         raise
+
+    # Phase 2b: reverse the fulfilling supplier's transfer for the refunded share so the
+    # platform does not absorb money already paid out. Idempotent; a failure here leaves the
+    # return REFUNDING and re-runs on retry (the buyer refund above is idempotent too).
+    sub_total = locked.sub_order.subtotal
+    ratio = (amount / sub_total) if sub_total > 0 else Decimal("0")
+    payment_services.reverse_payout_for_sub_order(locked.sub_order, ratio)
 
     # Phase 3: return inventory and mark REFUNDED. Re-read under lock in case a
     # concurrent retry also reached Stripe; bail early if already REFUNDED.

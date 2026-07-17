@@ -360,3 +360,51 @@ def process_payout(payout: Payout) -> Payout:
         logger.exception("Failed to send payout email for payout %s", payout.id)
 
     return payout
+
+
+def reverse_payout_for_sub_order(sub_order, ratio: Decimal) -> None:
+    """Reverse the fulfilling supplier's transfer for a refunded sub-order (ADR-012).
+
+    ``ratio`` is refund_amount / sub_order.subtotal (1 for a full return). If the payout was
+    already PAID, reverse ``net_amount * ratio`` on Stripe and mark it REVERSED; if it has not
+    paid out yet, mark it FAILED so it never does. Idempotent and safe under concurrent retries:
+    the reversal is keyed by (payout, amount) so a repeat call reuses the same Stripe reversal.
+    """
+    with transaction.atomic():
+        try:
+            payout = Payout.objects.select_for_update().get(sub_order=sub_order)
+        except Payout.DoesNotExist:
+            return
+        if payout.status in (PayoutStatus.REVERSED, PayoutStatus.FAILED):
+            return
+        if payout.status in (PayoutStatus.PENDING, PayoutStatus.PROCESSING):
+            # Not paid out yet — make sure it never is.
+            payout.status = PayoutStatus.FAILED
+            payout.save(update_fields=["status", "updated_at"])
+            return
+        # status == PAID: fall through and reverse the transfer outside the lock.
+        transfer_id = payout.stripe_transfer_id
+
+    capped_ratio = min(ratio, Decimal("1"))
+    reversal = (payout.net_amount * capped_ratio).quantize(Decimal("0.01"))
+    reversal = min(reversal, payout.net_amount)
+
+    if transfer_id and reversal > 0:
+        amount_pence = _to_pence(reversal)
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        try:
+            stripe.Transfer.create_reversal(
+                transfer_id,
+                amount=amount_pence,
+                idempotency_key=f"reverse-{payout.id}-{amount_pence}",
+            )
+        except stripe.StripeError as exc:
+            logger.exception("Transfer reversal failed for payout %s", payout.id)
+            raise ValueError(f"Stripe transfer reversal failed: {exc}") from exc
+        logger.info("Reversed £%s of transfer %s for payout %s", reversal, transfer_id, payout.id)
+
+    with transaction.atomic():
+        locked = Payout.objects.select_for_update().get(pk=payout.pk)
+        if locked.status == PayoutStatus.PAID:
+            locked.status = PayoutStatus.REVERSED
+            locked.save(update_fields=["status", "updated_at"])

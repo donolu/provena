@@ -526,3 +526,56 @@ class TestInitiateRefund:
             services.initiate_refund(succeeded_payment, amount=Decimal("1.00"))
         succeeded_payment.refresh_from_db()
         assert succeeded_payment.pending_refund_amount == Decimal("0.00")
+
+
+class TestReversePayoutForSubOrder:
+    def _paid_payout(self, sub_order, net="4.50", transfer="tr_test_x"):
+        return Payout.objects.create(
+            sub_order=sub_order,
+            supplier=sub_order.supplier,
+            gross_amount=Decimal("5.00"),
+            platform_fee=Decimal("0.50"),
+            net_amount=Decimal(net),
+            status=PayoutStatus.PAID,
+            stripe_transfer_id=transfer,
+        )
+
+    def test_paid_payout_fully_reversed(self, sub_order, mock_stripe_services):
+        payout = self._paid_payout(sub_order, net="4.50")
+        services.reverse_payout_for_sub_order(sub_order, Decimal("1"))
+        payout.refresh_from_db()
+        assert payout.status == PayoutStatus.REVERSED
+        args, kwargs = mock_stripe_services.Transfer.create_reversal.call_args
+        assert args[0] == "tr_test_x"
+        assert kwargs["amount"] == 450  # £4.50 net in pence
+
+    def test_partial_ratio_reverses_proportional_net(self, sub_order, mock_stripe_services):
+        self._paid_payout(sub_order, net="4.50")
+        services.reverse_payout_for_sub_order(sub_order, Decimal("0.5"))
+        kwargs = mock_stripe_services.Transfer.create_reversal.call_args[1]
+        assert kwargs["amount"] == 225  # 4.50 * 0.5
+
+    def test_pending_payout_marked_failed_without_stripe(self, sub_order, mock_stripe_services):
+        payout = Payout.objects.create(
+            sub_order=sub_order,
+            supplier=sub_order.supplier,
+            gross_amount=Decimal("5.00"),
+            platform_fee=Decimal("0.50"),
+            net_amount=Decimal("4.50"),
+            status=PayoutStatus.PENDING,
+        )
+        services.reverse_payout_for_sub_order(sub_order, Decimal("1"))
+        payout.refresh_from_db()
+        assert payout.status == PayoutStatus.FAILED
+        mock_stripe_services.Transfer.create_reversal.assert_not_called()
+
+    def test_already_reversed_is_idempotent_noop(self, sub_order, mock_stripe_services):
+        payout = self._paid_payout(sub_order)
+        payout.status = PayoutStatus.REVERSED
+        payout.save(update_fields=["status"])
+        services.reverse_payout_for_sub_order(sub_order, Decimal("1"))
+        mock_stripe_services.Transfer.create_reversal.assert_not_called()
+
+    def test_no_payout_is_noop(self, sub_order, mock_stripe_services):
+        services.reverse_payout_for_sub_order(sub_order, Decimal("1"))
+        mock_stripe_services.Transfer.create_reversal.assert_not_called()
