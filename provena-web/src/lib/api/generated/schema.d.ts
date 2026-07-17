@@ -3532,9 +3532,10 @@ export interface components {
          *     * `PROCESSING` - Processing
          *     * `PAID` - Paid
          *     * `FAILED` - Failed
+         *     * `REVERSED` - Reversed
          * @enum {string}
          */
-        PayoutStatusEnum: "PENDING" | "PROCESSING" | "PAID" | "FAILED";
+        PayoutStatusEnum: "PENDING" | "PROCESSING" | "PAID" | "FAILED" | "REVERSED";
         PlaceOrderRequest: {
             items: components["schemas"]["OrderItemInputRequest"][];
             shipping_name: string;

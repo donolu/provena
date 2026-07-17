@@ -24,6 +24,7 @@ class PayoutStatus(models.TextChoices):
     PROCESSING = "PROCESSING", "Processing"
     PAID = "PAID", "Paid"
     FAILED = "FAILED", "Failed"
+    REVERSED = "REVERSED", "Reversed"
 
 
 class Payment(models.Model):
