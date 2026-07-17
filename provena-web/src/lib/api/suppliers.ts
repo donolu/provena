@@ -13,6 +13,35 @@ export async function getPublicSupplier(slug: string): Promise<PublicSupplier> {
   return data
 }
 
+// ── Become a supplier ─────────────────────────────────────────────────────────
+
+export interface SupplierRegistrationPayload {
+  business_name: string
+  description?: string
+  phone?: string
+  website?: string
+  logo_url?: string
+  address?: {
+    line1: string
+    line2?: string
+    city: string
+    county?: string
+    postcode: string
+    country?: string
+  }
+}
+
+/**
+ * Register the authenticated buyer as a supplier. The backend upgrades the
+ * user's role to SUPPLIER and creates a PENDING profile awaiting KYC review.
+ */
+export async function registerSupplier(
+  payload: SupplierRegistrationPayload,
+): Promise<SupplierProfile> {
+  const { data } = await apiClient.post<SupplierProfile>('/suppliers/register/', payload)
+  return data
+}
+
 // ── Supplier self-service ─────────────────────────────────────────────────────
 
 export async function getMySupplierProfile(): Promise<SupplierProfile> {

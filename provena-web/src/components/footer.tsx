@@ -17,6 +17,7 @@ export function Footer() {
             <span className="text-[11px] uppercase tracking-[0.14em] text-mist/40 mb-1">Marketplace</span>
             <Link href="/catalogue" className="hover:text-marigold transition-colors">Browse products</Link>
             <Link href="/orders" className="hover:text-marigold transition-colors">Orders</Link>
+            <Link href="/sell" className="hover:text-marigold transition-colors">Sell on Provena</Link>
             <Link href="/account/security" className="hover:text-marigold transition-colors">Your account</Link>
           </nav>
 
