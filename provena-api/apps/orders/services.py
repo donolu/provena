@@ -137,6 +137,27 @@ def _resolve_discount(buyer, code_str: str, order_goods: Decimal) -> DiscountCod
     return code
 
 
+def preview_discount(buyer, code_str: str) -> dict:
+    """Advisory check of a discount code against the buyer's current cart.
+
+    Returns ``{"valid": True, "code", "discount_amount"}`` or ``{"valid": False, "reason"}``.
+    The preview does not reserve anything — ``place_order`` re-validates authoritatively, so a
+    code can still lapse between preview and checkout.
+    """
+    from apps.marketplace.services import get_or_create_cart
+
+    goods = get_or_create_cart(user=buyer).total
+    if goods <= 0:
+        return {"valid": False, "reason": "Your cart is empty."}
+    try:
+        with transaction.atomic():
+            code = _resolve_discount(buyer, code_str, goods)
+            amount = code.compute_discount(goods)
+    except ValueError as exc:
+        return {"valid": False, "reason": str(exc)}
+    return {"valid": True, "code": code.code, "discount_amount": str(amount)}
+
+
 @transaction.atomic
 def place_order(
     buyer,

@@ -15,7 +15,8 @@ import {
 import { Nav } from '@/components/nav'
 import { OrderBreakdown } from '@/components/order-breakdown'
 import { getCart, clearCart } from '@/lib/api/cart'
-import { placeOrder, createPaymentIntent } from '@/lib/api/orders'
+import { placeOrder, createPaymentIntent, validateDiscount } from '@/lib/api/orders'
+import type { DiscountValidateResult } from '@/lib/api/types'
 import { getAddresses } from '@/lib/api/addresses'
 import type { Address } from '@/lib/api/addresses'
 import { useAuthStore } from '@/store/auth'
@@ -162,6 +163,12 @@ export default function CheckoutPage() {
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
   const [discountCode, setDiscountCode] = useState('')
+  const [discountResult, setDiscountResult] = useState<DiscountValidateResult | null>(null)
+
+  const validateMutation = useMutation({
+    mutationFn: () => validateDiscount(discountCode.trim()),
+    onSuccess: (r) => setDiscountResult(r),
+  })
 
   const { data: cart, isPending: cartLoading } = useQuery({
     queryKey: ['cart'],
@@ -401,14 +408,35 @@ export default function CheckoutPage() {
                   <label className="block text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium mb-1.5">
                     Discount code <span className="text-hoarfrost">(optional)</span>
                   </label>
-                  <input
-                    type="text"
-                    value={discountCode}
-                    onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
-                    placeholder="e.g. SAVE10"
-                    autoCapitalize="characters"
-                    className="w-full border border-hoarfrost rounded px-3 py-2.5 text-sm font-sans uppercase tracking-wide text-forest bg-white focus:outline-none focus:border-forest transition-colors duration-150"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={discountCode}
+                      onChange={(e) => {
+                        setDiscountCode(e.target.value.toUpperCase())
+                        setDiscountResult(null)
+                      }}
+                      placeholder="e.g. SAVE10"
+                      autoCapitalize="characters"
+                      className="flex-1 border border-hoarfrost rounded px-3 py-2.5 text-sm font-sans uppercase tracking-wide text-forest bg-white focus:outline-none focus:border-forest transition-colors duration-150"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => discountCode.trim() && validateMutation.mutate()}
+                      disabled={!discountCode.trim() || validateMutation.isPending}
+                      className="rounded border border-forest px-4 py-2.5 text-sm font-sans font-medium text-forest hover:bg-forest hover:text-mist transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {validateMutation.isPending ? 'Checking…' : 'Apply'}
+                    </button>
+                  </div>
+                  {discountResult?.valid && (
+                    <p className="text-xs font-sans text-meadow mt-1.5">
+                      Code applied — £{discountResult.discount_amount} off at the next step.
+                    </p>
+                  )}
+                  {discountResult && !discountResult.valid && (
+                    <p className="text-xs font-sans text-terracotta mt-1.5">{discountResult.reason}</p>
+                  )}
                 </div>
 
                 {error && (

@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Order, OrderDispute, OrderReturn, PaginatedResponse, Payment, SubOrderListItem } from './types'
+import type { DiscountValidateResult, Order, OrderDispute, OrderReturn, PaginatedResponse, Payment, SubOrderListItem } from './types'
 
 export interface PaymentIntentResponse {
   client_secret: string
@@ -193,4 +193,9 @@ export async function adminRejectDispute(id: string, resolution: string): Promis
 export async function getWsTicket(): Promise<string> {
   const { data } = await apiClient.post<{ ticket: string }>('/orders/ws-ticket/')
   return data.ticket
+}
+
+export async function validateDiscount(code: string): Promise<DiscountValidateResult> {
+  const { data } = await apiClient.post<DiscountValidateResult>('/discounts/validate/', { code })
+  return data
 }

@@ -3,7 +3,7 @@ import secrets
 from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework import status
+from rest_framework import generics, status
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -14,8 +14,11 @@ from apps.pagination import PaginatedListMixin
 from apps.suppliers.permissions import IsApprovedSupplier
 
 from . import services
-from .models import Order, OrderReturn, OrderStatus, SubOrder
+from .models import DiscountCode, Order, OrderReturn, OrderStatus, SubOrder
 from .serializers import (
+    AdminDiscountCodeSerializer,
+    DiscountValidateResultSerializer,
+    DiscountValidateSerializer,
     DispatchSerializer,
     OrderReturnSerializer,
     OrderSerializer,
@@ -488,3 +491,40 @@ class AdminProcessReturnRefundView(APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(OrderReturnSerializer(ret).data)
+
+
+# ---------------------------------------------------------------------------
+# Discount codes
+# ---------------------------------------------------------------------------
+
+
+@extend_schema(tags=["Discounts"])
+class ValidateDiscountView(APIView):
+    """Advisory check of a discount code against the buyer's current cart."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=DiscountValidateSerializer,
+        responses={200: DiscountValidateResultSerializer},
+        summary="Validate a discount code against the current cart",
+    )
+    def post(self, request: Request) -> Response:
+        ser = DiscountValidateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        result = services.preview_discount(request.user, ser.validated_data["code"])
+        return Response(result)
+
+
+@extend_schema(tags=["Discounts (Admin)"])
+class AdminDiscountCodeListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = AdminDiscountCodeSerializer
+    queryset = DiscountCode.objects.all()
+
+
+@extend_schema(tags=["Discounts (Admin)"])
+class AdminDiscountCodeDetailView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = AdminDiscountCodeSerializer
+    queryset = DiscountCode.objects.all()

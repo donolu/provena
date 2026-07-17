@@ -124,6 +124,9 @@ Browser
 ### 4.2 Checkout and Payment
 
 ```
+(optional) Buyer enters a discount code
+  -> POST /api/v1/discounts/validate/   (advisory: returns the discount amount or a reason;
+     place_order re-validates authoritatively at checkout)
 Buyer clicks Pay
   -> Next.js -> POST /api/v1/payments/checkout/
   -> Django creates Order (status=PENDING_PAYMENT)
