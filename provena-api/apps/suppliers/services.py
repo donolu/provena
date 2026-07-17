@@ -54,7 +54,17 @@ def create_supplier_profile(
 def update_supplier_profile(supplier: Supplier, **kwargs: object) -> Supplier:
     address_data = kwargs.pop("address_data", None)
 
-    allowed = {"business_name", "description", "phone", "website", "logo_url"}
+    allowed = {
+        "business_name",
+        "description",
+        "phone",
+        "website",
+        "logo_url",
+        "shipping_policy",
+        "shipping_flat_rate",
+        "shipping_per_item_rate",
+        "free_shipping_threshold",
+    }
     for field, value in kwargs.items():
         if field in allowed:
             setattr(supplier, field, value)

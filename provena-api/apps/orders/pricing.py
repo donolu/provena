@@ -77,8 +77,10 @@ def compute_order_pricing(supplier_groups: dict) -> OrderPricing:
     order = OrderPricing()
 
     for group in supplier_groups.values():
+        supplier = group["supplier"]
         lines: list[LinePricing] = []
         goods_subtotal = _ZERO
+        total_quantity = 0
         sub_vat = _ZERO
 
         for item in group["items"]:
@@ -99,19 +101,25 @@ def compute_order_pricing(supplier_groups: dict) -> OrderPricing:
                 )
             )
             goods_subtotal += line_total
+            total_quantity += quantity
             sub_vat += line_vat
 
         discount_amount = _ZERO
-        shipping_amount = _ZERO
+        # Free-shipping thresholds are evaluated on the pre-discount goods value (ADR-012 §4).
+        shipping_amount = _quantise(
+            supplier.compute_shipping(goods_subtotal - discount_amount, total_quantity)
+        )
+        # Shipping is VAT-inclusive at the standard rate; extract it into the sub-order VAT.
+        sub_vat += extract_vat(shipping_amount, VatRate.STANDARD)
         total = goods_subtotal - discount_amount + shipping_amount
 
         sub = SubOrderPricing(
-            supplier=group["supplier"],
+            supplier=supplier,
             lines=lines,
             goods_subtotal=_quantise(goods_subtotal),
             discount_amount=discount_amount,
             shipping_amount=shipping_amount,
-            # Per-line VAT is already quantised, so the sub-order VAT reconciles exactly.
+            # Per-line and shipping VAT are each quantised, so the sub-order VAT reconciles exactly.
             vat_amount=sub_vat,
             total=_quantise(total),
         )

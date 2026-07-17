@@ -9,6 +9,7 @@ from apps.catalogue.models import VatRate
 from apps.orders import services
 from apps.orders.pricing import compute_order_pricing, extract_vat
 from apps.orders.tests.conftest import SHIPPING
+from apps.suppliers.models import ShippingPolicy, Supplier
 
 
 def _fake_variant(price: str, vat_rate: str) -> SimpleNamespace:
@@ -17,6 +18,11 @@ def _fake_variant(price: str, vat_rate: str) -> SimpleNamespace:
         sku="SKU",
         product=SimpleNamespace(vat_rate=vat_rate),
     )
+
+
+def _free_supplier() -> Supplier:
+    # Unsaved instance — no DB needed; default policy is flat £0 (free).
+    return Supplier(shipping_policy=ShippingPolicy.FLAT, shipping_flat_rate=Decimal("0.00"))
 
 
 class TestExtractVat:
@@ -41,7 +47,7 @@ class TestComputeOrderPricing:
         # stored boundary (OrderItem.vat_amount), so it is where rounding happens.
         groups = {
             1: {
-                "supplier": object(),
+                "supplier": _free_supplier(),
                 "items": [
                     {
                         "variant": _fake_variant("3.99", VatRate.STANDARD),
@@ -65,7 +71,7 @@ class TestComputeOrderPricing:
     def test_totals_aggregate_across_suppliers(self):
         groups = {
             1: {
-                "supplier": object(),
+                "supplier": _free_supplier(),
                 "items": [
                     {
                         "variant": _fake_variant("10.00", VatRate.STANDARD),
@@ -75,7 +81,7 @@ class TestComputeOrderPricing:
                 ],
             },
             2: {
-                "supplier": object(),
+                "supplier": _free_supplier(),
                 "items": [
                     {
                         "variant": _fake_variant("20.00", VatRate.ZERO),
@@ -168,3 +174,74 @@ class TestBackfillMigration:
         assert item.vat_amount == extract_vat(variant.price * 2, VatRate.STANDARD)
         assert sub.vat_amount == item.vat_amount
         assert order.vat_amount == sub.vat_amount
+
+
+class TestShippingPricing:
+    def _group(self, supplier: Supplier, price: str, qty: int) -> dict:
+        return {
+            1: {
+                "supplier": supplier,
+                "items": [
+                    {
+                        "variant": _fake_variant(price, VatRate.STANDARD),
+                        "quantity": qty,
+                        "line_total": Decimal(price) * qty,
+                    }
+                ],
+            }
+        }
+
+    def test_flat_rate_added_to_total_with_vat(self):
+        supplier = Supplier(shipping_policy=ShippingPolicy.FLAT, shipping_flat_rate=Decimal("4.99"))
+        sub = compute_order_pricing(self._group(supplier, "10.00", 1)).sub_orders[0]
+        assert sub.shipping_amount == Decimal("4.99")
+        assert sub.total == Decimal("14.99")
+        assert sub.vat_amount == extract_vat(Decimal("10.00"), VatRate.STANDARD) + extract_vat(
+            Decimal("4.99"), VatRate.STANDARD
+        )
+
+    def test_per_item_rate(self):
+        supplier = Supplier(
+            shipping_policy=ShippingPolicy.PER_ITEM, shipping_per_item_rate=Decimal("1.50")
+        )
+        sub = compute_order_pricing(self._group(supplier, "10.00", 3)).sub_orders[0]
+        assert sub.shipping_amount == Decimal("4.50")  # 1.50 * 3
+        assert sub.total == Decimal("34.50")
+
+    def test_free_over_threshold_below_charges_flat(self):
+        supplier = Supplier(
+            shipping_policy=ShippingPolicy.FREE_OVER_THRESHOLD,
+            shipping_flat_rate=Decimal("5.00"),
+            free_shipping_threshold=Decimal("50.00"),
+        )
+        sub = compute_order_pricing(self._group(supplier, "10.00", 1)).sub_orders[0]
+        assert sub.shipping_amount == Decimal("5.00")
+
+    def test_free_over_threshold_at_boundary_is_free(self):
+        supplier = Supplier(
+            shipping_policy=ShippingPolicy.FREE_OVER_THRESHOLD,
+            shipping_flat_rate=Decimal("5.00"),
+            free_shipping_threshold=Decimal("50.00"),
+        )
+        sub = compute_order_pricing(self._group(supplier, "50.00", 1)).sub_orders[0]
+        assert sub.shipping_amount == Decimal("0.00")
+
+
+@pytest.mark.django_db
+class TestShippingViaPlaceOrder:
+    def test_flat_shipping_snapshotted_into_total_and_vat(self, buyer, variant, approved_supplier):
+        approved_supplier.shipping_policy = ShippingPolicy.FLAT
+        approved_supplier.shipping_flat_rate = Decimal("4.99")
+        approved_supplier.save()
+
+        order = services.place_order(buyer, [{"variant": variant, "quantity": 2}], SHIPPING)
+        sub = order.sub_orders.first()
+        item = sub.items.first()
+        goods = variant.price * 2  # 7.98
+
+        assert sub.shipping_amount == Decimal("4.99")
+        assert order.shipping_amount == Decimal("4.99")
+        assert sub.subtotal == goods + Decimal("4.99")
+        assert order.total_amount == goods + Decimal("4.99")
+        # Item VAT is goods-only; the sub-order VAT additionally carries the shipping VAT.
+        assert sub.vat_amount == item.vat_amount + extract_vat(Decimal("4.99"), VatRate.STANDARD)

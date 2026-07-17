@@ -55,10 +55,41 @@ class TestHandlePaymentSucceeded:
         services.handle_payment_succeeded(payment.stripe_payment_intent_id)
         payout = Payout.objects.get(sub_order=sub_order)
         assert payout.gross_amount == sub_order.subtotal
-        assert payout.platform_fee == (
-            sub_order.subtotal * Decimal("10") / Decimal("100")
+        # Commission is charged on discounted goods only, at the supplier's commission_rate.
+        commission_base = sub_order.goods_subtotal - sub_order.discount_amount
+        expected_fee = (
+            commission_base * sub_order.supplier.commission_rate / Decimal("100")
         ).quantize(Decimal("0.01"))
+        assert payout.platform_fee == expected_fee
         assert payout.net_amount == payout.gross_amount - payout.platform_fee
+
+    def test_payout_includes_shipping_in_gross_but_not_fee(
+        self, buyer, approved_supplier, variant, mock_stripe_services
+    ):
+        # Flat £4.99 shipping: it lands in the supplier's gross/net but is never commissioned.
+        approved_supplier.shipping_policy = "FLAT"
+        approved_supplier.shipping_flat_rate = Decimal("4.99")
+        approved_supplier.save()
+
+        from apps.orders import services as order_services
+        from apps.payments.tests.conftest import SHIPPING
+
+        order = order_services.place_order(
+            buyer=buyer, items=[{"variant": variant, "quantity": 2}], shipping=SHIPPING
+        )
+        payment = services.create_payment_intent(order)
+        services.handle_payment_succeeded(payment.stripe_payment_intent_id)
+
+        sub = order.sub_orders.first()
+        payout = Payout.objects.get(sub_order=sub)
+        goods = variant.price * 2  # 5.00
+        expected_fee = (goods * approved_supplier.commission_rate / Decimal("100")).quantize(
+            Decimal("0.01")
+        )
+        assert sub.shipping_amount == Decimal("4.99")
+        assert payout.gross_amount == goods + Decimal("4.99")  # shipping in gross
+        assert payout.platform_fee == expected_fee  # fee on goods only
+        assert payout.net_amount == goods + Decimal("4.99") - expected_fee
 
     def test_payout_linked_to_supplier(self, payment, sub_order, approved_supplier):
         services.handle_payment_succeeded(payment.stripe_payment_intent_id)

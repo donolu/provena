@@ -63,6 +63,29 @@ class TestUpdateSupplierProfile:
         pending_supplier.address.refresh_from_db()
         assert pending_supplier.address.city == "Manchester"
 
+    def test_updates_shipping_policy(self, pending_supplier):
+        from decimal import Decimal
+
+        from apps.suppliers.models import ShippingPolicy
+
+        updated = update_supplier_profile(
+            pending_supplier,
+            shipping_policy=ShippingPolicy.FREE_OVER_THRESHOLD,
+            shipping_flat_rate=Decimal("3.50"),
+            free_shipping_threshold=Decimal("40.00"),
+        )
+        assert updated.shipping_policy == ShippingPolicy.FREE_OVER_THRESHOLD
+        assert updated.shipping_flat_rate == Decimal("3.50")
+        assert updated.free_shipping_threshold == Decimal("40.00")
+
+    def test_commission_rate_not_self_updatable(self, pending_supplier):
+        # commission_rate is not in the allowed set, so profile updates must not change it.
+        from decimal import Decimal
+
+        original = pending_supplier.commission_rate
+        updated = update_supplier_profile(pending_supplier, commission_rate=Decimal("1.00"))
+        assert updated.commission_rate == original
+
 
 @pytest.mark.django_db
 class TestSupplierStatusActions:
