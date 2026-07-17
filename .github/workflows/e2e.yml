@@ -73,7 +73,7 @@ jobs:
 
       # Playwright itself runs on the runner (the web container only serves the
       # app), so install the runner's web dependencies and browser here.
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
