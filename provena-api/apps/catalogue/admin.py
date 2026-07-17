@@ -27,8 +27,16 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ["name", "supplier", "category", "status", "is_featured", "created_at"]
-    list_filter = ["status", "is_featured", "category"]
+    list_display = [
+        "name",
+        "supplier",
+        "category",
+        "status",
+        "vat_rate",
+        "is_featured",
+        "created_at",
+    ]
+    list_filter = ["status", "vat_rate", "is_featured", "category"]
     search_fields = ["name", "supplier__business_name"]
     prepopulated_fields = {"slug": ("name",)}
     readonly_fields = ["id", "created_at", "updated_at"]

@@ -18,6 +18,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "quantity",
             "unit_price",
             "total_price",
+            "vat_rate",
+            "vat_amount",
         ]
 
 
@@ -50,6 +52,7 @@ class OrderReturnSerializer(serializers.ModelSerializer):
 class SubOrderSerializer(serializers.ModelSerializer):
     supplier_name = serializers.CharField(source="supplier.business_name", read_only=True)
     supplier_slug = serializers.SlugField(source="supplier.slug", read_only=True)
+    supplier_vat_number = serializers.CharField(source="supplier.vat_number", read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
     returns = OrderReturnSerializer(many=True, read_only=True)
 
@@ -59,7 +62,12 @@ class SubOrderSerializer(serializers.ModelSerializer):
             "id",
             "supplier_name",
             "supplier_slug",
+            "supplier_vat_number",
             "status",
+            "goods_subtotal",
+            "discount_amount",
+            "shipping_amount",
+            "vat_amount",
             "subtotal",
             "tracking_number",
             "delivered_at",
@@ -85,6 +93,10 @@ class SubOrderListSerializer(serializers.ModelSerializer):
             "buyer_email",
             "supplier_name",
             "status",
+            "goods_subtotal",
+            "discount_amount",
+            "shipping_amount",
+            "vat_amount",
             "subtotal",
             "tracking_number",
             "created_at",
@@ -123,6 +135,10 @@ class OrderSerializer(serializers.ModelSerializer):
             "shipping_city",
             "shipping_postcode",
             "shipping_country",
+            "goods_subtotal",
+            "discount_amount",
+            "shipping_amount",
+            "vat_amount",
             "total_amount",
             "notes",
             "payment_id",

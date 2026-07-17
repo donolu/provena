@@ -12,6 +12,21 @@ class ProductStatus(models.TextChoices):
     ARCHIVED = "ARCHIVED", "Archived"
 
 
+class VatRate(models.TextChoices):
+    STANDARD = "STANDARD", "Standard (20%)"
+    REDUCED = "REDUCED", "Reduced (5%)"
+    ZERO = "ZERO", "Zero (0%)"
+
+
+# Fraction of the net price that VAT adds; prices are VAT-inclusive, so VAT is
+# extracted from the gross rather than added on top (see ADR-012).
+VAT_RATE_FRACTIONS: dict[str, Decimal] = {
+    VatRate.STANDARD: Decimal("0.20"),
+    VatRate.REDUCED: Decimal("0.05"),
+    VatRate.ZERO: Decimal("0.00"),
+}
+
+
 def _unique_product_slug(name: str) -> str:
     base = slugify(name)
     slug = base
@@ -78,6 +93,7 @@ class Product(models.Model):
     status = models.CharField(
         max_length=10, choices=ProductStatus.choices, default=ProductStatus.DRAFT
     )
+    vat_rate = models.CharField(max_length=10, choices=VatRate.choices, default=VatRate.STANDARD)
     is_featured = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

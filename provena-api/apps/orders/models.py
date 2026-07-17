@@ -6,6 +6,8 @@ from decimal import Decimal
 from django.db import models
 from django.utils import timezone
 
+from apps.catalogue.models import VatRate
+
 
 class OrderStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
@@ -34,6 +36,10 @@ class Order(models.Model):
     shipping_city = models.CharField(max_length=100)
     shipping_postcode = models.CharField(max_length=20)
     shipping_country = models.CharField(max_length=2)
+    goods_subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    shipping_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    vat_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -55,6 +61,10 @@ class SubOrder(models.Model):
     status = models.CharField(
         max_length=12, choices=OrderStatus.choices, default=OrderStatus.PENDING
     )
+    goods_subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    shipping_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    vat_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     tracking_number = models.CharField(max_length=200, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
@@ -82,6 +92,8 @@ class OrderItem(models.Model):
     sku = models.CharField(max_length=100)
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    vat_rate = models.CharField(max_length=10, choices=VatRate.choices, default=VatRate.STANDARD)
+    vat_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
 
     class Meta:
         ordering = ["id"]

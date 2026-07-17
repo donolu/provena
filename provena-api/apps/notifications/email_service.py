@@ -143,6 +143,10 @@ def send_order_confirmation_buyer(order) -> None:
         + _divider()
         + _label("Order reference")
         + _value(order.reference)
+        + _label("Goods (excl VAT)")
+        + _value(f"£{order.goods_subtotal - order.vat_amount}")
+        + _label("VAT")
+        + _value(f"£{order.vat_amount}")
         + _label("Total paid")
         + _value(f"£{order.total_amount}")
         + _label("Delivering to")
@@ -157,6 +161,8 @@ def send_order_confirmation_buyer(order) -> None:
     html = _base(f"Order confirmed · {order.reference}", body)
     plain = (
         f"Order confirmed: {order.reference}\n\n"
+        f"Goods (excl VAT): £{order.goods_subtotal - order.vat_amount}\n"
+        f"VAT: £{order.vat_amount}\n"
         f"Total: £{order.total_amount}\n"
         f"Delivering to: {address}\n\n"
         f"View your order: {order_url}"
@@ -201,6 +207,10 @@ def send_order_notification_supplier(sub_order) -> None:
         f", {order.shipping_city}, {order.shipping_postcode}"
     )
 
+    vat_block = _label("of which VAT") + _value(f"£{sub_order.vat_amount}")
+    if sub_order.supplier.vat_number:
+        vat_block += _label("Your VAT number") + _value(sub_order.supplier.vat_number)
+
     body = (
         _h1("New order received")
         + _p("You have a new order to fulfil. Please confirm it as soon as possible.")
@@ -209,6 +219,7 @@ def send_order_notification_supplier(sub_order) -> None:
         + _value(order.reference)
         + _label("Subtotal")
         + _value(f"£{sub_order.subtotal}")
+        + vat_block
         + _label("Ship to")
         + _value(address)
         + _divider()
@@ -222,6 +233,7 @@ def send_order_notification_supplier(sub_order) -> None:
     plain = (
         f"New order: {order.reference}\n\n"
         f"Subtotal: £{sub_order.subtotal}\n"
+        f"of which VAT: £{sub_order.vat_amount}\n"
         f"Ship to: {address}\n\n"
         f"View orders: {orders_url}"
     )

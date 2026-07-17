@@ -21,10 +21,12 @@ class SupplierAdmin(admin.ModelAdmin):
         "user",
         "status",
         "commission_rate",
+        "vat_registered",
+        "vat_number",
         "stripe_onboarding_complete",
         "created_at",
     ]
-    list_filter = ["status", "stripe_onboarding_complete"]
+    list_filter = ["status", "vat_registered", "stripe_onboarding_complete"]
     search_fields = ["business_name", "user__email"]
     prepopulated_fields = {"slug": ("business_name",)}
     readonly_fields = ["id", "created_at", "updated_at", "stripe_account_id"]

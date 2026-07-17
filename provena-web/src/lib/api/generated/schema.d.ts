@@ -2970,6 +2970,14 @@ export interface components {
             shipping_postcode: string;
             shipping_country: string;
             /** Format: decimal */
+            goods_subtotal?: string;
+            /** Format: decimal */
+            discount_amount?: string;
+            /** Format: decimal */
+            shipping_amount?: string;
+            /** Format: decimal */
+            vat_amount?: string;
+            /** Format: decimal */
             total_amount?: string;
             notes?: string;
             readonly payment_id: string | null;
@@ -2993,6 +3001,9 @@ export interface components {
             unit_price: string;
             /** Format: decimal */
             readonly total_price: string;
+            vat_rate?: components["schemas"]["VatRateEnum"];
+            /** Format: decimal */
+            vat_amount?: string;
         };
         OrderItemInputRequest: {
             /** Format: uuid */
@@ -3740,7 +3751,16 @@ export interface components {
             readonly id: string;
             readonly supplier_name: string;
             readonly supplier_slug: string;
+            readonly supplier_vat_number: string;
             status?: components["schemas"]["OrderStatusEnum"];
+            /** Format: decimal */
+            goods_subtotal?: string;
+            /** Format: decimal */
+            discount_amount?: string;
+            /** Format: decimal */
+            shipping_amount?: string;
+            /** Format: decimal */
+            vat_amount?: string;
             /** Format: decimal */
             subtotal?: string;
             tracking_number?: string;
@@ -3762,6 +3782,14 @@ export interface components {
             readonly buyer_email: string;
             readonly supplier_name: string;
             status?: components["schemas"]["OrderStatusEnum"];
+            /** Format: decimal */
+            goods_subtotal?: string;
+            /** Format: decimal */
+            discount_amount?: string;
+            /** Format: decimal */
+            shipping_amount?: string;
+            /** Format: decimal */
+            vat_amount?: string;
             /** Format: decimal */
             subtotal?: string;
             tracking_number?: string;
@@ -3919,6 +3947,13 @@ export interface components {
             /** @default false */
             is_primary: boolean;
         };
+        /**
+         * @description * `STANDARD` - Standard (20%)
+         *     * `REDUCED` - Reduced (5%)
+         *     * `ZERO` - Zero (0%)
+         * @enum {string}
+         */
+        VatRateEnum: "STANDARD" | "REDUCED" | "ZERO";
         WishlistItem: {
             /** Format: uuid */
             readonly id: string;

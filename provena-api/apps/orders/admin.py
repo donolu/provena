@@ -6,7 +6,16 @@ from .models import Order, OrderItem, SubOrder
 class SubOrderInline(admin.TabularInline):
     model = SubOrder
     extra = 0
-    readonly_fields = ["id", "supplier", "status", "subtotal", "tracking_number", "created_at"]
+    readonly_fields = [
+        "id",
+        "supplier",
+        "status",
+        "goods_subtotal",
+        "vat_amount",
+        "subtotal",
+        "tracking_number",
+        "created_at",
+    ]
     show_change_link = True
 
 
@@ -21,6 +30,8 @@ class OrderItemInline(admin.TabularInline):
         "sku",
         "quantity",
         "unit_price",
+        "vat_rate",
+        "vat_amount",
     ]
 
 
@@ -30,6 +41,8 @@ class OrderAdmin(admin.ModelAdmin):
         "reference",
         "buyer",
         "status",
+        "goods_subtotal",
+        "vat_amount",
         "total_amount",
         "shipping_city",
         "shipping_country",
@@ -37,7 +50,18 @@ class OrderAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status", "shipping_country", "created_at"]
     search_fields = ["reference", "buyer__email", "shipping_name"]
-    readonly_fields = ["id", "reference", "buyer", "total_amount", "created_at", "updated_at"]
+    readonly_fields = [
+        "id",
+        "reference",
+        "buyer",
+        "goods_subtotal",
+        "discount_amount",
+        "shipping_amount",
+        "vat_amount",
+        "total_amount",
+        "created_at",
+        "updated_at",
+    ]
     inlines = [SubOrderInline]
 
 
@@ -48,11 +72,24 @@ class SubOrderAdmin(admin.ModelAdmin):
         "order",
         "supplier",
         "status",
+        "goods_subtotal",
+        "vat_amount",
         "subtotal",
         "tracking_number",
         "created_at",
     ]
     list_filter = ["status", "created_at"]
     search_fields = ["order__reference", "supplier__business_name", "tracking_number"]
-    readonly_fields = ["id", "order", "supplier", "subtotal", "created_at", "updated_at"]
+    readonly_fields = [
+        "id",
+        "order",
+        "supplier",
+        "goods_subtotal",
+        "discount_amount",
+        "shipping_amount",
+        "vat_amount",
+        "subtotal",
+        "created_at",
+        "updated_at",
+    ]
     inlines = [OrderItemInline]

@@ -18,6 +18,7 @@ from .models import (
     SubOrder,
     _generate_order_reference,
 )
+from .pricing import compute_order_pricing
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +126,6 @@ def place_order(
 
     reference = _generate_order_reference()
     supplier_groups: dict = {}
-    total_amount = Decimal("0.00")
 
     for item in items:
         variant: ProductVariant = item["variant"]
@@ -142,17 +142,23 @@ def place_order(
             inventory_services.reserve_stock(variant, quantity, reference=reference)
 
         line_total = variant.price * quantity
-        total_amount += line_total
         sid = variant.product.supplier_id
         supplier_groups.setdefault(sid, {"supplier": variant.product.supplier, "items": []})
         supplier_groups[sid]["items"].append(
             {"variant": variant, "quantity": quantity, "line_total": line_total}
         )
 
+    # One deterministic pricing pass; results are snapshotted onto the order (ADR-012).
+    pricing = compute_order_pricing(supplier_groups)
+
     order = Order.objects.create(
         buyer=buyer,
         reference=reference,
-        total_amount=total_amount,
+        goods_subtotal=pricing.goods_subtotal,
+        discount_amount=pricing.discount_amount,
+        shipping_amount=pricing.shipping_amount,
+        vat_amount=pricing.vat_amount,
+        total_amount=pricing.total_amount,
         shipping_name=shipping["name"],
         shipping_line1=shipping["line1"],
         shipping_line2=shipping.get("line2", ""),
@@ -162,23 +168,28 @@ def place_order(
         notes=shipping.get("notes", ""),
     )
 
-    for group in supplier_groups.values():
-        subtotal = sum(i["line_total"] for i in group["items"])
+    for sub_pricing in pricing.sub_orders:
         sub = SubOrder.objects.create(
             order=order,
-            supplier=group["supplier"],
-            subtotal=subtotal,
+            supplier=sub_pricing.supplier,
+            goods_subtotal=sub_pricing.goods_subtotal,
+            discount_amount=sub_pricing.discount_amount,
+            shipping_amount=sub_pricing.shipping_amount,
+            vat_amount=sub_pricing.vat_amount,
+            subtotal=sub_pricing.total,
         )
-        for item in group["items"]:
-            v = item["variant"]
+        for line in sub_pricing.lines:
+            v = line.variant
             OrderItem.objects.create(
                 sub_order=sub,
                 variant=v,
                 product_name=v.product.name,
                 variant_name=v.name,
                 sku=v.sku,
-                quantity=item["quantity"],
-                unit_price=v.price,
+                quantity=line.quantity,
+                unit_price=line.unit_price,
+                vat_rate=line.vat_rate,
+                vat_amount=line.vat_amount,
             )
 
     return order

@@ -52,6 +52,8 @@ class Supplier(models.Model):
         max_length=10, choices=SupplierStatus.choices, default=SupplierStatus.PENDING
     )
     commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("10.00"))
+    vat_registered = models.BooleanField(default=False)
+    vat_number = models.CharField(max_length=20, blank=True)
     stripe_account_id = models.CharField(max_length=100, blank=True)
     stripe_onboarding_complete = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
