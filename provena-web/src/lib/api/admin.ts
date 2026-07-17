@@ -3,6 +3,7 @@ import type {
   AdminUser,
   AuditLog,
   Banner,
+  DiscountCode,
   PaginatedResponse,
   Payout,
   Product,
@@ -162,4 +163,21 @@ export async function updateBanner(id: string, payload: Partial<Omit<Banner, 'id
 
 export async function deleteBanner(id: string): Promise<void> {
   await apiClient.delete(`/catalogue/admin/banners/${id}/`)
+}
+
+export async function getAdminDiscounts(page = 1): Promise<PaginatedResponse<DiscountCode>> {
+  const { data } = await apiClient.get<PaginatedResponse<DiscountCode>>('/discounts/admin/', {
+    params: { page },
+  })
+  return data
+}
+
+export async function createDiscount(payload: Partial<DiscountCode>): Promise<DiscountCode> {
+  const { data } = await apiClient.post<DiscountCode>('/discounts/admin/', payload)
+  return data
+}
+
+export async function updateDiscount(id: string, payload: Partial<DiscountCode>): Promise<DiscountCode> {
+  const { data } = await apiClient.patch<DiscountCode>(`/discounts/admin/${id}/`, payload)
+  return data
 }

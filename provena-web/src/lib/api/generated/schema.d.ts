@@ -1720,6 +1720,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/discounts/validate/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate a discount code against the current cart
+         * @description Advisory check of a discount code against the buyer's current cart.
+         */
+        post: operations["discounts_validate_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discounts/admin/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["discounts_admin_list"];
+        put?: never;
+        post: operations["discounts_admin_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discounts/admin/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["discounts_admin_retrieve"];
+        put: operations["discounts_admin_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["discounts_admin_partial_update"];
+        trace?: never;
+    };
     "/api/v1/payments/create-intent/": {
         parameters: {
             query?: never;
@@ -2551,6 +2603,49 @@ export interface components {
             delta: number;
             notes: string;
         };
+        AdminDiscountCode: {
+            /** Format: uuid */
+            readonly id: string;
+            code: string;
+            discount_type: components["schemas"]["DiscountTypeEnum"];
+            /** Format: decimal */
+            value: string;
+            funded_by?: components["schemas"]["FundedByEnum"];
+            /** Format: decimal */
+            minimum_spend?: string;
+            /** Format: date-time */
+            valid_from?: string | null;
+            /** Format: date-time */
+            valid_until?: string | null;
+            /** Format: int64 */
+            max_uses?: number | null;
+            /** Format: int64 */
+            max_uses_per_buyer?: number | null;
+            is_active?: boolean;
+            readonly times_used: number;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        AdminDiscountCodeRequest: {
+            code: string;
+            discount_type: components["schemas"]["DiscountTypeEnum"];
+            /** Format: decimal */
+            value: string;
+            funded_by?: components["schemas"]["FundedByEnum"];
+            /** Format: decimal */
+            minimum_spend?: string;
+            /** Format: date-time */
+            valid_from?: string | null;
+            /** Format: date-time */
+            valid_until?: string | null;
+            /** Format: int64 */
+            max_uses?: number | null;
+            /** Format: int64 */
+            max_uses_per_buyer?: number | null;
+            is_active?: boolean;
+        };
         AdminProduct: {
             /** Format: uuid */
             readonly id: string;
@@ -2753,6 +2848,22 @@ export interface components {
             title: string;
             body: string;
         };
+        /**
+         * @description * `PERCENTAGE` - Percentage
+         *     * `FIXED` - Fixed amount
+         * @enum {string}
+         */
+        DiscountTypeEnum: "PERCENTAGE" | "FIXED";
+        DiscountValidateRequest: {
+            code: string;
+        };
+        DiscountValidateResult: {
+            valid: boolean;
+            code?: string;
+            /** Format: decimal */
+            discount_amount?: string;
+            reason?: string;
+        };
         DispatchRequest: {
             /** @default  */
             tracking_number: string;
@@ -2919,6 +3030,12 @@ export interface components {
          * @enum {string}
          */
         FulfilmentModeEnum: "SUPPLIER_SHIP" | "PLATFORM_DELIVERY";
+        /**
+         * @description * `PLATFORM` - Platform
+         *     * `SUPPLIER` - Supplier
+         * @enum {string}
+         */
+        FundedByEnum: "PLATFORM" | "SUPPLIER";
         LoginRequest: {
             /** Format: email */
             email: string;
@@ -3072,6 +3189,21 @@ export interface components {
          * @enum {string}
          */
         OutcomeEnum: "FULL_REFUND" | "PARTIAL_REFUND" | "REPLACEMENT" | "REJECTED" | "WITHDRAWN";
+        PaginatedAdminDiscountCodeList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["AdminDiscountCode"][];
+        };
         PaginatedAdminSupplierList: {
             /** @example 123 */
             count: number;
@@ -3377,6 +3509,24 @@ export interface components {
             postcode?: string;
             /** @default GB */
             country: string;
+        };
+        PatchedAdminDiscountCodeRequest: {
+            code?: string;
+            discount_type?: components["schemas"]["DiscountTypeEnum"];
+            /** Format: decimal */
+            value?: string;
+            funded_by?: components["schemas"]["FundedByEnum"];
+            /** Format: decimal */
+            minimum_spend?: string;
+            /** Format: date-time */
+            valid_from?: string | null;
+            /** Format: date-time */
+            valid_until?: string | null;
+            /** Format: int64 */
+            max_uses?: number | null;
+            /** Format: int64 */
+            max_uses_per_buyer?: number | null;
+            is_active?: boolean;
         };
         PatchedAdminSupplierRequest: {
             business_name?: string;
@@ -7072,6 +7222,153 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Order"];
+                };
+            };
+        };
+    };
+    discounts_validate_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscountValidateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["DiscountValidateRequest"];
+                "multipart/form-data": components["schemas"]["DiscountValidateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountValidateResult"];
+                };
+            };
+        };
+    };
+    discounts_admin_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedAdminDiscountCodeList"];
+                };
+            };
+        };
+    };
+    discounts_admin_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminDiscountCodeRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AdminDiscountCodeRequest"];
+                "multipart/form-data": components["schemas"]["AdminDiscountCodeRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDiscountCode"];
+                };
+            };
+        };
+    };
+    discounts_admin_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDiscountCode"];
+                };
+            };
+        };
+    };
+    discounts_admin_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminDiscountCodeRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AdminDiscountCodeRequest"];
+                "multipart/form-data": components["schemas"]["AdminDiscountCodeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDiscountCode"];
+                };
+            };
+        };
+    };
+    discounts_admin_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedAdminDiscountCodeRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedAdminDiscountCodeRequest"];
+                "multipart/form-data": components["schemas"]["PatchedAdminDiscountCodeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDiscountCode"];
                 };
             };
         };

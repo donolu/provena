@@ -16,6 +16,7 @@ import {
   Wallet,
   Package,
   ClipboardList,
+  Ticket,
   Menu,
   X,
   LogOut,
@@ -40,6 +41,7 @@ const BASE_NAV = [
   { href: '/admin/reviews',    label: 'Reviews',   icon: MessageSquare },
   { href: '/admin/analytics',  label: 'Analytics', icon: BarChart2 },
   { href: '/admin/payouts',    label: 'Payouts',   icon: Wallet },
+  { href: '/admin/discounts',  label: 'Discounts', icon: Ticket },
   { href: '/admin/banners',    label: 'Banners',   icon: ImageIcon },
   { href: '/admin/audit-log',  label: 'Audit log', icon: ClipboardList },
 ]

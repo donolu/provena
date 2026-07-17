@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from .models import Order, OrderItem, OrderReturn, SubOrder
+from .models import DiscountCode, DiscountType, Order, OrderItem, OrderReturn, SubOrder
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -199,3 +199,63 @@ class ReturnRefundSerializer(serializers.Serializer):
     amount = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, allow_null=True, min_value=Decimal("0.01")
     )
+
+
+# --- Discount codes ---
+
+
+class DiscountValidateSerializer(serializers.Serializer):
+    code = serializers.CharField(max_length=40)
+
+
+class DiscountValidateResultSerializer(serializers.Serializer):
+    valid = serializers.BooleanField()
+    code = serializers.CharField(required=False)
+    discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    reason = serializers.CharField(required=False)
+
+
+class AdminDiscountCodeSerializer(serializers.ModelSerializer):
+    times_used = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DiscountCode
+        fields = [
+            "id",
+            "code",
+            "discount_type",
+            "value",
+            "funded_by",
+            "minimum_spend",
+            "valid_from",
+            "valid_until",
+            "max_uses",
+            "max_uses_per_buyer",
+            "is_active",
+            "times_used",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "times_used", "created_at", "updated_at"]
+
+    def get_times_used(self, obj: DiscountCode) -> int:
+        return obj.redemptions.count()
+
+    def validate_code(self, value: str) -> str:
+        value = value.strip().upper()
+        if not value:
+            raise serializers.ValidationError("Code cannot be blank.")
+        return value
+
+    def validate(self, attrs):
+        discount_type = attrs.get("discount_type") or getattr(self.instance, "discount_type", None)
+        value = attrs.get("value", getattr(self.instance, "value", None))
+        if value is not None and value <= 0:
+            raise serializers.ValidationError({"value": "Value must be greater than zero."})
+        if (
+            discount_type == DiscountType.PERCENTAGE
+            and value is not None
+            and value > Decimal("100")
+        ):
+            raise serializers.ValidationError({"value": "Percentage cannot exceed 100."})
+        return attrs

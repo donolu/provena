@@ -420,6 +420,33 @@ export interface StockMovement {
 
 export type PayoutStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED' | 'REVERSED'
 
+export type DiscountType = 'PERCENTAGE' | 'FIXED'
+export type DiscountFunding = 'PLATFORM' | 'SUPPLIER'
+
+export interface DiscountCode {
+  id: string
+  code: string
+  discount_type: DiscountType
+  value: string
+  funded_by: DiscountFunding
+  minimum_spend: string
+  valid_from: string | null
+  valid_until: string | null
+  max_uses: number | null
+  max_uses_per_buyer: number | null
+  is_active: boolean
+  times_used: number
+  created_at: string
+  updated_at: string
+}
+
+export interface DiscountValidateResult {
+  valid: boolean
+  code?: string
+  discount_amount?: string
+  reason?: string
+}
+
 export interface Payout {
   id: string
   sub_order_id: string
