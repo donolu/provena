@@ -1,20 +1,9 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
 import { ProductCard } from '@/components/product-card'
 import { useRecentlyViewed } from '@/store/recently-viewed'
+import { useHydrated } from '@/hooks/use-hydrated'
 import type { Product } from '@/lib/api/types'
-
-// Hydration-safe "is this the client?" flag: false during SSR and the first
-// client render (matching the server), true afterwards — without a hydration
-// mismatch and without setState in an effect.
-const subscribe = () => () => {}
-const useHydrated = () =>
-  useSyncExternalStore(
-    subscribe,
-    () => true,
-    () => false,
-  )
 
 interface RecentlyViewedProps {
   /** Drops the current product on the PDP. */
