@@ -52,9 +52,9 @@ function AdminNav({ onLinkClick }: { onLinkClick?: () => void }) {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
 
-  function handleLogout() {
+  async function handleLogout() {
     apiLogout().catch(() => {})
-    logout()
+    await logout()
     router.push('/login')
   }
   const { data: suppliersData } = useQuery({

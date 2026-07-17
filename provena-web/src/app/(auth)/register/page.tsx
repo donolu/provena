@@ -44,7 +44,7 @@ function RegisterForm() {
         last_name: lastName,
       })
       await mergeGuestCart(access).catch(() => {})
-      storeLogin(user, access)
+      await storeLogin(user, access)
       router.push(safeNext(searchParams.get('next'), '/catalogue'))
     } catch (err: unknown) {
       const data = (err as {

@@ -39,7 +39,7 @@ function LoginForm() {
       } else {
         const { access, user } = result as LoginResponse
         await mergeGuestCart(access).catch(() => {})
-        storeLogin(user, access)
+        await storeLogin(user, access)
         const fallback = user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue'
         router.push(safeNext(searchParams.get('next'), fallback))
       }
@@ -60,7 +60,7 @@ function LoginForm() {
     try {
       const { access, user } = await loginTotp(totpToken, totpCode)
       await mergeGuestCart(access).catch(() => {})
-      storeLogin(user, access)
+      await storeLogin(user, access)
       const fallback = user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'SUPPLIER' ? '/supplier/dashboard' : '/catalogue'
       router.push(safeNext(searchParams.get('next'), fallback))
     } catch {

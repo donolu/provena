@@ -33,8 +33,8 @@ function SecurityContent() {
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteAccount(delPassword, delCode),
-    onSuccess: () => {
-      logout()
+    onSuccess: async () => {
+      await logout()
       router.push('/')
     },
     onError: (err: unknown) => {
@@ -52,7 +52,7 @@ function SecurityContent() {
     mutationFn: () => enableTotp(code),
     onSuccess: async () => {
       const profile = await getMe()
-      setUser(profile)
+      await setUser(profile)
       setSetupUri(null)
       setCode('')
       setError('')
@@ -64,7 +64,7 @@ function SecurityContent() {
     mutationFn: () => disableTotp(code),
     onSuccess: async () => {
       const profile = await getMe()
-      setUser(profile)
+      await setUser(profile)
       setCode('')
       setError('')
     },

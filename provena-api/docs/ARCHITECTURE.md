@@ -184,6 +184,13 @@ provena-web/
 
 Route groups (parentheses) are used so that layouts can be shared within a group without affecting the URL.
 
+**Route-gating.** `middleware.ts` gates protected/role-scoped routes on `has_session` / `user_role` /
+`totp_enabled` cookies. These are **httpOnly** and set only by the same-origin `/api/session` Next route
+handler, which verifies the caller's access token against Django `/auth/me` and writes the cookies from
+the *verified* profile — so the browser cannot forge them. Being same-origin, they reach the middleware
+in both dev (cross-origin API on :8000) and prod (single Nginx origin). This is a UX/defence-in-depth
+layer; the API remains the real authorization boundary.
+
 ---
 
 ## 6. Domain Interaction Map
