@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useHydrated } from '@/hooks/use-hydrated'
 
 const COOKIE_KEY = 'cookie_consent'
 
@@ -11,21 +12,26 @@ function hasConsentCookie(): boolean {
 }
 
 export function CookieConsent() {
-  const [visible, setVisible] = useState(() => !hasConsentCookie())
+  // Render nothing on the server and the first client render (hydrated is false
+  // then), so SSR and hydration agree. Only after mount do we read the cookie to
+  // decide whether to show the banner — reading it during the initial render
+  // would desync SSR and cause a hydration mismatch for first-time visitors.
+  const hydrated = useHydrated()
+  const [dismissed, setDismissed] = useState(false)
 
   function accept() {
     const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString()
     document.cookie = `${COOKIE_KEY}=accepted; path=/; expires=${expires}; SameSite=Lax`
-    setVisible(false)
+    setDismissed(true)
   }
 
   function decline() {
     const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString()
     document.cookie = `${COOKIE_KEY}=declined; path=/; expires=${expires}; SameSite=Lax`
-    setVisible(false)
+    setDismissed(true)
   }
 
-  if (!visible) return null
+  if (!hydrated || dismissed || hasConsentCookie()) return null
 
   return (
     <div
