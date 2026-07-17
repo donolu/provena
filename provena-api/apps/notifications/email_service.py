@@ -229,6 +229,15 @@ def send_order_notification_supplier(sub_order) -> None:
     if sub_order.supplier.vat_number:
         vat_block += _label("Your VAT number") + _value(sub_order.supplier.vat_number)
 
+    # Under platform-brokered delivery Provena arranges the courier, so the supplier does not ship
+    # and the delivery fee is not theirs (ADR-013).
+    platform_delivered = sub_order.fulfilment_mode == "PLATFORM_DELIVERY"
+    delivery_block = (
+        _label("Delivery") + _value("Handled by Provena")
+        if platform_delivered
+        else _label("Shipping") + _value(_shipping_display(sub_order.shipping_amount))
+    )
+
     body = (
         _h1("New order received")
         + _p("You have a new order to fulfil. Please confirm it as soon as possible.")
@@ -237,8 +246,7 @@ def send_order_notification_supplier(sub_order) -> None:
         + _value(order.reference)
         + _label("Goods")
         + _value(f"£{sub_order.goods_subtotal}")
-        + _label("Shipping")
-        + _value(_shipping_display(sub_order.shipping_amount))
+        + delivery_block
         + _label("Subtotal")
         + _value(f"£{sub_order.subtotal}")
         + vat_block

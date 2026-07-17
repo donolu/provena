@@ -273,11 +273,20 @@ The three features all mutate the same money path and interact: a discount chang
 
 ## ADR-013: Platform-Brokered Delivery (Third-Party Courier)
 
-**Date:** 2026-07-16
-**Status:** Proposed
+**Date:** 2026-07-16 (proposed); first slice **Accepted** 2026-07-17.
+**Status:** Accepted (first slice — architecture; live courier deferred)
 
 **Context:**
 ADR-012 §3 assumes a supplier fulfils their own delivery: the shipping fee is the supplier's revenue and is added to their payout gross in full. Some suppliers have no delivery capability of their own (the "Lidl" case). To serve them, the platform would broker a third-party courier (Uber Direct / Stuart-style, Tesco Whoosh-like same-day), quote the fee at checkout, and have the courier deliver. This is not another entry in the flat/free-over/per-item shipping menu; it is a different fulfilment model with a different money path and a different merchant of record, so it gets its own decision rather than being smuggled into #140.
+
+**First slice — Accepted (#194, 2026-07-17):** the *architecture*, with a platform-configured flat fee instead of a live courier quote.
+- **Per-supplier, admin-set fulfilment mode.** `Supplier.fulfilment_mode` = `SUPPLIER_SHIP` (default) | `PLATFORM_DELIVERY`, plus a `platform_delivery_fee` (flat). Platform-brokered delivery is a commercial arrangement the platform configures; the supplier sees it read-only. Snapshotted per sub-order (`SubOrder.fulfilment_mode`).
+- **Attribution off the snapshot.** `PLATFORM_DELIVERY` shipping lands in the buyer's total (VAT extracted at the standard rate as before) but is **excluded from the supplier's payout gross** — `_create_payouts` computes `gross = commission_base + supplier_shipping`, where `supplier_shipping` is the shipping for `SUPPLIER_SHIP` and `0` for `PLATFORM_DELIVERY`. The platform keeps the fee. This is exactly the ADR-012 §3 forward-compat contract.
+- **Pass-through at cost, no margin line.** The buyer's delivery fee equals the platform's configured cost; there is no delivery-margin accounting line in this slice.
+- **VAT principal.** For the delivery leg the platform is the principal (standard-rated). The money math is unchanged; the split VAT invoice (supplier VAT number on goods, platform VAT on delivery) is a **deferred refinement**.
+- **Refunds compose unchanged.** `reverse_payout_for_sub_order` reverses `payout.net`, which now excludes platform-delivery shipping, so a return reverses only the supplier's goods share; the platform absorbs the delivery-fee refund (failed-delivery/courier-cost reconciliation deferred).
+
+**Deferred to the live-courier slice:** a real courier API + live quotes, serviceability checks + fallback, quote expiry/refresh, courier dispatch/billing + failed-delivery refunds, a delivery-margin line, buyer per-order delivery choice, and the split VAT invoice. The open questions below are settled only insofar as the flat-fee architecture requires; they remain open for the live-courier work.
 
 **Decision (to be settled):**
 The direction, with the details deferred until the base pipeline (#140/#141/#142) has shipped:

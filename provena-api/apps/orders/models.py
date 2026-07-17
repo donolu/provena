@@ -7,6 +7,7 @@ from django.db import models
 from django.utils import timezone
 
 from apps.catalogue.models import VatRate
+from apps.suppliers.models import FulfilmentMode
 
 
 class OrderStatus(models.TextChoices):
@@ -69,6 +70,12 @@ class SubOrder(models.Model):
     shipping_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     vat_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    # Snapshot of who delivers this sub-order (drives shipping attribution in payouts, ADR-013).
+    fulfilment_mode = models.CharField(
+        max_length=20,
+        choices=FulfilmentMode.choices,
+        default=FulfilmentMode.SUPPLIER_SHIP,
+    )
     tracking_number = models.CharField(max_length=200, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)

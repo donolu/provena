@@ -236,23 +236,27 @@ def handle_payment_cancelled(stripe_payment_intent_id: str) -> Payment:
 
 def _create_payouts(payment: Payment) -> None:
     from apps.orders.models import DiscountFunding
+    from apps.suppliers.models import FulfilmentMode
 
     default_fee_pct = Decimal(str(getattr(settings, "PLATFORM_FEE_PERCENT", "10")))
     platform_funded = payment.order.discount_funded_by == DiscountFunding.PLATFORM
     for sub_order in payment.order.sub_orders.select_related("supplier").all():
+        # Commission is on goods only, never shipping (ADR-012 §3). The base is pre-discount goods
+        # when the platform funds the discount (supplier paid on full goods, ADR-012 §4), else the
+        # discounted goods.
         if platform_funded:
-            # PLATFORM-funded discount: the supplier is paid on pre-discount goods and the
-            # platform absorbs the discount out of its fee (ADR-012 §4).
             commission_base = sub_order.goods_subtotal
-            gross = sub_order.goods_subtotal + sub_order.shipping_amount
         else:
-            # No discount, or SUPPLIER-funded: gross is the snapshotted sub-order total
-            # (goods - discount + shipping) and commission is on the discounted goods.
             commission_base = sub_order.goods_subtotal - sub_order.discount_amount
-            gross = sub_order.subtotal
-        # Commission is charged on goods only, never on shipping (ADR-012 §3). Shipping is in
-        # gross because the fulfilling supplier delivers; a future platform-brokered delivery
-        # model (ADR-013) would exclude it here based on the sub-order's fulfilment attribution.
+        # Shipping enters the supplier's gross only when the supplier delivers; under
+        # platform-brokered delivery the platform keeps the fee (ADR-013). Attribution is read off
+        # the sub-order snapshot, not assumed (the ADR-012 §3 forward-compat note).
+        supplier_shipping = (
+            sub_order.shipping_amount
+            if sub_order.fulfilment_mode == FulfilmentMode.SUPPLIER_SHIP
+            else Decimal("0.00")
+        )
+        gross = commission_base + supplier_shipping
         fee_pct = sub_order.supplier.commission_rate or default_fee_pct
         fee = (commission_base * fee_pct / Decimal("100")).quantize(Decimal("0.01"))
         net = gross - fee

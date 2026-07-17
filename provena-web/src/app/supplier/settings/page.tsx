@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, Truck } from 'lucide-react'
 import { getMySupplierProfile, updateMySupplierProfile } from '@/lib/api/suppliers'
 import type { ShippingPolicy, SupplierProfile } from '@/lib/api/types'
 
@@ -77,6 +77,7 @@ function SettingsForm({ profile }: { profile: SupplierProfile }) {
   }
 
   const policy = form.shipping_policy
+  const platformDelivered = profile.fulfilment_mode === 'PLATFORM_DELIVERY'
 
   return (
     <div className="px-6 py-8 max-w-2xl mx-auto">
@@ -89,64 +90,81 @@ function SettingsForm({ profile }: { profile: SupplierProfile }) {
         <section className="bg-white rounded-lg border border-hoarfrost p-6 space-y-5">
           <h2 className="text-sm font-sans font-semibold text-forest">Shipping</h2>
 
-          <div>
-            <FieldLabel>Delivery charge</FieldLabel>
-            <select
-              value={policy}
-              onChange={(e) => set('shipping_policy')(e.target.value)}
-              className={inputClass}
-            >
-              <option value="FLAT">Flat rate per order</option>
-              <option value="FREE_OVER_THRESHOLD">Flat rate, free over a threshold</option>
-              <option value="PER_ITEM">Per item</option>
-            </select>
-          </div>
-
-          {(policy === 'FLAT' || policy === 'FREE_OVER_THRESHOLD') && (
-            <div>
-              <FieldLabel>Flat rate (£)</FieldLabel>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.shipping_flat_rate}
-                onChange={(e) => set('shipping_flat_rate')(e.target.value)}
-                className={inputClass}
-              />
-              <p className="text-[11px] font-sans text-soil mt-1">Set to 0 for free delivery.</p>
+          {platformDelivered ? (
+            <div className="flex items-start gap-2.5 px-4 py-3 bg-meadow/10 border border-meadow/30 rounded-lg">
+              <Truck className="w-4 h-4 text-meadow shrink-0 mt-0.5" strokeWidth={1.5} />
+              <div>
+                <p className="text-sm font-sans text-forest font-medium">
+                  Delivery handled by Provena
+                </p>
+                <p className="text-xs font-sans text-soil mt-0.5">
+                  Provena arranges the courier and sets the delivery fee for your orders — you don&apos;t
+                  need to configure shipping. You fulfil the goods; we handle delivery.
+                </p>
+              </div>
             </div>
-          )}
+          ) : (
+            <>
+              <div>
+                <FieldLabel>Delivery charge</FieldLabel>
+                <select
+                  value={policy}
+                  onChange={(e) => set('shipping_policy')(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="FLAT">Flat rate per order</option>
+                  <option value="FREE_OVER_THRESHOLD">Flat rate, free over a threshold</option>
+                  <option value="PER_ITEM">Per item</option>
+                </select>
+              </div>
 
-          {policy === 'FREE_OVER_THRESHOLD' && (
-            <div>
-              <FieldLabel>Free over (£)</FieldLabel>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.free_shipping_threshold}
-                onChange={(e) => set('free_shipping_threshold')(e.target.value)}
-                placeholder="e.g. 40.00"
-                className={inputClass}
-              />
-              <p className="text-[11px] font-sans text-soil mt-1">
-                Orders of goods at or above this value ship free.
-              </p>
-            </div>
-          )}
+              {(policy === 'FLAT' || policy === 'FREE_OVER_THRESHOLD') && (
+                <div>
+                  <FieldLabel>Flat rate (£)</FieldLabel>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.shipping_flat_rate}
+                    onChange={(e) => set('shipping_flat_rate')(e.target.value)}
+                    className={inputClass}
+                  />
+                  <p className="text-[11px] font-sans text-soil mt-1">Set to 0 for free delivery.</p>
+                </div>
+              )}
 
-          {policy === 'PER_ITEM' && (
-            <div>
-              <FieldLabel>Rate per item (£)</FieldLabel>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.shipping_per_item_rate}
-                onChange={(e) => set('shipping_per_item_rate')(e.target.value)}
-                className={inputClass}
-              />
-            </div>
+              {policy === 'FREE_OVER_THRESHOLD' && (
+                <div>
+                  <FieldLabel>Free over (£)</FieldLabel>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.free_shipping_threshold}
+                    onChange={(e) => set('free_shipping_threshold')(e.target.value)}
+                    placeholder="e.g. 40.00"
+                    className={inputClass}
+                  />
+                  <p className="text-[11px] font-sans text-soil mt-1">
+                    Orders of goods at or above this value ship free.
+                  </p>
+                </div>
+              )}
+
+              {policy === 'PER_ITEM' && (
+                <div>
+                  <FieldLabel>Rate per item (£)</FieldLabel>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.shipping_per_item_rate}
+                    onChange={(e) => set('shipping_per_item_rate')(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              )}
+            </>
           )}
         </section>
 

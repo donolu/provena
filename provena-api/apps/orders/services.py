@@ -221,6 +221,7 @@ def place_order(
             shipping_amount=sub_pricing.shipping_amount,
             vat_amount=sub_pricing.vat_amount,
             subtotal=sub_pricing.total,
+            fulfilment_mode=sub_pricing.fulfilment_mode,
         )
         for line in sub_pricing.lines:
             v = line.variant

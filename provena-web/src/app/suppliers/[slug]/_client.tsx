@@ -33,6 +33,9 @@ function StarRating({ value, count }: { value: number; count: number }) {
 }
 
 function deliveryLabel(s: PublicSupplier): string {
+  if (s.fulfilment_mode === 'PLATFORM_DELIVERY') {
+    return `Provena delivery · £${s.platform_delivery_fee}`
+  }
   if (s.shipping_policy === 'PER_ITEM') {
     return `£${s.shipping_per_item_rate} delivery per item`
   }

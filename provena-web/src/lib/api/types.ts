@@ -194,6 +194,7 @@ export interface SubOrder {
   shipping_amount: string
   vat_amount: string
   subtotal: string
+  fulfilment_mode: FulfilmentMode
   tracking_number: string
   delivered_at: string | null
   items: OrderItem[]
@@ -246,7 +247,11 @@ export type SupplierStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'REJECTED'
 
 export type ShippingPolicy = 'FLAT' | 'FREE_OVER_THRESHOLD' | 'PER_ITEM'
 
+export type FulfilmentMode = 'SUPPLIER_SHIP' | 'PLATFORM_DELIVERY'
+
 export interface SupplierShipping {
+  fulfilment_mode: FulfilmentMode
+  platform_delivery_fee: string
   shipping_policy: ShippingPolicy
   shipping_flat_rate: string
   shipping_per_item_rate: string
