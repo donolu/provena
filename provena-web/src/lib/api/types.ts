@@ -187,7 +187,12 @@ export interface SubOrder {
   id: string
   supplier_name: string
   supplier_slug: string
+  supplier_vat_number: string
   status: OrderStatus
+  goods_subtotal: string
+  discount_amount: string
+  shipping_amount: string
+  vat_amount: string
   subtotal: string
   tracking_number: string
   delivered_at: string | null
@@ -220,6 +225,11 @@ export interface Order {
   shipping_city: string
   shipping_postcode: string
   shipping_country: string
+  goods_subtotal: string
+  discount_amount: string
+  discount_code: string
+  shipping_amount: string
+  vat_amount: string
   total_amount: string
   notes: string
   payment_id: string | null
@@ -233,6 +243,15 @@ export interface Order {
 // ── Suppliers ─────────────────────────────────────────────────────────────────
 
 export type SupplierStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'REJECTED'
+
+export type ShippingPolicy = 'FLAT' | 'FREE_OVER_THRESHOLD' | 'PER_ITEM'
+
+export interface SupplierShipping {
+  shipping_policy: ShippingPolicy
+  shipping_flat_rate: string
+  shipping_per_item_rate: string
+  free_shipping_threshold: string | null
+}
 
 export interface SupplierAddress {
   line1: string
@@ -256,7 +275,7 @@ export interface SupplierDocument {
   reviewed_by_email: string | null
 }
 
-export interface PublicSupplier {
+export interface PublicSupplier extends SupplierShipping {
   id: string
   business_name: string
   slug: string
@@ -268,7 +287,7 @@ export interface PublicSupplier {
   product_count: number
 }
 
-export interface SupplierProfile {
+export interface SupplierProfile extends SupplierShipping {
   id: string
   user_email: string
   business_name: string
@@ -279,6 +298,8 @@ export interface SupplierProfile {
   phone: string
   status: SupplierStatus
   commission_rate: string
+  vat_registered: boolean
+  vat_number: string
   stripe_onboarding_complete: boolean
   address: SupplierAddress | null
   documents: SupplierDocument[]

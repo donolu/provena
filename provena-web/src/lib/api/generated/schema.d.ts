@@ -3445,6 +3445,7 @@ export interface components {
             logo_url?: string;
             website?: string;
             phone?: string;
+            vat_number?: string;
             shipping_policy?: components["schemas"]["ShippingPolicyEnum"];
             /** Format: decimal */
             shipping_flat_rate?: string;
@@ -3883,6 +3884,8 @@ export interface components {
             readonly status: components["schemas"]["SupplierStatusEnum"];
             /** Format: decimal */
             readonly commission_rate: string;
+            readonly vat_registered: boolean;
+            vat_number?: string;
             shipping_policy?: components["schemas"]["ShippingPolicyEnum"];
             /** Format: decimal */
             shipping_flat_rate?: string;

@@ -13,6 +13,7 @@ import {
   useElements,
 } from '@stripe/react-stripe-js'
 import { Nav } from '@/components/nav'
+import { OrderBreakdown } from '@/components/order-breakdown'
 import { getCart, clearCart } from '@/lib/api/cart'
 import { placeOrder, createPaymentIntent } from '@/lib/api/orders'
 import { getAddresses } from '@/lib/api/addresses'
@@ -79,20 +80,19 @@ function OrderSummary({ items, total }: { items: { id: string; product_name: str
         ))}
       </ul>
       <div className="px-5 py-4 border-t border-hoarfrost flex items-baseline justify-between">
-        <span className="text-sm font-sans text-soil">Total</span>
+        <span className="text-sm font-sans text-soil">Subtotal</span>
         <span className="font-mono text-base font-semibold text-forest">£{total}</span>
       </div>
+      <p className="px-5 pb-4 -mt-2 text-[11px] font-sans text-soil">Excl. shipping &amp; VAT</p>
     </div>
   )
 }
 
 function PaymentStep({
   order,
-  cartTotal,
   onSuccess,
 }: {
   order: Order
-  cartTotal: string
   onSuccess: () => void
 }) {
   const stripe = useStripe()
@@ -125,7 +125,11 @@ function PaymentStep({
   return (
     <form onSubmit={handlePay} className="space-y-5">
       <h2 className="text-sm font-sans font-semibold text-forest">Payment</h2>
-      <p className="text-xs font-sans text-soil">Order {order.reference} · £{cartTotal}</p>
+      <p className="text-xs font-sans text-soil">Order {order.reference}</p>
+
+      <div className="bg-white border border-hoarfrost rounded p-4">
+        <OrderBreakdown order={order} />
+      </div>
 
       <div className="bg-white border border-hoarfrost rounded p-4">
         <PaymentElement />
@@ -142,7 +146,7 @@ function PaymentStep({
         disabled={!stripe || processing}
         className="w-full rounded bg-forest py-3 text-sm font-sans font-medium text-mist hover:bg-meadow transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        {processing ? 'Processing…' : `Pay £${cartTotal}`}
+        {processing ? 'Processing…' : `Pay £${order.total_amount}`}
       </button>
     </form>
   )
@@ -157,6 +161,7 @@ export default function CheckoutPage() {
   const [order, setOrder] = useState<Order | null>(null)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
+  const [discountCode, setDiscountCode] = useState('')
 
   const { data: cart, isPending: cartLoading } = useQuery({
     queryKey: ['cart'],
@@ -183,6 +188,7 @@ export default function CheckoutPage() {
         shipping_postcode: form.postcode,
         shipping_country: form.country,
         notes: form.notes,
+        discount_code: discountCode.trim() || undefined,
       })
       const intent = await createPaymentIntent(placed.reference)
       return { order: placed, clientSecret: intent.client_secret }
@@ -270,7 +276,6 @@ export default function CheckoutPage() {
               >
                 <PaymentStep
                   order={order}
-                  cartTotal={cart?.total ?? '0.00'}
                   onSuccess={handlePaymentSuccess}
                 />
               </Elements>
@@ -392,6 +397,20 @@ export default function CheckoutPage() {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium mb-1.5">
+                    Discount code <span className="text-hoarfrost">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={discountCode}
+                    onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. SAVE10"
+                    autoCapitalize="characters"
+                    className="w-full border border-hoarfrost rounded px-3 py-2.5 text-sm font-sans uppercase tracking-wide text-forest bg-white focus:outline-none focus:border-forest transition-colors duration-150"
+                  />
+                </div>
+
                 {error && (
                   <p className="text-xs font-sans text-terracotta bg-terracotta/5 border border-terracotta/20 rounded px-3 py-2">
                     {error}
@@ -403,8 +422,11 @@ export default function CheckoutPage() {
                   disabled={mutation.isPending}
                   className="w-full rounded bg-forest py-3 text-sm font-sans font-medium text-mist hover:bg-meadow transition-colors duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {mutation.isPending ? 'Preparing order…' : `Continue to payment · £${cart?.total}`}
+                  {mutation.isPending ? 'Preparing order…' : 'Continue to payment'}
                 </button>
+                <p className="text-[11px] font-sans text-soil text-center">
+                  Shipping, VAT and any discount are calculated on the next step.
+                </p>
               </form>
             )}
 

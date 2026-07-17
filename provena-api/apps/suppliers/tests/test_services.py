@@ -86,6 +86,10 @@ class TestUpdateSupplierProfile:
         updated = update_supplier_profile(pending_supplier, commission_rate=Decimal("1.00"))
         assert updated.commission_rate == original
 
+    def test_updates_vat_number(self, pending_supplier):
+        updated = update_supplier_profile(pending_supplier, vat_number="GB123456789")
+        assert updated.vat_number == "GB123456789"
+
 
 @pytest.mark.django_db
 class TestSupplierStatusActions:

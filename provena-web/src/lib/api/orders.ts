@@ -42,6 +42,7 @@ export async function placeOrder(payload: {
   shipping_postcode: string
   shipping_country: string
   notes?: string
+  discount_code?: string
 }): Promise<Order> {
   const { data } = await apiClient.post<Order>('/orders/', payload)
   return data

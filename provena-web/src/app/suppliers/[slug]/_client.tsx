@@ -4,7 +4,7 @@ import { use, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ExternalLink, MapPin, Star } from 'lucide-react'
+import { ChevronLeft, ExternalLink, MapPin, Star, Truck } from 'lucide-react'
 import { Nav } from '@/components/nav'
 import { CartDrawer } from '@/components/cart-drawer'
 import { ProductCard } from '@/components/product-card'
@@ -30,6 +30,16 @@ function StarRating({ value, count }: { value: number; count: number }) {
       <span className="text-xs text-soil">({count})</span>
     </span>
   )
+}
+
+function deliveryLabel(s: PublicSupplier): string {
+  if (s.shipping_policy === 'PER_ITEM') {
+    return `£${s.shipping_per_item_rate} delivery per item`
+  }
+  if (s.shipping_policy === 'FREE_OVER_THRESHOLD' && s.free_shipping_threshold) {
+    return `Free delivery over £${s.free_shipping_threshold}`
+  }
+  return Number(s.shipping_flat_rate) === 0 ? 'Free delivery' : `£${s.shipping_flat_rate} delivery`
 }
 
 export default function SupplierStorefrontPage({
@@ -178,6 +188,10 @@ export default function SupplierStorefrontPage({
                   {locationLabel}
                 </span>
               )}
+              <span className="flex items-center gap-1 text-xs text-soil">
+                <Truck className="w-3 h-3" strokeWidth={1.5} />
+                {deliveryLabel(supplier)}
+              </span>
               {supplier.website && (
                 <a
                   href={supplier.website}
