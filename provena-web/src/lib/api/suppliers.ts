@@ -50,7 +50,21 @@ export async function getMySupplierProfile(): Promise<SupplierProfile> {
 }
 
 export async function updateMySupplierProfile(
-  payload: Partial<Pick<SupplierProfile, 'business_name' | 'description' | 'logo_url' | 'website' | 'phone'>>,
+  payload: Partial<
+    Pick<
+      SupplierProfile,
+      | 'business_name'
+      | 'description'
+      | 'logo_url'
+      | 'website'
+      | 'phone'
+      | 'shipping_policy'
+      | 'shipping_flat_rate'
+      | 'shipping_per_item_rate'
+      | 'free_shipping_threshold'
+      | 'vat_number'
+    >
+  >,
 ): Promise<SupplierProfile> {
   const { data } = await apiClient.patch<SupplierProfile>('/suppliers/me/', payload)
   return data

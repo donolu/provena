@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle2, ChevronLeft, RotateCcw, XCircle } from 'lucide-react'
 import Link from 'next/link'
 import { Nav } from '@/components/nav'
+import { OrderBreakdown } from '@/components/order-breakdown'
 import { StatusBadge } from '@/components/supplier/status-badge'
 import { getOrder, cancelOrder, raiseDispute, requestReturn } from '@/lib/api/orders'
 import { getCart } from '@/lib/api/cart'
@@ -374,11 +375,17 @@ export default function OrderDetailPage({ params }: { params: Promise<{ referenc
               ))}
             </div>
 
-            <div className="mt-8 bg-white rounded-lg border border-hoarfrost px-5 py-4">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium mb-2">Shipping to</p>
-              <p className="text-sm font-sans text-forest">{order.shipping_name}</p>
-              <p className="text-sm font-sans text-soil">{order.shipping_line1}{order.shipping_line2 ? `, ${order.shipping_line2}` : ''}</p>
-              <p className="text-sm font-sans text-soil">{order.shipping_city}, {order.shipping_postcode}</p>
+            <div className="mt-8 grid sm:grid-cols-2 gap-4">
+              <div className="bg-white rounded-lg border border-hoarfrost px-5 py-4">
+                <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium mb-3">Payment breakdown</p>
+                <OrderBreakdown order={order} />
+              </div>
+              <div className="bg-white rounded-lg border border-hoarfrost px-5 py-4">
+                <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium mb-2">Shipping to</p>
+                <p className="text-sm font-sans text-forest">{order.shipping_name}</p>
+                <p className="text-sm font-sans text-soil">{order.shipping_line1}{order.shipping_line2 ? `, ${order.shipping_line2}` : ''}</p>
+                <p className="text-sm font-sans text-soil">{order.shipping_city}, {order.shipping_postcode}</p>
+              </div>
             </div>
           </>
         )}

@@ -10,6 +10,7 @@ import {
   ShoppingBag,
   Wallet,
   Warehouse,
+  Settings,
   Menu,
   X,
   LogOut,
@@ -27,6 +28,7 @@ const BASE_NAV = [
   { href: '/supplier/orders',     label: 'Orders',     icon: ShoppingBag },
   { href: '/supplier/returns',    label: 'Returns',    icon: RotateCcw },
   { href: '/supplier/payouts',    label: 'Payouts',    icon: Wallet },
+  { href: '/supplier/settings',   label: 'Settings',   icon: Settings },
 ]
 
 function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {

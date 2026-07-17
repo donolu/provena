@@ -64,6 +64,7 @@ def update_supplier_profile(supplier: Supplier, **kwargs: object) -> Supplier:
         "shipping_flat_rate",
         "shipping_per_item_rate",
         "free_shipping_threshold",
+        "vat_number",
     }
     for field, value in kwargs.items():
         if field in allowed:
