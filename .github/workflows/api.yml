@@ -185,7 +185,7 @@ jobs:
       - name: Export OpenAPI schema
         run: python manage.py spectacular --file ../provena-web/schema.yaml
         working-directory: provena-api
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
