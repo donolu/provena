@@ -235,10 +235,16 @@ def handle_payment_cancelled(stripe_payment_intent_id: str) -> Payment:
 
 
 def _create_payouts(payment: Payment) -> None:
-    fee_pct = Decimal(str(getattr(settings, "PLATFORM_FEE_PERCENT", "10")))
+    default_fee_pct = Decimal(str(getattr(settings, "PLATFORM_FEE_PERCENT", "10")))
     for sub_order in payment.order.sub_orders.select_related("supplier").all():
+        # Commission is charged on discounted goods only, never on shipping (ADR-012 §3).
+        commission_base = sub_order.goods_subtotal - sub_order.discount_amount
+        fee_pct = sub_order.supplier.commission_rate or default_fee_pct
+        fee = (commission_base * fee_pct / Decimal("100")).quantize(Decimal("0.01"))
+        # Gross is the snapshotted sub-order total (goods - discount + shipping). Shipping is
+        # included because the fulfilling supplier delivers; a future platform-brokered delivery
+        # model (ADR-013) would exclude it here based on the sub-order's fulfilment attribution.
         gross = sub_order.subtotal
-        fee = (gross * fee_pct / Decimal("100")).quantize(Decimal("0.01"))
         net = gross - fee
         _payout, created = Payout.objects.get_or_create(
             sub_order=sub_order,

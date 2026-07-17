@@ -2588,6 +2588,13 @@ export interface components {
             status?: components["schemas"]["SupplierStatusEnum"];
             /** Format: decimal */
             commission_rate?: string;
+            shipping_policy?: components["schemas"]["ShippingPolicyEnum"];
+            /** Format: decimal */
+            shipping_flat_rate?: string;
+            /** Format: decimal */
+            shipping_per_item_rate?: string;
+            /** Format: decimal */
+            free_shipping_threshold?: string | null;
             readonly stripe_account_id: string;
             readonly stripe_onboarding_complete: boolean;
             readonly address: components["schemas"]["SupplierAddress"];
@@ -3370,6 +3377,13 @@ export interface components {
             status?: components["schemas"]["SupplierStatusEnum"];
             /** Format: decimal */
             commission_rate?: string;
+            shipping_policy?: components["schemas"]["ShippingPolicyEnum"];
+            /** Format: decimal */
+            shipping_flat_rate?: string;
+            /** Format: decimal */
+            shipping_per_item_rate?: string;
+            /** Format: decimal */
+            free_shipping_threshold?: string | null;
         };
         PatchedBannerWriteRequest: {
             title?: string;
@@ -3430,6 +3444,13 @@ export interface components {
             logo_url?: string;
             website?: string;
             phone?: string;
+            shipping_policy?: components["schemas"]["ShippingPolicyEnum"];
+            /** Format: decimal */
+            shipping_flat_rate?: string;
+            /** Format: decimal */
+            shipping_per_item_rate?: string;
+            /** Format: decimal */
+            free_shipping_threshold?: string | null;
             address?: components["schemas"]["SupplierAddressRequest"];
         };
         PatchedUpdateCartItemRequest: {
@@ -3706,6 +3727,13 @@ export interface components {
          * @enum {string}
          */
         RoleEnum: "BUYER" | "SUPPLIER" | "ADMIN";
+        /**
+         * @description * `FLAT` - Flat rate
+         *     * `FREE_OVER_THRESHOLD` - Free over threshold
+         *     * `PER_ITEM` - Per item
+         * @enum {string}
+         */
+        ShippingPolicyEnum: "FLAT" | "FREE_OVER_THRESHOLD" | "PER_ITEM";
         StockLevel: {
             /** Format: uuid */
             readonly id: string;
@@ -3852,6 +3880,13 @@ export interface components {
             readonly status: components["schemas"]["SupplierStatusEnum"];
             /** Format: decimal */
             readonly commission_rate: string;
+            shipping_policy?: components["schemas"]["ShippingPolicyEnum"];
+            /** Format: decimal */
+            shipping_flat_rate?: string;
+            /** Format: decimal */
+            shipping_per_item_rate?: string;
+            /** Format: decimal */
+            free_shipping_threshold?: string | null;
             readonly stripe_onboarding_complete: boolean;
             address?: components["schemas"]["SupplierAddress"];
             readonly documents: components["schemas"]["SupplierDocument"][];
@@ -3867,6 +3902,13 @@ export interface components {
             logo_url?: string;
             website?: string;
             readonly address: components["schemas"]["SupplierAddress"];
+            shipping_policy?: components["schemas"]["ShippingPolicyEnum"];
+            /** Format: decimal */
+            shipping_flat_rate?: string;
+            /** Format: decimal */
+            shipping_per_item_rate?: string;
+            /** Format: decimal */
+            free_shipping_threshold?: string | null;
             /** Format: double */
             readonly average_rating: number | null;
             readonly product_count: number;

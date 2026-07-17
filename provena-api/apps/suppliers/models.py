@@ -13,6 +13,12 @@ class SupplierStatus(models.TextChoices):
     REJECTED = "REJECTED", "Rejected"
 
 
+class ShippingPolicy(models.TextChoices):
+    FLAT = "FLAT", "Flat rate"
+    FREE_OVER_THRESHOLD = "FREE_OVER_THRESHOLD", "Free over threshold"
+    PER_ITEM = "PER_ITEM", "Per item"
+
+
 class DocumentType(models.TextChoices):
     IDENTITY = "IDENTITY", "Identity Document"
     BUSINESS_REG = "BUSINESS_REG", "Business Registration"
@@ -54,6 +60,18 @@ class Supplier(models.Model):
     commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("10.00"))
     vat_registered = models.BooleanField(default=False)
     vat_number = models.CharField(max_length=20, blank=True)
+    shipping_policy = models.CharField(
+        max_length=20, choices=ShippingPolicy.choices, default=ShippingPolicy.FLAT
+    )
+    shipping_flat_rate = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal("0.00")
+    )
+    shipping_per_item_rate = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal("0.00")
+    )
+    free_shipping_threshold = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
     stripe_account_id = models.CharField(max_length=100, blank=True)
     stripe_onboarding_complete = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -68,6 +86,22 @@ class Supplier(models.Model):
     @property
     def is_approved(self) -> bool:
         return self.status == SupplierStatus.APPROVED
+
+    def compute_shipping(self, goods_subtotal: Decimal, total_quantity: int) -> Decimal:
+        """Shipping charged for a sub-order under this supplier's policy.
+
+        FREE_OVER_THRESHOLD is evaluated on the pre-discount goods value (ADR-012 §4).
+        The pricing pass quantises the result at the stored boundary.
+        """
+        if self.shipping_policy == ShippingPolicy.PER_ITEM:
+            return self.shipping_per_item_rate * total_quantity
+        if (
+            self.shipping_policy == ShippingPolicy.FREE_OVER_THRESHOLD
+            and self.free_shipping_threshold is not None
+            and goods_subtotal >= self.free_shipping_threshold
+        ):
+            return Decimal("0.00")
+        return self.shipping_flat_rate
 
 
 class SupplierAddress(models.Model):

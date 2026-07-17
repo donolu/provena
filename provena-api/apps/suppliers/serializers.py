@@ -61,6 +61,10 @@ class SupplierPublicSerializer(serializers.ModelSerializer):
             "logo_url",
             "website",
             "address",
+            "shipping_policy",
+            "shipping_flat_rate",
+            "shipping_per_item_rate",
+            "free_shipping_threshold",
             "average_rating",
             "product_count",
         ]
@@ -104,6 +108,10 @@ class SupplierProfileSerializer(serializers.ModelSerializer):
             "phone",
             "status",
             "commission_rate",
+            "shipping_policy",
+            "shipping_flat_rate",
+            "shipping_per_item_rate",
+            "free_shipping_threshold",
             "stripe_onboarding_complete",
             "address",
             "documents",
@@ -124,6 +132,21 @@ class SupplierProfileSerializer(serializers.ModelSerializer):
         if not value.strip():
             raise serializers.ValidationError("Business name cannot be blank.")
         return value.strip()
+
+    def validate_shipping_flat_rate(self, value):
+        if value < Decimal("0"):
+            raise serializers.ValidationError("Shipping flat rate cannot be negative.")
+        return value
+
+    def validate_shipping_per_item_rate(self, value):
+        if value < Decimal("0"):
+            raise serializers.ValidationError("Shipping per-item rate cannot be negative.")
+        return value
+
+    def validate_free_shipping_threshold(self, value):
+        if value is not None and value < Decimal("0"):
+            raise serializers.ValidationError("Free shipping threshold cannot be negative.")
+        return value
 
 
 class SupplierRegistrationSerializer(serializers.Serializer):
@@ -158,6 +181,10 @@ class AdminSupplierSerializer(serializers.ModelSerializer):
             "phone",
             "status",
             "commission_rate",
+            "shipping_policy",
+            "shipping_flat_rate",
+            "shipping_per_item_rate",
+            "free_shipping_threshold",
             "stripe_account_id",
             "stripe_onboarding_complete",
             "address",
