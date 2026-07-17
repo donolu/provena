@@ -41,6 +41,9 @@ class Order(models.Model):
     shipping_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     vat_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    # Snapshot of the applied discount code and who funded it (drives the payout split).
+    discount_code = models.CharField(max_length=40, blank=True)
+    discount_funded_by = models.CharField(max_length=10, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -141,3 +144,79 @@ class OrderReturn(models.Model):
 
     def __str__(self) -> str:
         return f"Return on {self.sub_order} ({self.status})"
+
+
+class DiscountType(models.TextChoices):
+    PERCENTAGE = "PERCENTAGE", "Percentage"
+    FIXED = "FIXED", "Fixed amount"
+
+
+class DiscountFunding(models.TextChoices):
+    PLATFORM = "PLATFORM", "Platform"
+    SUPPLIER = "SUPPLIER", "Supplier"
+
+
+class DiscountCode(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=40, unique=True)
+    discount_type = models.CharField(max_length=10, choices=DiscountType.choices)
+    value = models.DecimalField(max_digits=10, decimal_places=2)
+    funded_by = models.CharField(
+        max_length=10, choices=DiscountFunding.choices, default=DiscountFunding.PLATFORM
+    )
+    minimum_spend = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    valid_from = models.DateTimeField(null=True, blank=True)
+    valid_until = models.DateTimeField(null=True, blank=True)
+    max_uses = models.PositiveIntegerField(null=True, blank=True)
+    max_uses_per_buyer = models.PositiveIntegerField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return self.code
+
+    def save(self, *args, **kwargs) -> None:
+        self.code = self.code.upper()
+        super().save(*args, **kwargs)
+
+    def is_live(self, now) -> bool:
+        if not self.is_active:
+            return False
+        if self.valid_from is not None and now < self.valid_from:
+            return False
+        if self.valid_until is not None and now > self.valid_until:
+            return False
+        return True
+
+    def compute_discount(self, goods_subtotal: Decimal) -> Decimal:
+        """The discount for a pre-discount goods value, capped at that value."""
+        if self.discount_type == DiscountType.PERCENTAGE:
+            raw = goods_subtotal * self.value / Decimal("100")
+        else:
+            raw = self.value
+        capped = min(raw, goods_subtotal)
+        return capped.quantize(Decimal("0.01"))
+
+
+class DiscountRedemption(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.ForeignKey(DiscountCode, on_delete=models.PROTECT, related_name="redemptions")
+    buyer = models.ForeignKey(
+        "accounts.User", on_delete=models.PROTECT, related_name="discount_redemptions"
+    )
+    # One redemption per order makes application idempotent under retries.
+    order = models.OneToOneField(
+        Order, on_delete=models.CASCADE, related_name="discount_redemption"
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.code} on {self.order.reference} (£{self.amount})"

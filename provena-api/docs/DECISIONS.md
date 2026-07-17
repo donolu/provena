@@ -262,6 +262,13 @@ The three features all mutate the same money path and interact: a discount chang
 - Per-sub-order VAT breakdowns and per-supplier VAT numbers become new onboarding and KYC requirements; B2B VAT-exclusive invoicing and non-UK sellers are explicitly deferred.
 - Existing orders predate the breakdown columns, so a data migration backfills `goods_subtotal = subtotal`, zero shipping and discount, and VAT extracted at the standard rate, so historical receipts still render.
 
+**Addendum (2026-07-17): implementation refinements as the three issues landed.** The pipeline was built in the ADR's safe-to-risky order and settled three details the original decision left implicit:
+
+- **VAT base under discounts (#142).** VAT is extracted from the **post-discount** goods value. To keep mixed VAT rates correct within one sub-order, the order discount is allocated by largest remainder twice: order → sub-order (by goods value), then sub-order → line (by line value); per-line VAT is then extracted on the post-discount line value and summed. Item, sub-order and order VAT reconcile by construction.
+- **Funding → payout split (#142).** SUPPLIER-funded: payout gross is the sub-order total (`goods − discount + shipping`) and commission is on the discounted goods. PLATFORM-funded: the supplier is paid on **pre-discount** goods (`gross = goods + shipping`, commission on full goods) and the platform absorbs the discount out of its fee. The funding source and code are snapshotted on the order (`discount_funded_by`, `discount_code`) so payouts never depend on live `DiscountCode` config. Redemption is one-row-per-order (idempotent) with the code row locked `FOR UPDATE` at checkout so usage caps cannot be over-redeemed.
+- **Deferred: platform-funded VAT base.** Following this ADR, VAT is extracted from the discounted price even when the platform funds the discount. The HMRC treatment of third-party-funded discounts (which may not reduce the supplier's VAT base) is a known refinement left out of scope for now, alongside the ADR's existing B2B / non-UK-seller deferrals. Suppliers remain UK-established per KYC.
+- **Commission source (#140).** The payout fee moved off the global `PLATFORM_FEE_PERCENT` to the supplier's `commission_rate` (the setting is now only the default), and is charged on goods only, never on shipping.
+
 ---
 
 ## ADR-013: Platform-Brokered Delivery (Third-Party Courier)

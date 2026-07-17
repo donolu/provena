@@ -141,6 +141,12 @@ def send_order_confirmation_buyer(order) -> None:
         f", {order.shipping_city}, {order.shipping_postcode}"
     )
 
+    has_discount = order.discount_amount > Decimal("0.00")
+    discount_label = f"Discount ({order.discount_code})" if order.discount_code else "Discount"
+    discount_block = (
+        _label(discount_label) + _value(f"-£{order.discount_amount}") if has_discount else ""
+    )
+
     body = (
         _h1("Order confirmed")
         + _p("Thank you for your order. We've received your payment and notified your suppliers.")
@@ -149,6 +155,7 @@ def send_order_confirmation_buyer(order) -> None:
         + _value(order.reference)
         + _label("Goods")
         + _value(f"£{order.goods_subtotal}")
+        + discount_block
         + _label("Shipping")
         + _value(_shipping_display(order.shipping_amount))
         + _label("Includes VAT")
@@ -165,9 +172,13 @@ def send_order_confirmation_buyer(order) -> None:
     )
 
     html = _base(f"Order confirmed · {order.reference}", body)
+    discount_line = (
+        f"Discount ({order.discount_code}): -£{order.discount_amount}\n" if has_discount else ""
+    )
     plain = (
         f"Order confirmed: {order.reference}\n\n"
         f"Goods: £{order.goods_subtotal}\n"
+        f"{discount_line}"
         f"Shipping: {_shipping_display(order.shipping_amount)}\n"
         f"Includes VAT: £{order.vat_amount}\n"
         f"Total: £{order.total_amount}\n"

@@ -137,6 +137,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "shipping_country",
             "goods_subtotal",
             "discount_amount",
+            "discount_code",
             "shipping_amount",
             "vat_amount",
             "total_amount",
@@ -169,6 +170,9 @@ class PlaceOrderSerializer(serializers.Serializer):
     shipping_postcode = serializers.CharField(max_length=20)
     shipping_country = serializers.CharField(max_length=2)
     notes = serializers.CharField(required=False, allow_blank=True, default="")
+    discount_code = serializers.CharField(
+        max_length=40, required=False, allow_blank=True, default=""
+    )
 
     def validate_items(self, items):
         if not items:

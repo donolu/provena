@@ -1,5 +1,6 @@
 """Tests that email_service.py respects NotificationPreference opt-outs."""
 
+from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -37,7 +38,12 @@ def _make_order(buyer, reference="ORD-001"):
     order = MagicMock()
     order.buyer = buyer
     order.reference = reference
-    order.total_amount = "50.00"
+    order.goods_subtotal = Decimal("50.00")
+    order.discount_amount = Decimal("0.00")
+    order.discount_code = ""
+    order.shipping_amount = Decimal("0.00")
+    order.vat_amount = Decimal("8.33")
+    order.total_amount = Decimal("50.00")
     order.shipping_name = "A B"
     order.shipping_line1 = "1 Street"
     order.shipping_line2 = ""

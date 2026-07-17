@@ -122,7 +122,9 @@ class OrderListCreateView(PaginatedListMixin, APIView):
             "notes": d.get("notes", ""),
         }
         try:
-            order = services.place_order(request.user, items, shipping)
+            order = services.place_order(
+                request.user, items, shipping, discount_code=d.get("discount_code", "")
+            )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 

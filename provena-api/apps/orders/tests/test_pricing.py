@@ -7,7 +7,13 @@ from django.apps import apps as global_apps
 
 from apps.catalogue.models import VatRate
 from apps.orders import services
-from apps.orders.pricing import compute_order_pricing, extract_vat
+from apps.orders.models import (
+    DiscountCode,
+    DiscountFunding,
+    DiscountRedemption,
+    DiscountType,
+)
+from apps.orders.pricing import allocate_largest_remainder, compute_order_pricing, extract_vat
 from apps.orders.tests.conftest import SHIPPING
 from apps.suppliers.models import ShippingPolicy, Supplier
 
@@ -245,3 +251,159 @@ class TestShippingViaPlaceOrder:
         assert order.total_amount == goods + Decimal("4.99")
         # Item VAT is goods-only; the sub-order VAT additionally carries the shipping VAT.
         assert sub.vat_amount == item.vat_amount + extract_vat(Decimal("4.99"), VatRate.STANDARD)
+
+
+class TestAllocateLargestRemainder:
+    def test_sums_exactly_on_uneven_split(self):
+        parts = allocate_largest_remainder(
+            Decimal("10.00"), [Decimal("1"), Decimal("1"), Decimal("1")]
+        )
+        assert sum(parts) == Decimal("10.00")  # no lost/invented penny
+        assert parts == [Decimal("3.34"), Decimal("3.33"), Decimal("3.33")]
+
+    def test_proportional_split(self):
+        parts = allocate_largest_remainder(Decimal("9.00"), [Decimal("10"), Decimal("20")])
+        assert parts == [Decimal("3.00"), Decimal("6.00")]
+
+    def test_zero_total_returns_zeros(self):
+        assert allocate_largest_remainder(Decimal("0.00"), [Decimal("1"), Decimal("2")]) == [
+            Decimal("0.00"),
+            Decimal("0.00"),
+        ]
+
+
+class TestDiscountPricing:
+    def _one_supplier(self, price: str, qty: int) -> dict:
+        return {
+            1: {
+                "supplier": _free_supplier(),
+                "items": [
+                    {
+                        "variant": _fake_variant(price, VatRate.STANDARD),
+                        "quantity": qty,
+                        "line_total": Decimal(price) * qty,
+                    }
+                ],
+            }
+        }
+
+    def test_percentage_reduces_total_and_vat_base(self):
+        code = DiscountCode(discount_type=DiscountType.PERCENTAGE, value=Decimal("10"))
+        pricing = compute_order_pricing(self._one_supplier("100.00", 1), discount_code=code)
+        sub = pricing.sub_orders[0]
+        assert sub.discount_amount == Decimal("10.00")
+        assert sub.total == Decimal("90.00")
+        # VAT is on the post-discount 90.00, not the pre-discount 100.
+        assert sub.vat_amount == extract_vat(Decimal("90.00"), VatRate.STANDARD)
+        assert pricing.total_amount == Decimal("90.00")
+
+    def test_fixed_discount_capped_at_goods(self):
+        code = DiscountCode(discount_type=DiscountType.FIXED, value=Decimal("20.00"))
+        pricing = compute_order_pricing(self._one_supplier("5.00", 1), discount_code=code)
+        assert pricing.discount_amount == Decimal("5.00")
+        assert pricing.total_amount == Decimal("0.00")
+
+    def test_allocated_across_suppliers_sums_exactly(self):
+        groups = {
+            1: {
+                "supplier": _free_supplier(),
+                "items": [
+                    {
+                        "variant": _fake_variant("10.00", VatRate.STANDARD),
+                        "quantity": 1,
+                        "line_total": Decimal("10.00"),
+                    }
+                ],
+            },
+            2: {
+                "supplier": _free_supplier(),
+                "items": [
+                    {
+                        "variant": _fake_variant("20.00", VatRate.STANDARD),
+                        "quantity": 1,
+                        "line_total": Decimal("20.00"),
+                    }
+                ],
+            },
+        }
+        code = DiscountCode(discount_type=DiscountType.FIXED, value=Decimal("9.00"))
+        subs = compute_order_pricing(groups, discount_code=code).sub_orders
+        assert subs[0].discount_amount == Decimal("3.00")  # 10/30 of 9
+        assert subs[1].discount_amount == Decimal("6.00")  # 20/30 of 9
+        assert subs[0].discount_amount + subs[1].discount_amount == Decimal("9.00")
+
+
+@pytest.mark.django_db
+class TestDiscountViaPlaceOrder:
+    def _code(self, **kw) -> DiscountCode:
+        defaults = dict(
+            code="SAVE10",
+            discount_type=DiscountType.PERCENTAGE,
+            value=Decimal("10"),
+            funded_by=DiscountFunding.PLATFORM,
+        )
+        defaults.update(kw)
+        return DiscountCode.objects.create(**defaults)
+
+    def test_valid_code_applied_and_recorded(self, buyer, variant):
+        self._code()
+        order = services.place_order(
+            buyer, [{"variant": variant, "quantity": 4}], SHIPPING, discount_code="save10"
+        )
+        goods = variant.price * 4
+        expected = (goods * Decimal("0.10")).quantize(Decimal("0.01"))
+        assert order.discount_amount == expected
+        assert order.discount_code == "SAVE10"
+        assert order.discount_funded_by == "PLATFORM"
+        assert order.total_amount == goods - expected
+        assert DiscountRedemption.objects.filter(order=order).count() == 1
+
+    def test_unknown_code_rejected(self, buyer, variant):
+        with pytest.raises(ValueError, match="not found"):
+            services.place_order(
+                buyer, [{"variant": variant, "quantity": 1}], SHIPPING, discount_code="NOPE"
+            )
+
+    def test_minimum_spend_enforced(self, buyer, variant):
+        self._code(minimum_spend=Decimal("100.00"))
+        with pytest.raises(ValueError, match="Spend at least"):
+            services.place_order(
+                buyer, [{"variant": variant, "quantity": 1}], SHIPPING, discount_code="SAVE10"
+            )
+
+    def test_expired_code_rejected(self, buyer, variant):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        self._code(valid_until=timezone.now() - timedelta(days=1))
+        with pytest.raises(ValueError, match="not currently valid"):
+            services.place_order(
+                buyer, [{"variant": variant, "quantity": 1}], SHIPPING, discount_code="SAVE10"
+            )
+
+    def test_global_usage_limit(self, buyer, variant, second_variant):
+        self._code(max_uses=1)
+        services.place_order(
+            buyer, [{"variant": variant, "quantity": 1}], SHIPPING, discount_code="SAVE10"
+        )
+        with pytest.raises(ValueError, match="usage limit"):
+            services.place_order(
+                buyer,
+                [{"variant": second_variant, "quantity": 1}],
+                SHIPPING,
+                discount_code="SAVE10",
+            )
+
+    def test_per_buyer_usage_limit(self, buyer, variant, second_variant):
+        self._code(max_uses_per_buyer=1)
+        services.place_order(
+            buyer, [{"variant": variant, "quantity": 1}], SHIPPING, discount_code="SAVE10"
+        )
+        with pytest.raises(ValueError, match="already used"):
+            services.place_order(
+                buyer,
+                [{"variant": second_variant, "quantity": 1}],
+                SHIPPING,
+                discount_code="SAVE10",
+            )
