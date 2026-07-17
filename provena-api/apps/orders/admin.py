@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Order, OrderItem, SubOrder
+from .models import DiscountCode, DiscountRedemption, Order, OrderItem, SubOrder
 
 
 class SubOrderInline(admin.TabularInline):
@@ -93,3 +93,34 @@ class SubOrderAdmin(admin.ModelAdmin):
         "updated_at",
     ]
     inlines = [OrderItemInline]
+
+
+@admin.register(DiscountCode)
+class DiscountCodeAdmin(admin.ModelAdmin):
+    list_display = [
+        "code",
+        "discount_type",
+        "value",
+        "funded_by",
+        "is_active",
+        "valid_from",
+        "valid_until",
+        "times_used",
+    ]
+    list_filter = ["discount_type", "funded_by", "is_active"]
+    search_fields = ["code"]
+    readonly_fields = ["id", "created_at", "updated_at"]
+
+    @admin.display(description="Times used")
+    def times_used(self, obj: DiscountCode) -> int:
+        return obj.redemptions.count()
+
+
+@admin.register(DiscountRedemption)
+class DiscountRedemptionAdmin(admin.ModelAdmin):
+    list_display = ["code", "buyer", "order", "amount", "created_at"]
+    search_fields = ["code__code", "buyer__email", "order__reference"]
+    readonly_fields = ["id", "code", "buyer", "order", "amount", "created_at"]
+
+    def has_add_permission(self, request) -> bool:
+        return False

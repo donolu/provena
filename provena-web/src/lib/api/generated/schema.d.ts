@@ -2980,6 +2980,7 @@ export interface components {
             goods_subtotal?: string;
             /** Format: decimal */
             discount_amount?: string;
+            discount_code?: string;
             /** Format: decimal */
             shipping_amount?: string;
             /** Format: decimal */
@@ -3544,6 +3545,8 @@ export interface components {
             shipping_country: string;
             /** @default  */
             notes: string;
+            /** @default  */
+            discount_code: string;
         };
         PostMessageRequest: {
             body: string;

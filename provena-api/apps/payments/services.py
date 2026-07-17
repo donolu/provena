@@ -235,16 +235,26 @@ def handle_payment_cancelled(stripe_payment_intent_id: str) -> Payment:
 
 
 def _create_payouts(payment: Payment) -> None:
+    from apps.orders.models import DiscountFunding
+
     default_fee_pct = Decimal(str(getattr(settings, "PLATFORM_FEE_PERCENT", "10")))
+    platform_funded = payment.order.discount_funded_by == DiscountFunding.PLATFORM
     for sub_order in payment.order.sub_orders.select_related("supplier").all():
-        # Commission is charged on discounted goods only, never on shipping (ADR-012 §3).
-        commission_base = sub_order.goods_subtotal - sub_order.discount_amount
+        if platform_funded:
+            # PLATFORM-funded discount: the supplier is paid on pre-discount goods and the
+            # platform absorbs the discount out of its fee (ADR-012 §4).
+            commission_base = sub_order.goods_subtotal
+            gross = sub_order.goods_subtotal + sub_order.shipping_amount
+        else:
+            # No discount, or SUPPLIER-funded: gross is the snapshotted sub-order total
+            # (goods - discount + shipping) and commission is on the discounted goods.
+            commission_base = sub_order.goods_subtotal - sub_order.discount_amount
+            gross = sub_order.subtotal
+        # Commission is charged on goods only, never on shipping (ADR-012 §3). Shipping is in
+        # gross because the fulfilling supplier delivers; a future platform-brokered delivery
+        # model (ADR-013) would exclude it here based on the sub-order's fulfilment attribution.
         fee_pct = sub_order.supplier.commission_rate or default_fee_pct
         fee = (commission_base * fee_pct / Decimal("100")).quantize(Decimal("0.01"))
-        # Gross is the snapshotted sub-order total (goods - discount + shipping). Shipping is
-        # included because the fulfilling supplier delivers; a future platform-brokered delivery
-        # model (ADR-013) would exclude it here based on the sub-order's fulfilment attribution.
-        gross = sub_order.subtotal
         net = gross - fee
         _payout, created = Payout.objects.get_or_create(
             sub_order=sub_order,

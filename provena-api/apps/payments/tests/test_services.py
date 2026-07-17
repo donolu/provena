@@ -91,6 +91,58 @@ class TestHandlePaymentSucceeded:
         assert payout.platform_fee == expected_fee  # fee on goods only
         assert payout.net_amount == goods + Decimal("4.99") - expected_fee
 
+    def _place_discounted_order(self, buyer, variant, funding):
+        from apps.orders import services as order_services
+        from apps.orders.models import DiscountCode, DiscountType
+        from apps.payments.tests.conftest import SHIPPING
+
+        DiscountCode.objects.create(
+            code="TEN",
+            discount_type=DiscountType.PERCENTAGE,
+            value=Decimal("10"),
+            funded_by=funding,
+        )
+        return order_services.place_order(
+            buyer=buyer,
+            items=[{"variant": variant, "quantity": 2}],
+            shipping=SHIPPING,
+            discount_code="TEN",
+        )
+
+    def test_platform_funded_discount_pays_supplier_on_pre_discount_goods(
+        self, buyer, approved_supplier, variant, mock_stripe_services
+    ):
+        from apps.orders.models import DiscountFunding
+
+        order = self._place_discounted_order(buyer, variant, DiscountFunding.PLATFORM)
+        payment = services.create_payment_intent(order)
+        services.handle_payment_succeeded(payment.stripe_payment_intent_id)
+
+        payout = Payout.objects.get(sub_order=order.sub_orders.first())
+        goods = variant.price * 2  # 5.00
+        # Platform absorbs the discount: supplier gross + fee both on full goods.
+        assert payout.gross_amount == goods
+        assert payout.platform_fee == (
+            goods * approved_supplier.commission_rate / Decimal("100")
+        ).quantize(Decimal("0.01"))
+
+    def test_supplier_funded_discount_reduces_supplier_gross_and_fee(
+        self, buyer, approved_supplier, variant, mock_stripe_services
+    ):
+        from apps.orders.models import DiscountFunding
+
+        order = self._place_discounted_order(buyer, variant, DiscountFunding.SUPPLIER)
+        payment = services.create_payment_intent(order)
+        services.handle_payment_succeeded(payment.stripe_payment_intent_id)
+
+        sub = order.sub_orders.first()
+        payout = Payout.objects.get(sub_order=sub)
+        discounted_goods = (variant.price * 2) - sub.discount_amount  # 5.00 - 0.50
+        assert payout.gross_amount == discounted_goods  # gross reduced by the discount
+        assert payout.platform_fee == (
+            discounted_goods * approved_supplier.commission_rate / Decimal("100")
+        ).quantize(Decimal("0.01"))
+
     def test_payout_linked_to_supplier(self, payment, sub_order, approved_supplier):
         services.handle_payment_succeeded(payment.stripe_payment_intent_id)
         payout = Payout.objects.get(sub_order=sub_order)

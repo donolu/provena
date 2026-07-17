@@ -10,6 +10,8 @@ from apps.inventory import services as inventory_services
 
 from .models import (
     RETURN_WINDOW_DAYS,
+    DiscountCode,
+    DiscountRedemption,
     Order,
     OrderItem,
     OrderReturn,
@@ -110,15 +112,42 @@ def _consume_cart_reservation(buyer, variant: ProductVariant, quantity: int) -> 
     return True
 
 
+def _resolve_discount(buyer, code_str: str, order_goods: Decimal) -> DiscountCode:
+    """Validate a discount code for this buyer/order, raising ValueError on any failure.
+
+    The code row is locked FOR UPDATE so concurrent checkouts of the same code serialise
+    here: usage-limit counts are read under the lock, so the cap cannot be over-redeemed.
+    """
+    try:
+        code = DiscountCode.objects.select_for_update().get(code=code_str.strip().upper())
+    except DiscountCode.DoesNotExist:
+        raise ValueError("Discount code not found.") from None
+
+    if not code.is_live(timezone.now()):
+        raise ValueError("This discount code is not currently valid.")
+    if order_goods < code.minimum_spend:
+        raise ValueError(f"Spend at least £{code.minimum_spend} to use this code.")
+    if code.max_uses is not None and code.redemptions.count() >= code.max_uses:
+        raise ValueError("This discount code has reached its usage limit.")
+    if (
+        code.max_uses_per_buyer is not None
+        and code.redemptions.filter(buyer=buyer).count() >= code.max_uses_per_buyer
+    ):
+        raise ValueError("You have already used this discount code.")
+    return code
+
+
 @transaction.atomic
 def place_order(
     buyer,
     items: list[dict],
     shipping: dict,
+    discount_code: str = "",
 ) -> Order:
     """
     items: [{"variant": ProductVariant, "quantity": int}, ...]
     shipping: {"name", "line1", "line2", "city", "postcode", "country", "notes"}
+    discount_code: optional order-level voucher code.
     Reserves stock atomically; rolls back entirely on any failure.
     """
     if not items:
@@ -148,8 +177,16 @@ def place_order(
             {"variant": variant, "quantity": quantity, "line_total": line_total}
         )
 
+    discount: DiscountCode | None = None
+    if discount_code:
+        order_goods = sum(
+            (i["line_total"] for g in supplier_groups.values() for i in g["items"]),
+            Decimal("0.00"),
+        )
+        discount = _resolve_discount(buyer, discount_code, order_goods)
+
     # One deterministic pricing pass; results are snapshotted onto the order (ADR-012).
-    pricing = compute_order_pricing(supplier_groups)
+    pricing = compute_order_pricing(supplier_groups, discount_code=discount)
 
     order = Order.objects.create(
         buyer=buyer,
@@ -159,6 +196,8 @@ def place_order(
         shipping_amount=pricing.shipping_amount,
         vat_amount=pricing.vat_amount,
         total_amount=pricing.total_amount,
+        discount_code=discount.code if discount else "",
+        discount_funded_by=discount.funded_by if discount else "",
         shipping_name=shipping["name"],
         shipping_line1=shipping["line1"],
         shipping_line2=shipping.get("line2", ""),
@@ -167,6 +206,11 @@ def place_order(
         shipping_country=shipping["country"],
         notes=shipping.get("notes", ""),
     )
+
+    if discount is not None:
+        DiscountRedemption.objects.create(
+            code=discount, buyer=buyer, order=order, amount=pricing.discount_amount
+        )
 
     for sub_pricing in pricing.sub_orders:
         sub = SubOrder.objects.create(
