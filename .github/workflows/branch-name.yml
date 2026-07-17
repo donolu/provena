@@ -20,6 +20,12 @@ jobs:
         env:
           BRANCH: ${{ github.head_ref }}
         run: |
+          # Dependabot generates its own branch names and cannot reference an
+          # issue, so the convention does not apply to its automated PRs.
+          if [[ "$BRANCH" == dependabot/* ]]; then
+            echo "Dependabot branch '$BRANCH' — convention check skipped."
+            exit 0
+          fi
           pattern='^(feature|fix|chore|docs)/[0-9]+-[a-z][a-z0-9-]*$'
           if [[ ! "$BRANCH" =~ $pattern ]]; then
             echo "Branch name '$BRANCH' does not match the required pattern."
