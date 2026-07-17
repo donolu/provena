@@ -57,10 +57,11 @@ export async function requestReturn(
   reference: string,
   subOrderId: string,
   reason: string,
+  items?: Array<{ order_item_id: string; quantity: number }>,
 ): Promise<OrderReturn> {
   const { data } = await apiClient.post<OrderReturn>(
     `/orders/${reference}/sub-orders/${subOrderId}/return/`,
-    { reason },
+    { reason, items: items && items.length ? items : undefined },
   )
   return data
 }

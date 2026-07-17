@@ -148,6 +148,14 @@ export type DisputeStatus =
   | 'CLOSED'
 export type ReturnStatus = 'REQUESTED' | 'APPROVED' | 'REFUNDING' | 'REJECTED' | 'REFUNDED'
 
+export interface ReturnItem {
+  id: string
+  order_item_id: string
+  sku: string
+  product_name: string
+  quantity: number
+}
+
 export interface OrderReturn {
   id: string
   sub_order_id: string
@@ -157,6 +165,7 @@ export interface OrderReturn {
   status: ReturnStatus
   supplier_notes: string
   refund_amount: string | null
+  items: ReturnItem[]
   raised_by_email: string | null
   created_at: string
   updated_at: string

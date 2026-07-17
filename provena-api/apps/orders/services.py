@@ -16,6 +16,7 @@ from .models import (
     OrderItem,
     OrderReturn,
     OrderStatus,
+    ReturnItem,
     ReturnStatus,
     SubOrder,
     _generate_order_reference,
@@ -372,14 +373,31 @@ def cancel_order(order: Order) -> Order:
 
 
 @transaction.atomic
-def request_return(sub_order: SubOrder, raised_by, reason: str) -> OrderReturn:
+def request_return(sub_order: SubOrder, raised_by, reason: str, items=None) -> OrderReturn:
+    """Request a return. ``items`` is an optional list of ``{"order_item": OrderItem,
+    "quantity": int}``; omit it (or pass an empty list) for a full sub-order return."""
     if sub_order.status != OrderStatus.DELIVERED:
         raise ValueError("Returns can only be requested for delivered sub-orders.")
     if not sub_order.delivered_at or timezone.now() > sub_order.delivered_at + timedelta(
         days=RETURN_WINDOW_DAYS
     ):
         raise ValueError(f"Returns must be requested within {RETURN_WINDOW_DAYS} days of delivery.")
-    return OrderReturn.objects.create(sub_order=sub_order, raised_by=raised_by, reason=reason)
+
+    ret = OrderReturn.objects.create(sub_order=sub_order, raised_by=raised_by, reason=reason)
+    for line in items or []:
+        order_item = line["order_item"]
+        quantity = int(line["quantity"])
+        if order_item.sub_order_id != sub_order.id:
+            raise ValueError("Return item does not belong to this sub-order.")
+        if quantity <= 0:
+            raise ValueError("Return quantity must be positive.")
+        if quantity > order_item.returnable_quantity:
+            raise ValueError(
+                f"Cannot return {quantity} of {order_item.sku}; "
+                f"only {order_item.returnable_quantity} remain returnable."
+            )
+        ReturnItem.objects.create(order_return=ret, order_item=order_item, quantity=quantity)
+    return ret
 
 
 @transaction.atomic
@@ -400,6 +418,33 @@ def reject_return(return_obj: OrderReturn, notes: str = "") -> OrderReturn:
     return_obj.supplier_notes = notes
     return_obj.save(update_fields=["status", "supplier_notes", "updated_at"])
     return return_obj
+
+
+def _return_refund_amount(return_obj: OrderReturn) -> Decimal:
+    """Refund due for a return.
+
+    No items, or items covering the whole sub-order in one request, means the full sub-order total
+    (goods - discount + shipping). A genuine partial return refunds only the returned units'
+    discounted, VAT-inclusive value (goods, no shipping - the buyer still received a delivery),
+    the discount allocated pro rata by returned goods value.
+    """
+    sub = return_obj.sub_order
+    return_items = list(return_obj.items.select_related("order_item"))
+    if not return_items:
+        return sub.subtotal
+
+    returned_gross = sum(
+        (ri.order_item.unit_price * ri.quantity for ri in return_items), Decimal("0.00")
+    )
+    if returned_gross >= sub.goods_subtotal:  # every unit returned in one request
+        return sub.subtotal
+
+    discount_share = Decimal("0.00")
+    if sub.discount_amount > 0 and sub.goods_subtotal > 0:
+        discount_share = (sub.discount_amount * returned_gross / sub.goods_subtotal).quantize(
+            Decimal("0.01")
+        )
+    return (returned_gross - discount_share).quantize(Decimal("0.01"))
 
 
 def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderReturn:
@@ -423,12 +468,12 @@ def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderR
             raise ValueError("No payment found for this order.")
 
         if locked.status == ReturnStatus.APPROVED:
-            # Default to this sub-order's own VAT-inclusive total (goods - discount + shipping),
-            # not the whole order — a return only concerns one supplier's items (ADR-012).
+            # Default to the returned units' value (full sub-order total when the whole sub-order
+            # is returned, incl shipping; goods-only for a partial return). See _return_refund_amount.
             amount = (
                 Decimal(str(refund_amount))
                 if refund_amount is not None
-                else locked.sub_order.subtotal
+                else _return_refund_amount(locked)
             )
             locked.refund_amount = amount
             locked.status = ReturnStatus.REFUNDING
@@ -472,12 +517,23 @@ def process_return_refund(return_obj: OrderReturn, refund_amount=None) -> OrderR
         if final.status == ReturnStatus.REFUNDED:
             return final
 
-        for item in final.sub_order.items.select_related("variant"):
-            inventory_services.return_stock(
-                item.variant,
-                item.quantity,
-                notes=f"Return {final.id}",
-            )
+        return_items = list(final.items.select_related("order_item__variant"))
+        if return_items:
+            # Partial (or explicit-item) return: restock only the returned units.
+            for ri in return_items:
+                inventory_services.return_stock(
+                    ri.order_item.variant,
+                    ri.quantity,
+                    notes=f"Return {final.id}",
+                )
+        else:
+            # Full sub-order return: restock every item.
+            for item in final.sub_order.items.select_related("variant"):
+                inventory_services.return_stock(
+                    item.variant,
+                    item.quantity,
+                    notes=f"Return {final.id}",
+                )
         final.status = ReturnStatus.REFUNDED
         final.save(update_fields=["status", "updated_at"])
     return final

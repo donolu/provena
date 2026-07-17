@@ -3156,6 +3156,7 @@ export interface components {
             supplier_notes?: string;
             /** Format: decimal */
             refund_amount?: string | null;
+            readonly items: components["schemas"]["ReturnItem"][];
             readonly raised_by_email: string | null;
             /** Format: date-time */
             readonly created_at: string;
@@ -3859,6 +3860,22 @@ export interface components {
         };
         ReturnCreateRequest: {
             reason: string;
+            items?: components["schemas"]["ReturnLineInputRequest"][];
+        };
+        ReturnItem: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly order_item_id: string;
+            readonly sku: string;
+            readonly product_name: string;
+            /** Format: int64 */
+            quantity: number;
+        };
+        ReturnLineInputRequest: {
+            /** Format: uuid */
+            order_item_id: string;
+            quantity: number;
         };
         ReturnRefundRequest: {
             /** Format: decimal */

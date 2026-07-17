@@ -66,13 +66,26 @@ function SubOrderCard({
 
   const [showReturnForm, setShowReturnForm] = useState(false)
   const [returnReason, setReturnReason] = useState('')
+  const [returnQty, setReturnQty] = useState<Record<string, number>>({})
   const [returnError, setReturnError] = useState<string | null>(null)
 
+  // Units still returnable per item = ordered minus already-returned across non-rejected returns.
+  const returnableFor = (itemId: string, ordered: number) => {
+    const returned = sub.returns
+      .filter((r) => r.status !== 'REJECTED')
+      .flatMap((r) => r.items)
+      .filter((ri) => ri.order_item_id === itemId)
+      .reduce((s, ri) => s + ri.quantity, 0)
+    return ordered - returned
+  }
+
   const returnMutation = useMutation({
-    mutationFn: () => requestReturn(reference, sub.id, returnReason),
+    mutationFn: (items?: Array<{ order_item_id: string; quantity: number }>) =>
+      requestReturn(reference, sub.id, returnReason, items),
     onSuccess: () => {
       setShowReturnForm(false)
       setReturnReason('')
+      setReturnQty({})
       setReturnError(null)
       onDisputeRaised()
     },
@@ -80,6 +93,10 @@ function SubOrderCard({
       setReturnError(err.response?.data?.detail ?? 'Could not submit return request.')
     },
   })
+
+  const selectedReturnItems = Object.entries(returnQty)
+    .filter(([, q]) => q > 0)
+    .map(([order_item_id, quantity]) => ({ order_item_id, quantity }))
 
   const canReturn =
     sub.status === 'DELIVERED' &&
@@ -207,6 +224,43 @@ function SubOrderCard({
       {showReturnForm && (
         <div className="px-5 py-4 border-t border-hoarfrost space-y-3">
           <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium">
+            Which items?
+          </p>
+          <ul className="space-y-2">
+            {sub.items.map((item) => {
+              const max = returnableFor(item.id, item.quantity)
+              const qty = returnQty[item.id] ?? 0
+              if (max <= 0) return null
+              return (
+                <li key={item.id} className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-sans text-forest truncate">
+                    {item.product_name} <span className="text-soil">({item.variant_name})</span>
+                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setReturnQty((s) => ({ ...s, [item.id]: Math.max(0, qty - 1) }))}
+                      disabled={qty <= 0}
+                      className="w-6 h-6 rounded border border-hoarfrost text-soil hover:border-forest disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                    <span className="font-mono text-xs text-forest w-8 text-center">{qty}/{max}</span>
+                    <button
+                      type="button"
+                      onClick={() => setReturnQty((s) => ({ ...s, [item.id]: Math.min(max, qty + 1) }))}
+                      disabled={qty >= max}
+                      className="w-6 h-6 rounded border border-hoarfrost text-soil hover:border-forest disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
+          <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium pt-1">
             Reason for return
           </p>
           <textarea
@@ -221,14 +275,21 @@ function SubOrderCard({
           )}
           <div className="flex items-center gap-3">
             <button
-              onClick={() => returnMutation.mutate()}
-              disabled={!returnReason.trim() || returnMutation.isPending}
+              onClick={() => returnMutation.mutate(selectedReturnItems)}
+              disabled={!returnReason.trim() || selectedReturnItems.length === 0 || returnMutation.isPending}
               className="text-xs font-sans text-white bg-forest rounded px-3 py-1.5 hover:bg-meadow disabled:opacity-40 transition-colors"
             >
-              Submit return request
+              Return selected
             </button>
             <button
-              onClick={() => { setShowReturnForm(false); setReturnReason(''); setReturnError(null) }}
+              onClick={() => returnMutation.mutate(undefined)}
+              disabled={!returnReason.trim() || returnMutation.isPending}
+              className="text-xs font-sans text-forest border border-forest rounded px-3 py-1.5 hover:bg-forest hover:text-white disabled:opacity-40 transition-colors"
+            >
+              Return everything
+            </button>
+            <button
+              onClick={() => { setShowReturnForm(false); setReturnReason(''); setReturnQty({}); setReturnError(null) }}
               className="text-xs font-sans text-soil hover:text-forest transition-colors"
             >
               Cancel

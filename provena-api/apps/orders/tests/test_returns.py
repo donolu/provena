@@ -464,3 +464,112 @@ class TestReturnsInOrderDetail:
         assert len(sub_data["returns"]) == 1
         assert sub_data["returns"][0]["reason"] == "Test return"
         assert sub_data["returns"][0]["status"] == "REQUESTED"
+
+
+@pytest.mark.django_db
+class TestPartialReturns:
+    def _stripe_mocks(self):
+        intent = MagicMock()
+        intent.latest_charge = "ch_test"
+        return (
+            patch("stripe.PaymentIntent.retrieve", return_value=intent),
+            patch("stripe.Refund.create", return_value=MagicMock(id="re_test")),
+        )
+
+    def _delivered_order_with_shipping(self, buyer, variant, approved_supplier):
+        from apps.payments.models import Payment, PaymentStatus
+        from apps.suppliers.models import ShippingPolicy
+
+        approved_supplier.shipping_policy = ShippingPolicy.FLAT
+        approved_supplier.shipping_flat_rate = Decimal("4.00")
+        approved_supplier.save(update_fields=["shipping_policy", "shipping_flat_rate"])
+
+        order = services.place_order(buyer, [{"variant": variant, "quantity": 2}], SHIPPING)
+        Payment.objects.create(
+            order=order,
+            stripe_payment_intent_id="pi_partial_return",
+            amount=order.total_amount,
+            status=PaymentStatus.SUCCEEDED,
+        )
+        sub = order.sub_orders.first()
+        services.dispatch_sub_order(sub)
+        services.deliver_sub_order(sub)
+        return order, sub
+
+    def test_partial_return_refunds_goods_not_shipping(self, buyer, variant, approved_supplier):
+        _, sub = self._delivered_order_with_shipping(buyer, variant, approved_supplier)
+        assert sub.subtotal == Decimal("11.98")  # 7.98 goods + 4.00 shipping
+        item = sub.items.first()
+        ret = services.request_return(
+            sub, buyer, "one faulty", items=[{"order_item": item, "quantity": 1}]
+        )
+        services.approve_return(ret)
+
+        pi_patch, refund_patch = self._stripe_mocks()
+        with pi_patch, refund_patch as mock_refund:
+            result = services.process_return_refund(ret)
+
+        assert result.refund_amount == Decimal("3.99")  # 1 unit of goods, no shipping
+        assert mock_refund.call_args[1]["amount"] == 399
+
+    def test_full_return_via_all_items_refunds_subtotal(self, buyer, variant, approved_supplier):
+        _, sub = self._delivered_order_with_shipping(buyer, variant, approved_supplier)
+        item = sub.items.first()
+        ret = services.request_return(
+            sub, buyer, "all faulty", items=[{"order_item": item, "quantity": 2}]
+        )
+        services.approve_return(ret)
+
+        pi_patch, refund_patch = self._stripe_mocks()
+        with pi_patch, refund_patch:
+            result = services.process_return_refund(ret)
+
+        assert result.refund_amount == sub.subtotal  # 11.98, incl shipping
+
+    def test_partial_return_restocks_only_returned_units(self, buyer, variant, approved_supplier):
+        from apps.inventory.models import StockLevel
+
+        _, sub = self._delivered_order_with_shipping(buyer, variant, approved_supplier)
+        item = sub.items.first()
+        before = StockLevel.objects.get(variant=variant).quantity_available
+
+        ret = services.request_return(
+            sub, buyer, "one faulty", items=[{"order_item": item, "quantity": 1}]
+        )
+        services.approve_return(ret)
+        pi_patch, refund_patch = self._stripe_mocks()
+        with pi_patch, refund_patch:
+            services.process_return_refund(ret)
+
+        after = StockLevel.objects.get(variant=variant).quantity_available
+        assert after - before == 1  # only the one returned unit restocked
+
+    def test_over_return_rejected(self, buyer, variant, approved_supplier):
+        _, sub = self._delivered_order_with_shipping(buyer, variant, approved_supplier)
+        item = sub.items.first()
+        with pytest.raises(ValueError, match="returnable"):
+            services.request_return(
+                sub, buyer, "too many", items=[{"order_item": item, "quantity": 3}]
+            )
+
+    def test_second_partial_return_of_remaining(self, buyer, variant, approved_supplier):
+        _, sub = self._delivered_order_with_shipping(buyer, variant, approved_supplier)
+        item = sub.items.first()
+
+        r1 = services.request_return(sub, buyer, "one", items=[{"order_item": item, "quantity": 1}])
+        services.approve_return(r1)
+        pi_patch, refund_patch = self._stripe_mocks()
+        with pi_patch, refund_patch:
+            services.process_return_refund(r1)
+
+        # One unit already returned; one remains returnable.
+        item.refresh_from_db()
+        assert item.returnable_quantity == 1
+        r2 = services.request_return(
+            sub, buyer, "other", items=[{"order_item": item, "quantity": 1}]
+        )
+        assert r2.items.count() == 1
+        with pytest.raises(ValueError, match="returnable"):
+            services.request_return(
+                sub, buyer, "none left", items=[{"order_item": item, "quantity": 1}]
+            )
