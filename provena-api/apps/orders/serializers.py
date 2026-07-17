@@ -2,7 +2,15 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from .models import DiscountCode, DiscountType, Order, OrderItem, OrderReturn, SubOrder
+from .models import (
+    DiscountCode,
+    DiscountType,
+    Order,
+    OrderItem,
+    OrderReturn,
+    ReturnItem,
+    SubOrder,
+)
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -23,11 +31,22 @@ class OrderItemSerializer(serializers.ModelSerializer):
         ]
 
 
+class ReturnItemSerializer(serializers.ModelSerializer):
+    order_item_id = serializers.UUIDField(source="order_item.id", read_only=True)
+    sku = serializers.CharField(source="order_item.sku", read_only=True)
+    product_name = serializers.CharField(source="order_item.product_name", read_only=True)
+
+    class Meta:
+        model = ReturnItem
+        fields = ["id", "order_item_id", "sku", "product_name", "quantity"]
+
+
 class OrderReturnSerializer(serializers.ModelSerializer):
     raised_by_email = serializers.SerializerMethodField()
     sub_order_id = serializers.UUIDField(source="sub_order.id", read_only=True)
     order_reference = serializers.CharField(source="sub_order.order.reference", read_only=True)
     supplier_name = serializers.CharField(source="sub_order.supplier.business_name", read_only=True)
+    items = ReturnItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = OrderReturn
@@ -40,6 +59,7 @@ class OrderReturnSerializer(serializers.ModelSerializer):
             "status",
             "supplier_notes",
             "refund_amount",
+            "items",
             "raised_by_email",
             "created_at",
             "updated_at",
@@ -187,8 +207,15 @@ class DispatchSerializer(serializers.Serializer):
     )
 
 
+class ReturnLineInputSerializer(serializers.Serializer):
+    order_item_id = serializers.UUIDField()
+    quantity = serializers.IntegerField(min_value=1)
+
+
 class ReturnCreateSerializer(serializers.Serializer):
     reason = serializers.CharField()
+    # Omit or leave empty for a full sub-order return.
+    items = ReturnLineInputSerializer(many=True, required=False, default=list)
 
 
 class ReturnActionSerializer(serializers.Serializer):

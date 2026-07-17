@@ -115,6 +115,20 @@ class OrderItem(models.Model):
     def total_price(self) -> Decimal:
         return self.unit_price * self.quantity
 
+    @property
+    def returned_quantity(self) -> int:
+        """Units already returned across this item's non-rejected returns."""
+        from django.db.models import Sum
+
+        agg = self.return_items.exclude(order_return__status=ReturnStatus.REJECTED).aggregate(
+            total=Sum("quantity")
+        )
+        return agg["total"] or 0
+
+    @property
+    def returnable_quantity(self) -> int:
+        return self.quantity - self.returned_quantity
+
 
 class ReturnStatus(models.TextChoices):
     REQUESTED = "REQUESTED", "Requested"
@@ -151,6 +165,21 @@ class OrderReturn(models.Model):
 
     def __str__(self) -> str:
         return f"Return on {self.sub_order} ({self.status})"
+
+
+class ReturnItem(models.Model):
+    """A specific item + quantity within a return. A return with no items is a full sub-order return."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order_return = models.ForeignKey(OrderReturn, on_delete=models.CASCADE, related_name="items")
+    order_item = models.ForeignKey(OrderItem, on_delete=models.PROTECT, related_name="return_items")
+    quantity = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return f"{self.order_item.sku} x{self.quantity} (return {self.order_return_id})"
 
 
 class DiscountType(models.TextChoices):

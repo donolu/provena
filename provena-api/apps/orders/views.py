@@ -207,8 +207,24 @@ class RequestReturnView(APIView):
         sub_order = get_object_or_404(SubOrder, id=pk, order=order)
         ser = ReturnCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+
+        items = []
+        lines = ser.validated_data.get("items") or []
+        if lines:
+            by_id = {i.id: i for i in sub_order.items.all()}
+            for line in lines:
+                item = by_id.get(line["order_item_id"])
+                if item is None:
+                    return Response(
+                        {"detail": "Return item does not belong to this sub-order."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                items.append({"order_item": item, "quantity": line["quantity"]})
+
         try:
-            ret = services.request_return(sub_order, request.user, ser.validated_data["reason"])
+            ret = services.request_return(
+                sub_order, request.user, ser.validated_data["reason"], items=items
+            )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(OrderReturnSerializer(ret).data, status=status.HTTP_201_CREATED)
