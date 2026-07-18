@@ -247,6 +247,7 @@ class DiscountValidateResultSerializer(serializers.Serializer):
     valid = serializers.BooleanField()
     code = serializers.CharField(required=False)
     discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    new_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     reason = serializers.CharField(required=False)
 
 

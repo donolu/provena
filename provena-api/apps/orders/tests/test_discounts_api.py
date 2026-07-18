@@ -26,6 +26,25 @@ class TestValidateDiscount:
         assert res.data["valid"] is True
         assert res.data["code"] == "SAVE10"
         assert res.data["discount_amount"] == "3.99"  # 10% of 39.90
+        # new_total is the full pricing pass: goods - discount + shipping (£0 by default).
+        assert res.data["new_total"] == "35.91"
+
+    def test_new_total_includes_shipping(self, buyer_client, buyer, variant):
+        from apps.suppliers.models import ShippingPolicy
+
+        supplier = variant.product.supplier
+        supplier.shipping_policy = ShippingPolicy.FLAT
+        supplier.shipping_flat_rate = Decimal("4.50")
+        supplier.save(update_fields=["shipping_policy", "shipping_flat_rate"])
+        DiscountCode.objects.create(
+            code="SAVE10", discount_type=DiscountType.PERCENTAGE, value=Decimal("10")
+        )
+        _add_to_cart(buyer, variant, qty=10)  # goods = 39.90, discount 3.99
+        res = buyer_client.post(self.URL, {"code": "save10"}, format="json")
+        assert res.data["valid"] is True
+        assert res.data["discount_amount"] == "3.99"
+        # 39.90 - 3.99 + 4.50 shipping = 40.41 (VAT is inclusive, so it does not add on top).
+        assert res.data["new_total"] == "40.41"
 
     def test_unknown_code_returns_reason(self, buyer_client, buyer, variant):
         _add_to_cart(buyer, variant)
