@@ -25,22 +25,33 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Install Trivy from Aqua's APT repository rather than the trivy-action
+      # bootstrap, whose release-download step is flaky on hosted runners.
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key \
+            | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" \
+            | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+          trivy --version
+
       # Scans dependency manifests (pyproject.toml/package-lock.json), Dockerfiles,
       # compose files and other IaC for known CVEs, secrets and misconfigurations.
       # This first pass reports findings to the Security tab without failing the
-      # build (exit-code 0) so we can triage before choosing gating thresholds.
+      # build (--exit-code 0) so we can triage before choosing gating thresholds.
       - name: Trivy filesystem scan (SARIF)
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          scan-type: fs
-          scanners: vuln,secret,misconfig
-          format: sarif
-          output: trivy-results.sarif
-          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
-          exit-code: '0'
-        env:
-          # Cache the vuln DB in the tool cache to avoid rate limits.
-          TRIVY_CACHE_DIR: .trivycache
+        run: |
+          trivy fs \
+            --scanners vuln,secret,misconfig \
+            --format sarif \
+            --output trivy-results.sarif \
+            --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+            --exit-code 0 \
+            .
 
       - name: Upload Trivy SARIF to Security tab
         uses: github/codeql-action/upload-sarif@v3
@@ -52,13 +63,11 @@ jobs:
       # Human-readable table in the job log for a quick look without opening the
       # Security tab. Also non-blocking on this first run.
       - name: Trivy filesystem scan (table)
-        uses: aquasecurity/trivy-action@v0.33.1
         if: always()
-        with:
-          scan-type: fs
-          scanners: vuln,secret,misconfig
-          format: table
-          severity: HIGH,CRITICAL
-          exit-code: '0'
-        env:
-          TRIVY_CACHE_DIR: .trivycache
+        run: |
+          trivy fs \
+            --scanners vuln,secret,misconfig \
+            --format table \
+            --severity HIGH,CRITICAL \
+            --exit-code 0 \
+            .
