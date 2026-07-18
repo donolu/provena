@@ -6,6 +6,11 @@ import { type NextRequest, NextResponse } from 'next/server'
 // cookies from the *verified* profile, so a user cannot grant themselves a role they lack.
 // Being same-origin, they reach the Next middleware in both dev (cross-origin API) and prod
 // (single nginx origin), which a cookie set by Django directly would not in dev.
+//
+// NOTE: this route lives OUTSIDE /api/* on purpose — the single-origin nginx proxies /api/*
+// to Django, so a route under /api/ would never reach the Next server. Server-side calls use
+// API_URL_INTERNAL (the internal API address), since inside a container the browser-facing
+// origin (localhost / nginx) is not the API.
 
 const NAMES = ['has_session', 'user_role', 'totp_enabled'] as const
 
@@ -43,12 +48,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return clearOn(NextResponse.json({ ok: false }, { status: 502 }))
   }
 
+  // Mark Secure only when actually served over HTTPS — deriving from NODE_ENV would set Secure
+  // on a production build served over plain HTTP (e.g. the E2E stack), which the browser drops.
+  const proto = req.headers.get('x-forwarded-proto') ?? req.nextUrl.protocol.replace(':', '')
   const res = NextResponse.json({ ok: true })
   const opts = {
     httpOnly: true,
     sameSite: 'lax' as const,
     path: '/',
-    secure: process.env.NODE_ENV === 'production',
+    secure: proto === 'https',
   }
   res.cookies.set('has_session', '1', opts)
   res.cookies.set('user_role', profile.role ?? '', opts)

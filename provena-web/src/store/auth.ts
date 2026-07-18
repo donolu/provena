@@ -15,12 +15,12 @@ interface AuthState {
   initialise: () => Promise<void>
 }
 
-// Route-gating session cookies are set by the same-origin /api/session route handler, which
+// Route-gating session cookies are set by the same-origin /session-sync route handler, which
 // verifies the access token against Django and writes them httpOnly (so they cannot be forged
 // client-side). Await these before navigating so the middleware sees the new/cleared session.
 async function syncSessionCookies(accessToken: string) {
   try {
-    await fetch('/api/session', {
+    await fetch('/session-sync', {
       method: 'POST',
       headers: { Authorization: `Bearer ${accessToken}` },
     })
@@ -31,7 +31,7 @@ async function syncSessionCookies(accessToken: string) {
 
 async function clearSessionCookies() {
   try {
-    await fetch('/api/session', { method: 'DELETE' })
+    await fetch('/session-sync', { method: 'DELETE' })
   } catch {
     // ignore
   }
