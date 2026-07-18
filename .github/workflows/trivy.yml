@@ -47,6 +47,7 @@ jobs:
         run: |
           trivy fs \
             --scanners vuln,secret,misconfig \
+            --ignorefile .trivyignore.yaml \
             --format sarif \
             --output trivy-results.sarif \
             --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
@@ -67,6 +68,7 @@ jobs:
         run: |
           trivy fs \
             --scanners vuln,secret,misconfig \
+            --ignorefile .trivyignore.yaml \
             --format table \
             --severity HIGH,CRITICAL \
             --exit-code 0 \

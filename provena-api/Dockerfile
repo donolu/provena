@@ -42,5 +42,16 @@ RUN DJANGO_SECRET_KEY=dummy-build-only \
     REDIS_URL=redis://localhost/0 \
     python manage.py collectstatic --noinput
 
+# Run as a non-root user (container-escape hardening, Trivy DS-0002). The app
+# writes nothing under /app at runtime - backups stream through /tmp and static
+# is served by Nginx - so read-only ownership of the build output is sufficient.
+RUN useradd --system --uid 1001 appuser
+USER appuser
+
 EXPOSE 8000
+# Liveness probe against the app's own health endpoint. curl is purged from the
+# image, so use the bundled Python interpreter. Host: localhost passes
+# ALLOWED_HOSTS (production settings add it for internal probes).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health/', timeout=4).status == 200 else 1)"
 CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]
