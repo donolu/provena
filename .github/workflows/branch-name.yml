@@ -26,7 +26,7 @@ jobs:
             echo "Dependabot branch '$BRANCH' — convention check skipped."
             exit 0
           fi
-          pattern='^(feature|fix|chore|docs)/[0-9]+-[a-z][a-z0-9-]*$'
+          pattern='^(feature|fix|chore|docs|ci)/[0-9]+-[a-z][a-z0-9-]*$'
           if [[ ! "$BRANCH" =~ $pattern ]]; then
             echo "Branch name '$BRANCH' does not match the required pattern."
             echo ""
@@ -36,8 +36,9 @@ jobs:
             echo "  fix/17-cart-reservation-race"
             echo "  chore/88-bump-ruff"
             echo "  docs/5-deployment-guide"
+            echo "  ci/91-add-trivy-scan"
             echo ""
-            echo "Allowed types: feature, fix, chore, docs"
+            echo "Allowed types: feature, fix, chore, docs, ci"
             exit 1
           fi
           echo "Branch name '$BRANCH' is valid."
