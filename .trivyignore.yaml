@@ -1,0 +1,20 @@
+# Trivy ignore rules. Scoped by path so real findings elsewhere are unaffected.
+#
+# The Stripe "secrets" below are placeholder test values (sk_test_... / pk_test_...)
+# hard-coded into CI config and helper scripts so Django can boot during
+# lint/type-check/schema generation. They are not real credentials - a genuine
+# key in any other file would still be reported. This ignore file lists itself
+# in the paths so the example strings above/below do not trip the scanner.
+secrets:
+  - id: stripe-secret-token
+    paths:
+      - ".trivyignore.yaml"
+      - ".github/workflows/api.yml"
+      - ".github/scripts/run-mypy.sh"
+      - "scripts/generate-api-types.sh"
+  - id: stripe-publishable-token
+    paths:
+      - ".trivyignore.yaml"
+      - ".github/workflows/api.yml"
+      - ".github/scripts/run-mypy.sh"
+      - "scripts/generate-api-types.sh"
