@@ -8,23 +8,33 @@ interface AuthState {
   user: UserProfile | null
   accessToken: string | null
   isInitialised: boolean
-  login: (user: UserProfile, accessToken: string) => void
-  logout: () => void
+  login: (user: UserProfile, accessToken: string) => Promise<void>
+  logout: () => Promise<void>
   setAccessToken: (token: string) => void
-  setUser: (user: UserProfile) => void
+  setUser: (user: UserProfile) => Promise<void>
   initialise: () => Promise<void>
 }
 
-function setSessionCookies(user: UserProfile) {
-  document.cookie = `has_session=1; path=/; SameSite=Lax`
-  document.cookie = `user_role=${user.role}; path=/; SameSite=Lax`
-  document.cookie = `totp_enabled=${user.totp_enabled ? '1' : '0'}; path=/; SameSite=Lax`
+// Route-gating session cookies are set by the same-origin /session-sync route handler, which
+// verifies the access token against Django and writes them httpOnly (so they cannot be forged
+// client-side). Await these before navigating so the middleware sees the new/cleared session.
+async function syncSessionCookies(accessToken: string) {
+  try {
+    await fetch('/session-sync', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+  } catch {
+    // Advisory only — on failure the middleware falls back to gating to /login.
+  }
 }
 
-function clearSessionCookies() {
-  document.cookie = 'has_session=; path=/; max-age=0'
-  document.cookie = 'user_role=; path=/; max-age=0'
-  document.cookie = 'totp_enabled=; path=/; max-age=0'
+async function clearSessionCookies() {
+  try {
+    await fetch('/session-sync', { method: 'DELETE' })
+  } catch {
+    // ignore
+  }
 }
 
 export const useAuthStore = create<AuthState>((set, get) => {
@@ -32,7 +42,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
   // client.ts does not import from store/auth.ts).
   configureAuth(
     () => get().accessToken,
-    () => get().logout(),
+    () => {
+      void get().logout()
+    },
   )
 
   return {
@@ -40,29 +52,30 @@ export const useAuthStore = create<AuthState>((set, get) => {
     accessToken: null,
     isInitialised: false,
 
-    login(user, accessToken) {
-      if (typeof window !== 'undefined') {
-        setSessionCookies(user)
-      }
+    async login(user, accessToken) {
       set({ user, accessToken })
+      if (typeof window !== 'undefined') {
+        await syncSessionCookies(accessToken)
+      }
     },
 
-    logout() {
-      if (typeof window !== 'undefined') {
-        clearSessionCookies()
-      }
+    async logout() {
       set({ user: null, accessToken: null })
+      if (typeof window !== 'undefined') {
+        await clearSessionCookies()
+      }
     },
 
     setAccessToken(token) {
       set({ accessToken: token })
     },
 
-    setUser(user) {
-      if (typeof window !== 'undefined') {
-        setSessionCookies(user)
-      }
+    async setUser(user) {
       set({ user })
+      const token = get().accessToken
+      if (typeof window !== 'undefined' && token) {
+        await syncSessionCookies(token)
+      }
     },
 
     async initialise() {
@@ -85,10 +98,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
         const { data: profile } = await apiClient.get('/auth/me/', {
           headers: { Authorization: `Bearer ${tokens.access}` },
         })
-        setSessionCookies(profile)
         set({ user: profile, accessToken: tokens.access, isInitialised: true })
+        await syncSessionCookies(tokens.access)
       } catch {
-        clearSessionCookies()
+        await clearSessionCookies()
         set({ isInitialised: true })
       }
     },

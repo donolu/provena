@@ -207,10 +207,10 @@ export function Nav({ cartCount, onCartClick }: NavProps) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  function handleLogout() {
+  async function handleLogout() {
     setOpen(false)
     apiLogout().catch(() => {})
-    logout()
+    await logout()
     router.push('/login')
   }
 

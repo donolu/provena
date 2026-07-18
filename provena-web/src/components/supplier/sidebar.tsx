@@ -48,9 +48,9 @@ function SidebarNav({ onLinkClick }: { onLinkClick?: () => void }) {
     badge: item.href === '/supplier/returns' ? pendingReturnCount : 0,
   }))
 
-  function handleLogout() {
+  async function handleLogout() {
     apiLogout().catch(() => {})
-    logout()
+    await logout()
     router.push('/login')
   }
 

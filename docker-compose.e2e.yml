@@ -44,3 +44,6 @@ services:
         NEXT_PUBLIC_API_URL: http://localhost
     environment:
       NEXT_PUBLIC_API_URL: http://localhost
+      # Server-side (Next route handlers, e.g. /api/session) must reach the API by its
+      # internal address — inside the container `localhost` is the web container itself.
+      API_URL_INTERNAL: http://api:8000
