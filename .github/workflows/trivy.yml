@@ -1,0 +1,73 @@
+name: Trivy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, Mondays at 03:30 UTC - re-scans dependencies against newly
+    # disclosed CVEs even when nothing changed.
+    - cron: '30 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Filesystem scan
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to upload SARIF results to the Security tab.
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      # Install Trivy from Aqua's APT repository rather than the trivy-action
+      # bootstrap, whose release-download step is flaky on hosted runners.
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key \
+            | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" \
+            | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+          trivy --version
+
+      # Scans dependency manifests (pyproject.toml/package-lock.json), Dockerfiles,
+      # compose files and other IaC for known CVEs, secrets and misconfigurations.
+      # This first pass reports findings to the Security tab without failing the
+      # build (--exit-code 0) so we can triage before choosing gating thresholds.
+      - name: Trivy filesystem scan (SARIF)
+        run: |
+          trivy fs \
+            --scanners vuln,secret,misconfig \
+            --format sarif \
+            --output trivy-results.sarif \
+            --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+            --exit-code 0 \
+            .
+
+      - name: Upload Trivy SARIF to Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs
+
+      # Human-readable table in the job log for a quick look without opening the
+      # Security tab. Also non-blocking on this first run.
+      - name: Trivy filesystem scan (table)
+        if: always()
+        run: |
+          trivy fs \
+            --scanners vuln,secret,misconfig \
+            --format table \
+            --severity HIGH,CRITICAL \
+            --exit-code 0 \
+            .

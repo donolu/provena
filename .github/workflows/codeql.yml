@@ -1,0 +1,49 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly full scan, Mondays at 03:00 UTC (catches advisories on unchanged code).
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to upload results to the Security tab.
+      security-events: write
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            paths: provena-api
+          - language: javascript-typescript
+            paths: provena-web
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Initialise CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # security-and-quality adds maintainability/reliability queries on top of
+          # the default security set - more signal to review on this first run.
+          queries: security-and-quality
+
+      # Python and JS/TS need no compilation - autobuild is a no-op but kept for
+      # forward-compatibility if a compiled language is added later.
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyse
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'
