@@ -41,10 +41,8 @@ class TestPlaceOrder:
             services.place_order(buyer, [{"variant": variant, "quantity": 999}], SHIPPING)
 
     def test_stock_not_modified_on_failure(self, buyer, variant):
-        try:
+        with pytest.raises(ValueError, match="Insufficient"):
             services.place_order(buyer, [{"variant": variant, "quantity": 999}], SHIPPING)
-        except ValueError:
-            pass
         level = StockLevel.objects.get(variant=variant)
         assert level.quantity_available == 100
 

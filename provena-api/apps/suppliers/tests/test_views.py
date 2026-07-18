@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 import pytest
 from rest_framework import status
 
@@ -204,7 +206,9 @@ class TestStripeConnectView:
 
         assert response.status_code == 200
         assert "onboarding_url" in response.json()
-        assert response.json()["onboarding_url"].startswith("https://connect.stripe.com")
+        parsed = urlparse(response.json()["onboarding_url"])
+        assert parsed.scheme == "https"
+        assert parsed.netloc == "connect.stripe.com"
 
     def test_return_url_points_to_frontend(self, supplier_user_client, pending_supplier, settings):
         from unittest.mock import patch

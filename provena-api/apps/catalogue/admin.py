@@ -1,3 +1,5 @@
+import contextlib
+
 from django.contrib import admin
 
 from .models import Category, Product, ProductImage, ProductVariant
@@ -48,10 +50,10 @@ class ProductAdmin(admin.ModelAdmin):
         from .services import publish_product
 
         for product in queryset:
-            try:
+            # Skip products that fail validation (e.g. no variants); publishing
+            # the rest should still proceed.
+            with contextlib.suppress(ValueError):
                 publish_product(product)
-            except ValueError:
-                pass
 
     @admin.action(description="Archive selected products")
     def archive_products(self, request, queryset):

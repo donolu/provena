@@ -1,6 +1,7 @@
 import logging
 
 from apps.accounts.models import User
+from apps.log_utils import scrub
 
 from .models import (
     Category,
@@ -100,7 +101,7 @@ def archive_product(product: Product) -> Product:
 def feature_product(product: Product, admin_user: User) -> Product:
     product.is_featured = True
     product.save(update_fields=["is_featured", "updated_at"])
-    logger.info("Product %s featured by %s", product.slug, admin_user.email)
+    logger.info("Product %s featured by %s", product.slug, scrub(admin_user.email))
     return product
 
 
@@ -125,7 +126,7 @@ def bulk_update_products(
 def unfeature_product(product: Product, admin_user: User) -> Product:
     product.is_featured = False
     product.save(update_fields=["is_featured", "updated_at"])
-    logger.info("Product %s unfeatured by %s", product.slug, admin_user.email)
+    logger.info("Product %s unfeatured by %s", product.slug, scrub(admin_user.email))
     return product
 
 

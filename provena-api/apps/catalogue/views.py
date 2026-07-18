@@ -31,6 +31,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAdmin
+from apps.log_utils import scrub
 from apps.pagination import PaginatedListMixin
 from apps.suppliers.permissions import IsApprovedSupplier
 
@@ -260,7 +261,7 @@ class ProductListCreateView(PaginatedListMixin, APIView):
             except Exception:
                 logger.warning(
                     "Typesense search failed for %r; falling back to Postgres.",
-                    search_term,
+                    scrub(search_term),
                     exc_info=True,
                 )
 

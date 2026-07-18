@@ -6,7 +6,6 @@ from django.core.mail import EmailMultiAlternatives
 logger = logging.getLogger(__name__)
 
 _BRAND = "#2D4A3E"
-_ACCENT = "#5C8A6E"
 _LIGHT = "#F5F2EE"
 _TEXT = "#1C2B27"
 _MUTED = "#6B7B76"

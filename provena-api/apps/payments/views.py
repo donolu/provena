@@ -130,7 +130,9 @@ class StripeWebhookView(APIView):
 
                 handle_connect_account_updated(obj["id"])
         except Payment.DoesNotExist:
-            pass
+            # Event references a payment we do not have (e.g. from another
+            # environment sharing the endpoint); acknowledge and move on.
+            logger.debug("Stripe webhook for unknown payment; event %s ignored", event_type)
         except Exception:
             logger.exception("Stripe webhook handler error for event %s", event_type)
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
