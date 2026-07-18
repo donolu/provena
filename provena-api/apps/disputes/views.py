@@ -1,3 +1,5 @@
+import logging
+
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
@@ -29,6 +31,8 @@ from .serializers import (
     RespondDisputeSerializer,
     TriggerRefundSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 _SUPPLIER_ONLY_TYPES = {
     DisputeType.FALSE_CLAIM,
@@ -187,9 +191,10 @@ class DisputeResolveView(APIView):
                 outcome_amount_pence=d.get("outcome_amount_pence"),
                 outcome_notes=d.get("outcome_notes", ""),
             )
-        except Exception as exc:
+        except Exception:
+            logger.exception("Failed to process refund for dispute %s", dispute.id)
             return Response(
-                {"detail": f"Failed to process refund: {exc}"},
+                {"detail": "Failed to process refund. Please try again."},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
         return Response(DisputeDetailSerializer(dispute).data)
@@ -308,9 +313,10 @@ class DisputeAttachmentView(APIView):
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as exc:
+        except Exception:
+            logger.exception("Could not generate attachment upload URL for dispute %s", dispute.id)
             return Response(
-                {"detail": f"Could not generate upload URL: {exc}"},
+                {"detail": "Could not generate upload URL. Please try again."},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 

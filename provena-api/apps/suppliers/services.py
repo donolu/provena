@@ -6,6 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import Role, User
+from apps.log_utils import scrub
 
 from .models import (
     DocumentStatus,
@@ -102,21 +103,27 @@ def review_document(
 def approve_supplier(supplier: Supplier, admin_user: User) -> Supplier:
     supplier.status = SupplierStatus.APPROVED
     supplier.save(update_fields=["status", "updated_at"])
-    logger.info("Supplier %s approved by %s", supplier.business_name, admin_user.email)
+    logger.info(
+        "Supplier %s approved by %s", scrub(supplier.business_name), scrub(admin_user.email)
+    )
     return supplier
 
 
 def suspend_supplier(supplier: Supplier, admin_user: User) -> Supplier:
     supplier.status = SupplierStatus.SUSPENDED
     supplier.save(update_fields=["status", "updated_at"])
-    logger.info("Supplier %s suspended by %s", supplier.business_name, admin_user.email)
+    logger.info(
+        "Supplier %s suspended by %s", scrub(supplier.business_name), scrub(admin_user.email)
+    )
     return supplier
 
 
 def reject_supplier(supplier: Supplier, admin_user: User) -> Supplier:
     supplier.status = SupplierStatus.REJECTED
     supplier.save(update_fields=["status", "updated_at"])
-    logger.info("Supplier %s rejected by %s", supplier.business_name, admin_user.email)
+    logger.info(
+        "Supplier %s rejected by %s", scrub(supplier.business_name), scrub(admin_user.email)
+    )
     return supplier
 
 

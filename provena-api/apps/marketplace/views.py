@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
@@ -27,11 +29,27 @@ from .serializers import (
 _CART_COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
 
 
+def _cookie_session_key(request) -> str | None:
+    """Return the cart session key from the request cookie, but only if it is a
+    well-formed UUID (the format `new_session_key` issues).
+
+    Validating the value rejects a malformed or forged cookie and stops it
+    flowing straight back into a Set-Cookie header (CodeQL py/cookie-injection).
+    """
+    raw = request.COOKIES.get(services.CART_COOKIE)
+    if not raw:
+        return None
+    try:
+        return str(uuid.UUID(raw))
+    except ValueError:
+        return None
+
+
 def _cart_identity(request) -> dict | None:
     """Return identity kwargs for service calls, or None if the request has no cart context."""
     if request.user.is_authenticated:
         return {"user": request.user}
-    key = request.COOKIES.get(services.CART_COOKIE)
+    key = _cookie_session_key(request)
     if key:
         return {"session_key": key}
     return None
@@ -41,8 +59,7 @@ def _cart_identity_or_create(request) -> dict:
     """Like _cart_identity but generates a fresh session key for new anonymous users."""
     if request.user.is_authenticated:
         return {"user": request.user}
-    key = request.COOKIES.get(services.CART_COOKIE) or services.new_session_key()
-    return {"session_key": key}
+    return {"session_key": _cookie_session_key(request) or services.new_session_key()}
 
 
 def _set_cart_cookie(response: Response, identity: dict) -> None:

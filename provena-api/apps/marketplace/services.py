@@ -1,3 +1,4 @@
+import contextlib
 import uuid
 from datetime import datetime, timedelta
 
@@ -104,13 +105,11 @@ def remove_from_cart(*, user=None, session_key: str | None = None, item_id) -> N
     item = get_object_or_404(
         CartItem.objects.select_for_update(), id=item_id, **_item_filter(user, session_key)
     )
-    try:
+    with contextlib.suppress(CartReservation.DoesNotExist):
         res = item.reservation
         inventory_services.release_reservation(
             item.variant, res.quantity, reference=f"CART:{item.id}"
         )
-    except CartReservation.DoesNotExist:
-        pass
     item.delete()
 
 
@@ -129,13 +128,11 @@ def clear_cart(*, user=None, session_key: str | None = None) -> None:
     locked_ids = []
     for item in items:
         locked_ids.append(item.id)
-        try:
+        with contextlib.suppress(CartReservation.DoesNotExist):
             res = item.reservation
             inventory_services.release_reservation(
                 item.variant, res.quantity, reference=f"CART:{item.id}"
             )
-        except CartReservation.DoesNotExist:
-            pass
     if locked_ids:
         CartItem.objects.filter(id__in=locked_ids).delete()
 
@@ -175,12 +172,10 @@ def merge_guest_cart(session_key: str, user) -> None:
         except CartItem.DoesNotExist:
             item.cart = user_cart
             item.save(update_fields=["cart"])
-            try:
+            with contextlib.suppress(CartReservation.DoesNotExist):
                 res = item.reservation
                 res.expires_at = _reservation_expiry()
                 res.save(update_fields=["expires_at"])
-            except CartReservation.DoesNotExist:
-                pass
 
     guest_cart.delete()
 

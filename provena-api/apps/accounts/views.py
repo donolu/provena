@@ -200,7 +200,6 @@ class CookieTokenRefreshView(APIView):
             )
 
         new_access = str(refresh.access_token)
-        new_refresh = raw
 
         if jwt_settings.ROTATE_REFRESH_TOKENS:
             if jwt_settings.BLACKLIST_AFTER_ROTATION:
@@ -208,7 +207,10 @@ class CookieTokenRefreshView(APIView):
             refresh.set_jti()
             refresh.set_exp()
             refresh.set_iat()
-            new_refresh = str(refresh)
+
+        # Re-serialise from the validated token object rather than writing the raw
+        # request cookie back out, so the cookie value is always server-generated.
+        new_refresh = str(refresh)
 
         response = Response({"access": new_access})
         _set_refresh_cookie(response, new_refresh)
