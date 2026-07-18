@@ -1,0 +1,17 @@
+# Trivy ignore rules. Scoped by path so real findings elsewhere are unaffected.
+#
+# The Stripe "secrets" below are placeholder test values (sk_test_placeholder /
+# pk_test_placeholder) hard-coded into CI config and helper scripts so Django can
+# boot during lint/type-check/schema generation. They are not real credentials -
+# a genuine key (sk_test_<24+ chars>) in any other file would still be reported.
+secrets:
+  - id: stripe-secret-token
+    paths:
+      - ".github/workflows/api.yml"
+      - ".github/scripts/run-mypy.sh"
+      - "scripts/generate-api-types.sh"
+  - id: stripe-publishable-token
+    paths:
+      - ".github/workflows/api.yml"
+      - ".github/scripts/run-mypy.sh"
+      - "scripts/generate-api-types.sh"
