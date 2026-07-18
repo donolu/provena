@@ -151,8 +151,7 @@ class TestHandlePaymentSucceeded:
         from apps.suppliers.models import FulfilmentMode
 
         approved_supplier.fulfilment_mode = FulfilmentMode.PLATFORM_DELIVERY
-        approved_supplier.platform_delivery_fee = Decimal("4.00")
-        approved_supplier.save(update_fields=["fulfilment_mode", "platform_delivery_fee"])
+        approved_supplier.save(update_fields=["fulfilment_mode"])
 
         order = order_services.place_order(
             buyer=buyer, items=[{"variant": variant, "quantity": 2}], shipping=SHIPPING
@@ -164,9 +163,9 @@ class TestHandlePaymentSucceeded:
         payout = Payout.objects.get(sub_order=sub)
         goods = variant.price * 2  # 5.00
 
-        # Buyer paid goods + the £4 delivery fee...
-        assert sub.shipping_amount == Decimal("4.00")
-        assert sub.subtotal == goods + Decimal("4.00")
+        # Buyer paid goods + a platform delivery fee (live courier quote, #202)...
+        assert sub.shipping_amount > 0
+        assert sub.subtotal == goods + sub.shipping_amount
         # ...but the platform keeps the delivery fee: supplier gross is goods only.
         assert payout.gross_amount == goods
         assert payout.platform_fee == (

@@ -33,6 +33,13 @@ def create_payment_intent(order: Order) -> Payment:
     if hasattr(order, "payment"):
         return order.payment
 
+    # A platform-delivery quote can lapse between checkout and payment; reject rather than charge
+    # a stale delivery price (ADR-013 §#3).
+    from apps.delivery import services as delivery_services
+
+    if delivery_services.order_has_expired_quote(order):
+        raise ValueError("Your delivery quote has expired. Please check out again.")
+
     # Stripe is called outside any DB transaction so a network error never causes a rollback
     # of already-committed data. The idempotency key makes retries safe: Stripe returns the
     # same PaymentIntent on duplicate requests for the same order reference.

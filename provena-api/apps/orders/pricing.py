@@ -92,7 +92,10 @@ class OrderPricing:
 
 
 def compute_order_pricing(
-    supplier_groups: dict, *, discount_code: "DiscountCode | None" = None
+    supplier_groups: dict,
+    *,
+    discount_code: "DiscountCode | None" = None,
+    courier_quotes: dict | None = None,
 ) -> OrderPricing:
     """Compute the full money breakdown for an order.
 
@@ -153,8 +156,14 @@ def compute_order_pricing(
             total_quantity += quantity
             sub_vat += line_vat
 
-        # Free-shipping thresholds are evaluated on the pre-discount goods value (ADR-012 §4).
-        shipping_amount = _quantise(supplier.compute_shipping(goods_subtotal, total_quantity))
+        # Platform-brokered delivery (ADR-013): a live courier quote overrides the supplier's
+        # shipping policy / flat platform fee when one is supplied for this checkout.
+        quote = (courier_quotes or {}).get(getattr(supplier, "pk", None))
+        if quote is not None:
+            shipping_amount = _quantise(quote.fee)
+        else:
+            # Free-shipping thresholds are evaluated on the pre-discount goods value (ADR-012 §4).
+            shipping_amount = _quantise(supplier.compute_shipping(goods_subtotal, total_quantity))
         # Shipping is VAT-inclusive at the standard rate; extract it into the sub-order VAT.
         sub_vat += extract_vat(shipping_amount, VatRate.STANDARD)
         total = goods_subtotal - group_discount + shipping_amount

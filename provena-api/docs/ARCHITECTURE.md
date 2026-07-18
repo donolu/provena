@@ -10,7 +10,7 @@
 
 Provena starts as a **modular monolith**: one Django application with strict domain boundaries between apps, deployed as a single process. This is not a shortcut. It is the correct architecture for a product at this stage.
 
-Each domain app (accounts, catalogue, inventory, orders, payments, suppliers, notifications, analytics) is designed so that it can be extracted as an independent service when scale or team size demands it. The inter-domain contracts are defined through service layer calls and serialised data, not direct model imports across domain boundaries.
+Each domain app (accounts, catalogue, inventory, orders, payments, suppliers, notifications, analytics, delivery) is designed so that it can be extracted as an independent service when scale or team size demands it. The inter-domain contracts are defined through service layer calls and serialised data, not direct model imports across domain boundaries. (`delivery` brokers platform-delivery couriers behind a provider-agnostic interface — ADR-013 — quoting at checkout, booking at dispatch, and reconciling fees vs courier cost.)
 
 This approach avoids the operational overhead of microservices (distributed tracing, network latency between services, complex deployment pipelines) until that overhead is justified by actual scale.
 
