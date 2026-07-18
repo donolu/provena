@@ -1,0 +1,64 @@
+name: Trivy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, Mondays at 03:30 UTC - re-scans dependencies against newly
+    # disclosed CVEs even when nothing changed.
+    - cron: '30 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Filesystem scan
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to upload SARIF results to the Security tab.
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      # Scans dependency manifests (pyproject.toml/package-lock.json), Dockerfiles,
+      # compose files and other IaC for known CVEs, secrets and misconfigurations.
+      # This first pass reports findings to the Security tab without failing the
+      # build (exit-code 0) so we can triage before choosing gating thresholds.
+      - name: Trivy filesystem scan (SARIF)
+        uses: aquasecurity/trivy-action@v0.33.1
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy-results.sarif
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+        env:
+          # Cache the vuln DB in the tool cache to avoid rate limits.
+          TRIVY_CACHE_DIR: .trivycache
+
+      - name: Upload Trivy SARIF to Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs
+
+      # Human-readable table in the job log for a quick look without opening the
+      # Security tab. Also non-blocking on this first run.
+      - name: Trivy filesystem scan (table)
+        uses: aquasecurity/trivy-action@v0.33.1
+        if: always()
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+        env:
+          TRIVY_CACHE_DIR: .trivycache
