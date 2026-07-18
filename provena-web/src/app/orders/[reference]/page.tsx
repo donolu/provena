@@ -2,7 +2,7 @@
 
 import { use, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, ChevronLeft, RotateCcw, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronLeft, RotateCcw, Truck, XCircle } from 'lucide-react'
 import Link from 'next/link'
 import { Nav } from '@/components/nav'
 import { OrderBreakdown } from '@/components/order-breakdown'
@@ -26,6 +26,15 @@ const DISPUTE_STATUS_LABEL: Record<string, string> = {
   OPEN: 'Open',
   RESOLVED: 'Resolved',
   REJECTED: 'Rejected',
+}
+
+const COURIER_STATUS_LABEL: Record<string, string> = {
+  QUOTED: 'Delivery quoted',
+  BOOKED: 'Courier booked',
+  EN_ROUTE: 'Courier en route',
+  DELIVERED: 'Delivered by courier',
+  FAILED: 'Delivery failed',
+  CANCELLED: 'Delivery cancelled',
 }
 
 function withinDays(deliveredAt: string | null, days: number) {
@@ -135,6 +144,34 @@ function SubOrderCard({
         <span className="text-xs font-sans text-soil">Subtotal</span>
         <span className="font-mono text-sm font-medium text-forest">£{sub.subtotal}</span>
       </div>
+
+      {sub.courier && (
+        <div className="px-5 py-3 border-t border-hoarfrost flex items-center gap-2">
+          <Truck
+            className={`w-3.5 h-3.5 flex-shrink-0 ${
+              sub.courier.status === 'FAILED' || sub.courier.status === 'CANCELLED'
+                ? 'text-soil'
+                : sub.courier.status === 'DELIVERED'
+                  ? 'text-meadow'
+                  : 'text-forest'
+            }`}
+            strokeWidth={1.5}
+          />
+          <span className="text-[11px] font-sans text-forest font-medium">
+            {COURIER_STATUS_LABEL[sub.courier.status] ?? sub.courier.status}
+          </span>
+          {sub.courier.tracking_url && (
+            <a
+              href={sub.courier.tracking_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] font-sans text-soil hover:text-forest underline underline-offset-2 ml-auto"
+            >
+              Track delivery
+            </a>
+          )}
+        </div>
+      )}
 
       {sub.disputes.length > 0 && (
         <div className="px-5 py-3 border-t border-hoarfrost space-y-2">

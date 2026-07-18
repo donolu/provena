@@ -206,11 +206,25 @@ export interface SubOrder {
   fulfilment_mode: FulfilmentMode
   tracking_number: string
   delivered_at: string | null
+  courier: CourierDelivery | null
   items: OrderItem[]
   disputes: OrderDispute[]
   returns: OrderReturn[]
   created_at: string
   updated_at: string
+}
+
+export type CourierStatus =
+  | 'QUOTED'
+  | 'BOOKED'
+  | 'EN_ROUTE'
+  | 'DELIVERED'
+  | 'FAILED'
+  | 'CANCELLED'
+
+export interface CourierDelivery {
+  status: CourierStatus
+  tracking_url: string
 }
 
 export interface SubOrderListItem {

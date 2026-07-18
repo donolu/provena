@@ -289,6 +289,17 @@ ADR-012 §3 assumes a supplier fulfils their own delivery: the shipping fee is t
 
 **Deferred to the live-courier slice:** a real courier API + live quotes, serviceability checks + fallback, quote expiry/refresh, courier dispatch/billing + failed-delivery refunds, a delivery-margin line, buyer per-order delivery choice, and the split VAT invoice. The open questions below are settled only insofar as the flat-fee architecture requires; they remain open for the live-courier work.
 
+**Second slice — live courier, built against a mock (#202, 2026-07-18).** A provider-agnostic `CourierProvider` interface (`apps/delivery`) with a `MockUberDirectProvider` (Uber-Direct-shaped, deterministic, no creds) — a real Uber Direct / Stuart adapter is a drop-in via `settings.COURIER_PROVIDER`. The open questions are now settled (decisions made deliberately, documented here):
+- **Serviceability.** From the provider's quote call. An unserviceable `PLATFORM_DELIVERY` supplier **blocks checkout for that supplier** with a clear reason (`place_order` raises) — never a silent wrong charge. Auto-fallback to self-ship is deferred (a platform-delivery supplier has no reliable own policy to fall back to).
+- **Quote lifecycle.** The quote (provider id, fee, expiry) is snapshotted onto a `CourierDelivery` row and becomes the sub-order `shipping_amount`; `create_payment_intent` **rejects an expired quote** ("check out again") rather than charging a stale price. Auto re-quote-and-continue deferred.
+- **Margin.** **Pass-through at cost** (no margin line); `CourierDelivery` records buyer fee vs courier cost (equal under pass-through) as a reconciliation ledger.
+- **Dispatch trigger.** The courier is **booked when the supplier marks the sub-order dispatched** (parcel ready), not on payment — so a courier isn't sent to an unpacked order. On-demand.
+- **Failed/cancelled delivery.** On a courier failure/cancellation webhook the platform **refunds the buyer's delivery fee and absorbs the courier cost**; the row is flagged. Auto-retry deferred; the goods refund still follows the normal returns/dispute path.
+- **Billing/settlement.** The courier is billed via its **own API** (the mock records `courier_cost`), paid out-of-band by the platform — not via Stripe Connect. `CourierDelivery` is the ledger; `GET /api/v1/delivery/admin/reconciliation/` + Django admin summarise it. Webhook signature verification is deferred to the real adapter.
+- **VAT** (from slice 1, unchanged): the platform is principal for the delivery leg (standard-rated); the split VAT invoice stays deferred.
+
+Still deferred after this slice: the real provider adapter + credentials, webhook signature verification, self-ship fallback, re-quote-and-continue, delivery margin, auto-retry, scheduled windows, buyer per-order courier choice, a dedicated admin reconciliation page.
+
 **Decision (to be settled):**
 The direction, with the details deferred until the base pipeline (#140/#141/#142) has shipped:
 

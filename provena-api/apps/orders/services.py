@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from apps.catalogue.models import ProductVariant
 from apps.inventory import services as inventory_services
+from apps.suppliers.models import FulfilmentMode
 
 from .models import (
     RETURN_WINDOW_DAYS,
@@ -207,8 +208,25 @@ def place_order(
         )
         discount = _resolve_discount(buyer, discount_code, order_goods)
 
+    # Platform-brokered delivery (ADR-013): quote the courier for each PLATFORM_DELIVERY supplier.
+    # An unserviceable address blocks checkout for that supplier rather than charging a wrong fee.
+    courier_quotes: dict = {}
+    for sid, group in supplier_groups.items():
+        if getattr(group["supplier"], "fulfilment_mode", "") == FulfilmentMode.PLATFORM_DELIVERY:
+            from apps.delivery import services as delivery_services
+            from apps.delivery.providers import NotServiceable
+
+            try:
+                courier_quotes[sid] = delivery_services.quote_for_supplier(
+                    group["supplier"], dropoff=shipping, items=group["items"]
+                )
+            except NotServiceable as exc:
+                raise ValueError(str(exc)) from exc
+
     # One deterministic pricing pass; results are snapshotted onto the order (ADR-012).
-    pricing = compute_order_pricing(supplier_groups, discount_code=discount)
+    pricing = compute_order_pricing(
+        supplier_groups, discount_code=discount, courier_quotes=courier_quotes
+    )
 
     order = Order.objects.create(
         buyer=buyer,
@@ -245,6 +263,11 @@ def place_order(
             subtotal=sub_pricing.total,
             fulfilment_mode=sub_pricing.fulfilment_mode,
         )
+        quote = courier_quotes.get(sub_pricing.supplier.pk)
+        if quote is not None:
+            from apps.delivery import services as delivery_services
+
+            delivery_services.record_quote(sub, quote)
         for line in sub_pricing.lines:
             v = line.variant
             OrderItem.objects.create(
@@ -289,7 +312,20 @@ def dispatch_sub_order(sub_order: SubOrder, tracking_number: str = "") -> SubOrd
     ref, s = sub_order.order.reference, sub_order.order.status
     transaction.on_commit(lambda: _push_order_status(ref, s))
     transaction.on_commit(lambda: _safe_send_shipping_update(sub_order))
+    # Platform-brokered delivery: the supplier has marked the parcel ready, so book the courier
+    # now (ADR-013 §#5). After commit so a provider call never holds the dispatch transaction open.
+    if sub_order.fulfilment_mode == FulfilmentMode.PLATFORM_DELIVERY:
+        transaction.on_commit(lambda: _safe_book_courier(sub_order))
     return sub_order
+
+
+def _safe_book_courier(sub_order: SubOrder) -> None:
+    try:
+        from apps.delivery import services as delivery_services
+
+        delivery_services.book_delivery(sub_order)
+    except Exception:
+        logger.exception("Failed to book courier for sub_order %s", sub_order.id)
 
 
 @transaction.atomic

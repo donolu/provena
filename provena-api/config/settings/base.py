@@ -41,6 +41,7 @@ LOCAL_APPS = [
     "apps.inventory",
     "apps.orders",
     "apps.payments",
+    "apps.delivery",
     "apps.marketplace",
     "apps.notifications",
     "apps.analytics",
@@ -330,6 +331,10 @@ STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")
 STRIPE_PUBLISHABLE_KEY = env("STRIPE_PUBLISHABLE_KEY", default="")
 STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
 PLATFORM_FEE_PERCENT = env("PLATFORM_FEE_PERCENT", default="10")
+
+# Courier provider for platform-brokered delivery (ADR-013). "mock" is an Uber-Direct-shaped
+# stub; a real adapter (uber_direct / stuart) is registered in apps.delivery.providers.
+COURIER_PROVIDER = env("COURIER_PROVIDER", default="mock")
 
 # S3 / Cloudflare R2 (overridden in production.py with real credentials)
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")

@@ -75,6 +75,13 @@ class SubOrderSerializer(serializers.ModelSerializer):
     supplier_vat_number = serializers.CharField(source="supplier.vat_number", read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
     returns = OrderReturnSerializer(many=True, read_only=True)
+    courier = serializers.SerializerMethodField()
+
+    def get_courier(self, obj) -> dict | None:
+        cd = getattr(obj, "courier_delivery", None)
+        if cd is None:
+            return None
+        return {"status": cd.status, "tracking_url": cd.tracking_url}
 
     class Meta:
         model = SubOrder
@@ -92,6 +99,7 @@ class SubOrderSerializer(serializers.ModelSerializer):
             "fulfilment_mode",
             "tracking_number",
             "delivered_at",
+            "courier",
             "items",
             "returns",
             "created_at",

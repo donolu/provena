@@ -1909,6 +1909,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/delivery/webhook/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Courier status webhook */
+        post: operations["delivery_webhook_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/delivery/admin/reconciliation/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Platform delivery reconciliation summary */
+        get: operations["delivery_admin_reconciliation_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/marketplace/cart/": {
         parameters: {
             query?: never;
@@ -3979,6 +4013,9 @@ export interface components {
             tracking_number?: string;
             /** Format: date-time */
             delivered_at?: string | null;
+            readonly courier: {
+                [key: string]: unknown;
+            } | null;
             readonly items: components["schemas"]["OrderItem"][];
             readonly returns: components["schemas"]["OrderReturn"][];
             /** Format: date-time */
@@ -7584,6 +7621,42 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Payment"];
                 };
+            };
+        };
+    };
+    delivery_webhook_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Acknowledged */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delivery_admin_reconciliation_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fee vs courier-cost totals and status counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
