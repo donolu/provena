@@ -107,9 +107,17 @@ function SubOrderCard({
     .filter(([, q]) => q > 0)
     .map(([order_item_id, quantity]) => ({ order_item_id, quantity }))
 
+  // Only change-of-mind returns are offered; perishable / defective-only items (ADR-014)
+  // are not returnable and are steered to a dispute instead.
+  const hasReturnableItems = sub.items.some(
+    (i) => i.is_returnable && returnableFor(i.id, i.quantity) > 0,
+  )
+  const hasNonReturnableItems = sub.items.some((i) => !i.is_returnable)
+
   const canReturn =
     sub.status === 'DELIVERED' &&
     withinDays(sub.delivered_at, 14) &&
+    hasReturnableItems &&
     !sub.returns.some((r) => r.status === 'REQUESTED' || r.status === 'APPROVED')
 
   return (
@@ -133,6 +141,9 @@ function SubOrderCard({
               <p className="text-sm font-sans font-medium text-forest truncate">{item.product_name}</p>
               <p className="text-xs font-sans text-soil mt-0.5">
                 {item.variant_name} · qty {item.quantity}
+                {!item.is_returnable && (
+                  <span className="ml-1.5 text-[10px] text-soil/70">· non-returnable</span>
+                )}
               </p>
             </div>
             <span className="font-mono text-xs text-forest whitespace-nowrap">£{item.total_price}</span>
@@ -228,6 +239,14 @@ function SubOrderCard({
         </div>
       )}
 
+      {sub.status === 'DELIVERED' && hasNonReturnableItems && (
+        <div className="px-5 py-3 border-t border-hoarfrost">
+          <p className="text-[11px] font-sans text-soil">
+            Some items are perishable and can only be refunded if they arrive damaged or spoiled. Raise a dispute for those.
+          </p>
+        </div>
+      )}
+
       {canReturn && !showReturnForm && (
         <div className={`px-5 py-3 border-t border-hoarfrost flex items-center gap-4`}>
           <button
@@ -267,7 +286,7 @@ function SubOrderCard({
             {sub.items.map((item) => {
               const max = returnableFor(item.id, item.quantity)
               const qty = returnQty[item.id] ?? 0
-              if (max <= 0) return null
+              if (max <= 0 || !item.is_returnable) return null
               return (
                 <li key={item.id} className="flex items-center justify-between gap-3">
                   <span className="text-xs font-sans text-forest truncate">

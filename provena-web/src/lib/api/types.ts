@@ -182,6 +182,8 @@ export interface OrderDispute {
   updated_at: string
 }
 
+export type ReturnPolicy = 'RETURNABLE' | 'DEFECTIVE_ONLY'
+
 export interface OrderItem {
   id: string
   product_name: string
@@ -190,6 +192,8 @@ export interface OrderItem {
   quantity: number
   unit_price: string
   total_price: string
+  return_policy: ReturnPolicy
+  is_returnable: boolean
 }
 
 export interface SubOrder {
