@@ -2896,6 +2896,8 @@ export interface components {
             code?: string;
             /** Format: decimal */
             discount_amount?: string;
+            /** Format: decimal */
+            new_total?: string;
             reason?: string;
         };
         DispatchRequest: {

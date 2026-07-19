@@ -142,22 +142,53 @@ def _resolve_discount(buyer, code_str: str, order_goods: Decimal) -> DiscountCod
 def preview_discount(buyer, code_str: str) -> dict:
     """Advisory check of a discount code against the buyer's current cart.
 
-    Returns ``{"valid": True, "code", "discount_amount"}`` or ``{"valid": False, "reason"}``.
-    The preview does not reserve anything — ``place_order`` re-validates authoritatively, so a
-    code can still lapse between preview and checkout.
+    Returns ``{"valid": True, "code", "discount_amount", "new_total"}`` or
+    ``{"valid": False, "reason"}``. ``new_total`` is the full previewed order total
+    (goods - discount + shipping, VAT-inclusive) from the same ``compute_order_pricing``
+    pass used at checkout, so the buyer sees the figure they will actually be charged
+    rather than a raw goods discount. The preview reserves nothing — ``place_order``
+    re-validates authoritatively, so a code can still lapse between preview and checkout.
+
+    Shipping here follows each supplier's standing policy; for platform-brokered delivery
+    (ADR-013) the exact live courier fee is only resolved at checkout, since it needs the
+    delivery address, so the preview falls back to the supplier's configured fee.
     """
     from apps.marketplace.services import get_or_create_cart
 
-    goods = get_or_create_cart(user=buyer).total
+    cart = get_or_create_cart(user=buyer)
+    supplier_groups: dict = {}
+    for cart_item in cart.items.select_related("variant__product__supplier"):
+        variant = cart_item.variant
+        sid = variant.product.supplier_id
+        supplier_groups.setdefault(sid, {"supplier": variant.product.supplier, "items": []})
+        supplier_groups[sid]["items"].append(
+            {
+                "variant": variant,
+                "quantity": cart_item.quantity,
+                "line_total": variant.price * cart_item.quantity,
+            }
+        )
+
+    goods = sum(
+        (i["line_total"] for g in supplier_groups.values() for i in g["items"]),
+        Decimal("0.00"),
+    )
     if goods <= 0:
         return {"valid": False, "reason": "Your cart is empty."}
     try:
         with transaction.atomic():
             code = _resolve_discount(buyer, code_str, goods)
-            amount = code.compute_discount(goods)
     except ValueError as exc:
         return {"valid": False, "reason": str(exc)}
-    return {"valid": True, "code": code.code, "discount_amount": str(amount)}
+
+    # Pure computation (no writes), so run it outside the lock held by _resolve_discount.
+    pricing = compute_order_pricing(supplier_groups, discount_code=code)
+    return {
+        "valid": True,
+        "code": code.code,
+        "discount_amount": str(pricing.discount_amount),
+        "new_total": str(pricing.total_amount),
+    }
 
 
 @transaction.atomic

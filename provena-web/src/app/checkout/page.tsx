@@ -431,7 +431,8 @@ export default function CheckoutPage() {
                   </div>
                   {discountResult?.valid && (
                     <p className="text-xs font-sans text-meadow mt-1.5">
-                      Code applied — £{discountResult.discount_amount} off at the next step.
+                      Code applied: £{discountResult.discount_amount} off
+                      {discountResult.new_total && `, new total £${discountResult.new_total}`}. Charged at the next step.
                     </p>
                   )}
                   {discountResult && !discountResult.valid && (
