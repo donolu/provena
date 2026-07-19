@@ -69,6 +69,7 @@ export interface Product {
   supplier_name: string
   category_slug: string | null
   category_name: string | null
+  effective_return_policy: ReturnPolicy
   variants: ProductVariant[]
   images: ProductImage[]
   average_rating: number | null

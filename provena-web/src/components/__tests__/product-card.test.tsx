@@ -22,6 +22,7 @@ const baseProduct: Product = {
   supplier_name: 'Farm Fresh',
   category_slug: 'fruit',
   category_name: 'Fruit',
+  effective_return_policy: 'DEFECTIVE_ONLY',
   variants: [
     {
       id: 'var-1',

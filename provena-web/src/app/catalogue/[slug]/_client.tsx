@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Heart, ShoppingBasket, Star } from 'lucide-react'
+import { ChevronLeft, Heart, RotateCcw, ShoppingBasket, Star } from 'lucide-react'
 import Link from 'next/link'
 import { Nav } from '@/components/nav'
 import { CartDrawer } from '@/components/cart-drawer'
@@ -408,6 +408,15 @@ export default function ProductDetailPage({
                       />
                     </button>
                   )}
+                </div>
+
+                <div className="mt-4 flex items-start gap-2 border-t border-hoarfrost pt-4">
+                  <RotateCcw className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-soil" strokeWidth={1.5} />
+                  <p className="text-[11px] font-sans text-soil leading-relaxed">
+                    {product.effective_return_policy === 'RETURNABLE'
+                      ? 'Returnable within 14 days of delivery.'
+                      : 'Perishable: non-returnable, except if it arrives damaged or spoiled (raise a dispute).'}
+                  </p>
                 </div>
               </div>
             )}
