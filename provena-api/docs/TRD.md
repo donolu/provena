@@ -1,8 +1,12 @@
 # Technical Requirements Document
 
 **Product:** Provena
-**Version:** 1.0
-**Status:** Draft
+**Version:** 1.1
+**Status:** Living document (reflects shipped platform as of 2026-07)
+
+> Change log
+> - **1.1 (2026-07)** - corrected the stack versions, rewrote the API resource map and the data-model section to match the codebase (pricing pipeline, discounts, returns, platform-brokered delivery, refund-request ledger). See `DATABASE_SCHEMA.md` for the full model reference and `DECISIONS.md` for the ADRs.
+> - **1.0** - initial draft.
 
 ---
 
@@ -25,14 +29,18 @@ The two tiers communicate exclusively through the versioned REST API. They are d
 |---|---|---|
 | Language | Python 3.12 | Stable, well-supported, strong ecosystem for web and data |
 | Framework | Django 5.1 | Batteries-included ORM, auth, admin, migrations |
-| API layer | Django REST Framework 3.15 | Industry standard for Django APIs; browsable API for development |
-| Auth tokens | djangorestframework-simplejwt | JWT access + refresh tokens with rotation |
+| API layer | Django REST Framework 3.17 | Industry standard for Django APIs; browsable API for development |
+| API schema | drf-spectacular | OpenAPI 3 schema; TypeScript types generated for the frontend |
+| Auth tokens | djangorestframework-simplejwt | JWT access + refresh tokens with rotation; refresh token in an HttpOnly cookie |
+| Realtime | Django Channels + Redis | WebSocket order-status updates |
 | Task queue | Celery 5 + Redis | Async jobs: order emails, payout triggers, low-stock alerts |
 | Task scheduler | django-celery-beat | Cron-style scheduled tasks (expiry checks, reports) |
 | Database | PostgreSQL 16 | ACID compliance, JSONB for flexible attributes, full-text search |
-| Cache | Redis 7 | Session data, rate limiting counters, cart reservation locks |
+| Connection pooling | PgBouncer (transaction mode) | Pooled runtime connection; migrations use a direct connection (ADR-010) |
+| Search | Typesense (optional) | Product search when enabled; thin wrapper no-ops otherwise |
+| Cache | Redis | Session data, rate-limit counters, cart reservation locks, Channels layer |
 | File storage | AWS S3 or Cloudflare R2 | Product images, KYC documents, report exports |
-| Email | SendGrid or AWS SES | Transactional email with delivery tracking |
+| Email | Resend (SMTP) | Transactional email with delivery tracking |
 | Payments | Stripe API + Stripe Connect | PCI DSS handled by Stripe; Connect for supplier payouts |
 | HTTP server | Gunicorn + Nginx | Gunicorn as WSGI worker; Nginx as reverse proxy and TLS terminator |
 | Static files | WhiteNoise | Serves Django static files without a separate CDN in early stage |
@@ -45,8 +53,8 @@ The two tiers communicate exclusively through the versioned REST API. They are d
 
 | Component | Choice | Justification |
 |---|---|---|
-| Language | TypeScript 5 | Type safety across the entire frontend codebase |
-| Framework | Next.js 14 (App Router) | SSR for SEO; RSC for performance; first-class deployment on Vercel/Render |
+| Language | TypeScript 5 | Type safety across the entire frontend codebase (API types generated from the OpenAPI schema) |
+| Framework | Next.js 16 (App Router) | SSR for SEO; RSC for performance; single-origin behind Nginx in production |
 | Styling | Tailwind CSS 3 | Utility-first; no CSS bloat; consistent design system |
 | State | Zustand | Lightweight global state (cart, auth) |
 | Data fetching | TanStack Query v5 | Server state, caching, invalidation |
@@ -104,35 +112,64 @@ The two tiers communicate exclusively through the versioned REST API. They are d
 
 ### 3.2 Resource Map
 
-| Resource | Path | Methods |
-|---|---|---|
-| Auth | `/api/v1/auth/` | POST (login, register, refresh, logout) |
-| Users | `/api/v1/users/me/` | GET, PATCH, DELETE |
-| Suppliers | `/api/v1/suppliers/` | GET, POST |
-| Supplier detail | `/api/v1/suppliers/{id}/` | GET, PATCH, DELETE |
-| Stripe Connect onboarding | `/api/v1/suppliers/me/stripe-connect/` | GET (returns redirect URL) |
-| Categories | `/api/v1/catalogue/categories/` | GET |
-| Products | `/api/v1/catalogue/products/` | GET, POST |
-| Product detail | `/api/v1/catalogue/products/{id}/` | GET, PATCH, DELETE |
-| Product variants | `/api/v1/catalogue/products/{id}/variants/` | GET, POST |
-| Inventory | `/api/v1/inventory/` | GET, POST |
-| Stock adjustment | `/api/v1/inventory/{id}/adjust/` | POST |
-| Cart | `/api/v1/cart/` | GET, POST, DELETE |
-| Cart items | `/api/v1/cart/items/{id}/` | PATCH, DELETE |
-| Orders | `/api/v1/orders/` | GET, POST |
-| Order detail | `/api/v1/orders/{id}/` | GET, PATCH |
-| Disputes | `/api/v1/disputes/` | GET, POST |
-| Dispute detail | `/api/v1/disputes/{id}/` | GET |
-| Dispute respond | `/api/v1/disputes/{id}/respond/` | POST |
-| Dispute escalate | `/api/v1/disputes/{id}/escalate/` | POST |
-| Dispute resolve | `/api/v1/disputes/{id}/resolve/` | POST (admin) |
-| Dispute close | `/api/v1/disputes/{id}/close/` | POST |
-| Admin dispute list | `/api/v1/disputes/admin/` | GET (admin) |
-| Admin dispute refund | `/api/v1/disputes/admin/{id}/refund/` | POST (admin) |
-| Payments | `/api/v1/payments/checkout/` | POST (creates Stripe session) |
-| Stripe webhook | `/api/v1/payments/webhook/` | POST |
-| Notifications | `/api/v1/notifications/` | GET |
-| Analytics | `/api/v1/analytics/dashboard/` | GET |
+All resources are mounted under `/api/v1/`. The map below is grouped by domain (Django app); it lists the base paths and principal operations rather than every sub-route. The authoritative, always-current contract is the OpenAPI schema at `/api/v1/schema/` (Swagger UI and ReDoc served alongside).
+
+**Auth and accounts** (`/auth/`)
+| Path | Purpose |
+|---|---|
+| `login/`, `register/`, `logout/` | Session lifecycle; login returns an access token + sets the HttpOnly refresh cookie |
+| `refresh/` | Rotates the refresh token from the HttpOnly cookie (no token in the body) |
+| `me/` | Get/update the current user; `DELETE` requests GDPR erasure (anonymisation) |
+| `totp/enable/`, `totp/verify/`, `totp/disable/` | Two-factor (TOTP) enrolment and verification |
+| `password/reset/`, `password/reset/confirm/` | Password reset by emailed token |
+| `addresses/` | Buyer saved delivery addresses (CRUD) |
+| `data-export/` | Request/download a GDPR Article 20 data export (time-limited link) |
+
+**Suppliers** (`/suppliers/`)
+| Path | Purpose |
+|---|---|
+| `register/`, `me/`, `me/documents/`, `me/performance/` | Self-registration, profile (incl. shipping policy, VAT number, fulfilment mode), KYC docs, performance stats |
+| `me/stripe-connect/` | Stripe Connect onboarding link |
+| `` (list), `{slug}/` | Public approved-supplier list and detail |
+| `admin/`, `admin/{id}/approve|suspend|reject/`, `admin/documents/{id}/review/` | Admin onboarding queue and KYC review |
+
+**Catalogue** (`/catalogue/`): `categories/`, `products/` (+ `{slug}/`, `{slug}/variants/`), `search/`, `banners/`, featured. Public reads; supplier/admin writes.
+
+**Inventory** (`/inventory/`): stock levels, `{id}/adjust/`, lots, and movement audit trail (supplier/admin).
+
+**Marketplace** (`/marketplace/`): `cart/`, `cart/items/{id}/`, `wishlist/`, product `reviews/` (verified-purchase gated).
+
+**Orders** (`/orders/`)
+| Path | Purpose |
+|---|---|
+| `` (GET/POST), `{reference}/` | Buyer places and views orders |
+| `{reference}/cancel/` | Cancel before dispatch (releases stock) |
+| `{reference}/sub-orders/{id}/dispatch|deliver/` | Supplier fulfilment transitions |
+| `{reference}/sub-orders/{id}/return/` | Buyer requests a return (optionally per-item) |
+| `supplier/returns/`, `supplier/returns/{id}/approve|reject/` | Supplier return handling |
+| `admin/returns/`, `admin/returns/{id}/refund/` | Admin processes an approved return refund |
+| `admin/{reference}/refund-items/` | Admin refunds selected items; reverses the selling supplier's payout |
+| `admin/`, `admin/{reference}/` | Admin order list and detail |
+| `ws-ticket/` | Short-lived ticket for the order-status WebSocket |
+
+**Discounts** (`/discounts/`): `validate/` (buyer cart preview), `admin/` and `admin/{id}/` (code CRUD).
+
+**Payments** (`/payments/`)
+| Path | Purpose |
+|---|---|
+| `create-intent/` | Creates the Stripe PaymentIntent for a pending order (returns `client_secret`) |
+| `webhook/` | Stripe webhook (signature-verified): payment success/failure, refunds, Connect account updates |
+| `` (list), `{reference}/` | Buyer payment history |
+| `payouts/`, `admin/payouts/`, `admin/payouts/{id}/process/` | Supplier/admin payouts |
+| `admin/payments/{id}/refund/`, `admin/payments/` | Admin amount-based (goodwill) refund and payment list |
+
+**Delivery** (`/delivery/`): courier status `webhook/` and an admin reconciliation summary (ADR-013).
+
+**Disputes** (`/disputes/`): `` (list/create), `{id}/`, `{id}/respond|escalate|resolve|close/`, `{id}/messages/`, `{id}/attachments/`, `admin/`, `admin/{id}/refund/`.
+
+**Notifications** (`/notifications/`): list, mark-read, and per-event email `preferences/`.
+
+**Analytics** (`/analytics/`): `dashboard/` (admin KPIs).
 
 ### 3.3 Authentication Flow
 
@@ -166,40 +203,27 @@ UUID primary keys on all user-facing resources (prevents enumeration attacks). S
 
 ### 4.2 Domain Models (High Level)
 
-**accounts:**
-- `User` - extends `AbstractBaseUser`; fields: id (UUID), email, role (BUYER/SUPPLIER/ADMIN), is_active, totp_enabled, created_at
+Field-level detail, enums, and the entity-relationship diagram are in `DATABASE_SCHEMA.md`. Summary by app:
 
-**suppliers:**
-- `Supplier` - id, user (FK), business_name, status (PENDING/APPROVED/SUSPENDED), commission_rate, stripe_account_id, stripe_onboarding_complete
-- `SupplierDocument` - id, supplier (FK), document_type, file_url, uploaded_at
+**accounts:** `User` (UUID, email, role BUYER/SUPPLIER/ADMIN, totp_enabled, `erased_at`), `AuditLog` (append-only admin-action log), `Address`, `DataExportRequest` (GDPR Article 20), `PasswordResetToken`.
 
-**catalogue:**
-- `Category` - id, name, slug, parent (self-referential FK), is_active, dispute_window_days (1-7, default 3)
-- `Product` - id, supplier (FK), category (FK), name, slug, description, status, created_at
-- `ProductVariant` - id, product (FK), label, price, weight_grams, sku, is_active
-- `ProductImage` - id, product (FK), url, order, is_primary
+**suppliers:** `Supplier` (business profile, `status`, `commission_rate`, VAT registration, **shipping policy** fields, **fulfilment_mode** + `platform_delivery_fee`, Stripe Connect), `SupplierAddress`, `SupplierDocument` (KYC).
 
-**inventory:**
-- `StockLevel` - id, variant (FK), quantity, reserved_quantity, low_stock_threshold
-- `StockLot` - id, variant (FK), lot_number, quantity, expiry_date, received_at
-- `StockAuditLog` - id, variant (FK), actor (FK to User), delta, reason, created_at
+**catalogue:** `Category` (self-referential tree, `dispute_window_days`), `Product` (+ **`vat_rate`**), `ProductVariant` (`price`, `sku`, `weight_grams`), `ProductImage`, `VariantImage`, `Banner`.
 
-**orders:**
-- `Order` - id (UUID), buyer (FK), status, total_amount, created_at
-- `SubOrder` - id, order (FK), supplier (FK), status, subtotal, tracking_ref
-- `OrderItem` - id, sub_order (FK), variant (FK), quantity, unit_price, lot (FK nullable)
+**inventory:** `StockLevel` (`quantity_available`, `quantity_reserved`, `low_stock_threshold`), `StockLot` (lot/expiry), `StockMovement` (audit trail).
 
-**payments:**
-- `Payment` - id, order (FK), stripe_payment_intent_id, amount, currency, status, created_at
-- `Payout` - id, sub_order (FK), supplier (FK), gross_amount, commission, net_amount, stripe_transfer_id, status
+**marketplace:** `Cart`, `CartItem`, `CartReservation` (TTL stock hold), `WishlistItem`, `Review` (verified-purchase gated).
 
-**disputes:**
-- `Dispute` - id (UUID), sub_order (FK), opened_by (FK), respondent (FK), dispute_type, description, resolution_requested, status (OPEN/RESPONDENT_REPLIED/ESCALATED/RESOLVED/CLOSED), outcome, outcome_amount_pence, outcome_notes, response_deadline, payout_held, opened_at, resolved_at
-- `DisputeEvent` - id, dispute (FK), author (FK), event_type, body, created_at (append-only log)
-- `DisputeRefund` - id, dispute (FK), sub_order (FK), stripe_refund_id, amount_pence, status (PENDING/SUCCEEDED/FAILED)
+**orders:** `Order` and `SubOrder` both carry the **pricing breakdown** (`goods_subtotal`, `discount_amount`, `shipping_amount`, `vat_amount`, total); `OrderItem` snapshots `unit_price`, `vat_rate`, `vat_amount`; `OrderReturn` + `ReturnItem` (per-item returns); `DiscountCode` + `DiscountRedemption` (funding PLATFORM/SUPPLIER, usage caps).
 
-**notifications:**
-- `Notification` - id, user (FK), type, title, body, is_read, created_at
+**payments:** `Payment` (Stripe PaymentIntent, `refunded_amount`, `pending_refund_amount`), `Payout` (per sub-order; `gross`/`platform_fee`/`net`, status incl. REVERSED), `PaymentRefundRequest` (idempotency ledger for refunds).
+
+**delivery:** `CourierDelivery` (per sub-order; provider, quote/delivery ids, `fee_charged` vs `courier_cost`, status, tracking, quote expiry) - the reconciliation ledger for platform-brokered delivery (ADR-013).
+
+**disputes:** `Dispute` (sub-order, parties, type, status, outcome, `payout_held`, response deadline), `DisputeEvent` (append-only), `DisputeMessage`, `DisputeAttachment`, `DisputeRefund`.
+
+**notifications:** `Notification` (per recipient, typed, read/unread), `NotificationPreference` (per-event email toggles).
 
 ### 4.3 Caching Strategy
 

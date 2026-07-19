@@ -1,9 +1,13 @@
 # Business Requirements Document
 
 **Product:** Provena
-**Version:** 1.0
-**Status:** Draft
+**Version:** 1.1
+**Status:** Living document (reflects shipped platform as of 2026-07)
 **Owner:** Olumide Ibilaiye
+
+> Change log
+> - **1.1 (2026-07)** - added the order pricing pipeline (VAT, per-supplier shipping, discount codes; ADR-012), platform-brokered delivery (ADR-013), GDPR erasure + data export (ADR-011), and per-item returns/admin refunds. Corrected the delivery scope in §7/§8. See `DECISIONS.md` for the architecture record.
+> - **1.0** - initial draft.
 
 ---
 
@@ -119,14 +123,15 @@ Provena solves this by owning the full stack: supplier onboarding, product listi
 
 | ID | Requirement |
 |---|---|
-| ORD-01 | Order statuses: pending payment, confirmed, processing, shipped, delivered, cancelled, refunded |
+| ORD-01 | Sub-order lifecycle statuses: pending, confirmed, dispatched, delivered, cancelled (the parent order status is derived from its sub-orders) |
 | ORD-02 | Multi-supplier cart: single checkout can include products from multiple suppliers |
-| ORD-03 | Each supplier's items form a sub-order; Supplier sees only their sub-order |
+| ORD-03 | Each supplier's items form a sub-order; Supplier sees and fulfils only their sub-order |
 | ORD-04 | Order confirmation email sent to Buyer and Supplier on payment success |
-| ORD-05 | Buyer can cancel an order before it moves to processing |
-| ORD-06 | Supplier marks orders as shipped and provides tracking reference |
-| ORD-07 | Buyer can raise a dispute within 7 days of delivery; Admin mediates |
-| ORD-08 | Returns initiated by Buyer; Supplier approves or rejects; refund processed by Admin |
+| ORD-05 | Buyer can cancel an order (or a sub-order) before it is dispatched; stock is released |
+| ORD-06 | Supplier marks a sub-order dispatched and provides a tracking reference |
+| ORD-07 | Buyer can raise a dispute within the category's dispute window (1-7 days, default 3) of delivery; Admin mediates |
+| ORD-08 | Returns: Buyer requests within 14 days of delivery selecting specific items/quantities; Supplier approves or rejects; refund and stock restock processed on approval |
+| ORD-09 | Admin can refund selected items of any order directly; the refund is attributed to the supplier that sold each item and their payout is reversed proportionally |
 
 ### 4.7 Payments
 
@@ -137,9 +142,43 @@ Provena solves this by owning the full stack: supplier onboarding, product listi
 | PAY-03 | Stripe webhook events used to confirm payment, handle failures, and process refunds |
 | PAY-04 | Supplier payouts via Stripe Connect (platform model) |
 | PAY-05 | Platform commission deducted from payout before transfer to Supplier |
-| PAY-06 | Full refunds and partial refunds supported |
+| PAY-06 | Full refunds and partial (per-item) refunds supported; on refund of already-paid-out items the supplier's Stripe transfer is reversed proportionally so the platform does not absorb it |
 | PAY-07 | Payment history available to Buyer and Supplier in their respective dashboards |
-| PAY-08 | Admin can issue manual refunds and adjust payouts with an audit trail |
+| PAY-08 | Admin can issue manual refunds (item-level, attributed to the selling supplier, or a platform-absorbed goodwill amount) and process/hold payouts, all with an audit trail |
+| PAY-09 | Payout gross is the sub-order total; the platform commission is charged on discounted goods only (never on shipping); the fee rate is the supplier's `commission_rate` |
+
+### 4.7a Pricing, Tax and Promotions
+
+The order money path is a single deterministic pass at checkout, snapshotted onto the order so it is never recomputed from live config (see ADR-012 in `DECISIONS.md`).
+
+| ID | Requirement |
+|---|---|
+| PRC-01 | Prices are VAT-inclusive. VAT is *extracted* from the gross line total per the product's VAT rate (standard 20%, reduced 5%, zero); receipts and supplier statements show the VAT breakdown |
+| PRC-02 | Suppliers configure a shipping policy per account: flat rate, free-over-threshold, or per-item; shipping is added per sub-order and is itself VAT-inclusive at the standard rate |
+| PRC-03 | Order-level discount codes: percentage or fixed amount, with minimum spend, validity window, and global and per-buyer usage caps |
+| PRC-04 | A discount is allocated pro rata across sub-orders (and lines) by goods value; VAT is recomputed on the post-discount value |
+| PRC-05 | Each code declares who funds it: PLATFORM (supplier paid on pre-discount goods, platform absorbs the discount) or SUPPLIER (supplier's payout gross is reduced by their share) |
+| PRC-06 | Buyers can validate a code against their cart before checkout and see the previewed order total |
+| PRC-07 | Rounding is defined: money is decimal, quantised to pence half-up; pro-rata splits use largest-remainder so parts sum exactly to the whole |
+
+### 4.7b Delivery and Fulfilment Modes
+
+| ID | Requirement |
+|---|---|
+| DEL-01 | Each supplier has a fulfilment mode: they ship themselves (default), or the platform brokers delivery via a third-party courier (ADR-013) |
+| DEL-02 | For platform-brokered delivery, a courier quote is fetched at checkout and snapshotted as the delivery fee; an unserviceable address blocks that supplier's checkout with a clear reason rather than charging a wrong fee |
+| DEL-03 | The courier is booked when the supplier marks the sub-order ready/dispatched; the buyer sees courier status and a tracking link |
+| DEL-04 | The delivery fee is pass-through at cost; a reconciliation ledger records fee charged vs courier cost per delivery |
+| DEL-05 | On a failed or cancelled courier delivery, the platform refunds the buyer's delivery fee and absorbs the courier cost |
+| DEL-06 | The courier integration sits behind a swappable provider interface; a mock provider ships first, with a real courier adapter added later without changing the order flow |
+
+### 4.7c Data Protection (UK GDPR)
+
+| ID | Requirement |
+|---|---|
+| GDP-01 | Right to erasure: a user can request account erasure; personal data is anonymised in place while legally-required financial records (orders, payouts) are retained (ADR-011) |
+| GDP-02 | Right to data portability (Article 20): a user can request a machine-readable export of their data, delivered via a time-limited secure link |
+| GDP-03 | Cookie consent is collected before any analytics tracking; preferences stored per user |
 
 ### 4.8 Notifications
 
@@ -208,8 +247,9 @@ Provena solves this by owning the full stack: supplier onboarding, product listi
 
 - Native mobile app (iOS/Android)
 - Subscription or membership model for buyers
-- Automated logistics or delivery scheduling
-- Multi-currency support
+- Scheduled delivery windows and buyer per-order courier choice (on-demand platform-brokered delivery is in scope per ADR-013; scheduling is deferred)
+- A live third-party courier adapter with real credentials (the swappable provider interface and a mock provider are in scope; the real adapter is deferred)
+- Multi-currency support (GBP only)
 - Multi-language support
 - B2B wholesale pricing tiers
 - EDI integrations with suppliers
@@ -219,7 +259,8 @@ Provena solves this by owning the full stack: supplier onboarding, product listi
 ## 8. Assumptions and Constraints
 
 - Payment processing exclusively via Stripe; no alternative PSP in scope
-- Suppliers responsible for their own fulfilment and delivery
+- Suppliers are responsible for their own fulfilment by default; the platform may broker delivery via a third-party courier for suppliers configured for platform delivery (ADR-013)
+- Suppliers are UK-established (per KYC); VAT handling assumes UK-inclusive pricing
 - Platform operator based in the UK; UK GDPR applies
-- Initial deployment targets a single region (UK)
+- Initial deployment targets a single region (UK); GBP only
 - Budget constrains infrastructure to managed cloud services (Render/Railway initially)
