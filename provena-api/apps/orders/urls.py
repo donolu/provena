@@ -47,6 +47,11 @@ urlpatterns = [
     # Admin orders (must be before <str:reference>)
     path("admin/", views.AdminOrderListView.as_view(), name="admin-order-list"),
     path(
+        "admin/<str:reference>/refund-items/",
+        views.AdminRefundOrderItemsView.as_view(),
+        name="admin-refund-order-items",
+    ),
+    path(
         "admin/<str:reference>/",
         views.AdminOrderDetailView.as_view(),
         name="admin-order-detail",

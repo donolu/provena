@@ -14,9 +14,10 @@ from apps.pagination import PaginatedListMixin
 from apps.suppliers.permissions import IsApprovedSupplier
 
 from . import services
-from .models import DiscountCode, Order, OrderReturn, OrderStatus, SubOrder
+from .models import DiscountCode, Order, OrderItem, OrderReturn, OrderStatus, SubOrder
 from .serializers import (
     AdminDiscountCodeSerializer,
+    AdminItemRefundSerializer,
     DiscountValidateResultSerializer,
     DiscountValidateSerializer,
     DispatchSerializer,
@@ -507,6 +508,52 @@ class AdminProcessReturnRefundView(APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(OrderReturnSerializer(ret).data)
+
+
+@extend_schema(tags=["Admin: Orders"])
+class AdminRefundOrderItemsView(APIView):
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        summary="Refund selected order items (admin)",
+        description=(
+            "Refunds specific items from an order and reverses each supplier's payout for the "
+            "items they sold. Items are grouped by supplier; the buyer is refunded the selected "
+            "units' discounted, VAT-inclusive value. Not gated on delivery status or the return "
+            "window; the refunded units are restocked. Returns one refund record per supplier."
+        ),
+        request=AdminItemRefundSerializer,
+        responses={
+            200: OrderReturnSerializer(many=True),
+            400: OpenApiResponse(description="Invalid selection or refund not possible"),
+        },
+    )
+    def post(self, request: Request, reference: str) -> Response:
+        order = get_object_or_404(Order, reference=reference)
+        ser = AdminItemRefundSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+
+        by_id = {i.id: i for i in OrderItem.objects.filter(sub_order__order=order)}
+        selections = []
+        for line in ser.validated_data["items"]:
+            item = by_id.get(line["order_item_id"])
+            if item is None:
+                return Response(
+                    {"detail": "Refund item does not belong to this order."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            selections.append({"order_item": item, "quantity": line["quantity"]})
+
+        try:
+            returns = services.admin_refund_order_items(
+                order,
+                selections,
+                raised_by=request.user,
+                reason=ser.validated_data.get("reason") or "Admin item refund",
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(OrderReturnSerializer(returns, many=True).data)
 
 
 # ---------------------------------------------------------------------------

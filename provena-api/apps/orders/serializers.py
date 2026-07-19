@@ -236,6 +236,11 @@ class ReturnRefundSerializer(serializers.Serializer):
     )
 
 
+class AdminItemRefundSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True, default="")
+    items = ReturnLineInputSerializer(many=True, allow_empty=False)
+
+
 # --- Discount codes ---
 
 
