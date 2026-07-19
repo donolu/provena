@@ -73,7 +73,13 @@ def second_supplier_client(api_client, second_supplier):
 
 @pytest.fixture
 def category(db):
-    return Category.objects.create(name="Vegetables", slug="vegetables")
+    # Explicitly RETURNABLE so the returns tests exercise the change-of-mind path; the model
+    # default is DEFECTIVE_ONLY (perishable). Non-returnable behaviour is tested separately.
+    from apps.catalogue.models import ReturnPolicy
+
+    return Category.objects.create(
+        name="Vegetables", slug="vegetables", return_policy=ReturnPolicy.RETURNABLE
+    )
 
 
 @pytest.fixture

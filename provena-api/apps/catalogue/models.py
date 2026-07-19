@@ -18,6 +18,14 @@ class VatRate(models.TextChoices):
     ZERO = "ZERO", "Zero (0%)"
 
 
+class ReturnPolicy(models.TextChoices):
+    # Standard 14-day change-of-mind return (UK Consumer Contracts Regulations).
+    RETURNABLE = "RETURNABLE", "Returnable (14-day change of mind)"
+    # No change-of-mind return; perishable/exempt goods. A defect or spoilage on
+    # arrival is still covered, but goes via a dispute (Consumer Rights Act 2015).
+    DEFECTIVE_ONLY = "DEFECTIVE_ONLY", "Defective only (via dispute)"
+
+
 # Fraction of the net price that VAT adds; prices are VAT-inclusive, so VAT is
 # extracted from the gross rather than added on top (see ADR-012).
 VAT_RATE_FRACTIONS: dict[str, Decimal] = {
@@ -66,6 +74,13 @@ class Category(models.Model):
         default=3,
         validators=[MinValueValidator(1), MaxValueValidator(7)],
     )
+    # Default return policy for products in this category. Defaults to DEFECTIVE_ONLY:
+    # this is a fresh-produce marketplace, so most goods are perishable and exempt from
+    # the change-of-mind return right (ADR-014). Admins set non-perishable categories to
+    # RETURNABLE; a product may override its category (see Product.effective_return_policy).
+    return_policy = models.CharField(
+        max_length=16, choices=ReturnPolicy.choices, default=ReturnPolicy.DEFECTIVE_ONLY
+    )
 
     class Meta:
         ordering = ["position", "name"]
@@ -94,6 +109,11 @@ class Product(models.Model):
         max_length=10, choices=ProductStatus.choices, default=ProductStatus.DRAFT
     )
     vat_rate = models.CharField(max_length=10, choices=VatRate.choices, default=VatRate.STANDARD)
+    # Optional per-product override of the category's return policy; blank = inherit the
+    # category default (ADR-014). Resolve via effective_return_policy.
+    return_policy_override = models.CharField(
+        max_length=16, choices=ReturnPolicy.choices, blank=True, default=""
+    )
     is_featured = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -107,6 +127,17 @@ class Product(models.Model):
     @property
     def is_published(self) -> bool:
         return self.status == ProductStatus.ACTIVE
+
+    @property
+    def effective_return_policy(self) -> str:
+        """The product's return policy: its own override, else the category default,
+        else DEFECTIVE_ONLY when the product has no category (safe for perishables)."""
+        if self.return_policy_override:
+            return self.return_policy_override
+        category = self.category
+        if category is not None:
+            return category.return_policy
+        return ReturnPolicy.DEFECTIVE_ONLY
 
 
 class ProductVariant(models.Model):

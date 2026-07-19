@@ -22,6 +22,7 @@ class CategorySerializer(serializers.ModelSerializer):
             "children",
             "position",
             "is_active",
+            "return_policy",
             "product_count",
         ]
 
@@ -43,7 +44,15 @@ class CategoryWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ["name", "description", "image_url", "parent", "position", "is_active"]
+        fields = [
+            "name",
+            "description",
+            "image_url",
+            "parent",
+            "position",
+            "is_active",
+            "return_policy",
+        ]
 
     def validate_name(self, value: str) -> str:
         if not value.strip():
@@ -136,6 +145,7 @@ class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     average_rating = serializers.FloatField(read_only=True, allow_null=True)
     review_count = serializers.IntegerField(read_only=True, default=0)
+    effective_return_policy = serializers.CharField(read_only=True)
 
     class Meta:
         model = Product
@@ -150,6 +160,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "supplier_name",
             "category_slug",
             "category_name",
+            "effective_return_policy",
             "average_rating",
             "review_count",
             "variants",
@@ -166,6 +177,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "supplier_name",
             "category_slug",
             "category_name",
+            "effective_return_policy",
             "average_rating",
             "review_count",
             "variants",
@@ -200,6 +212,7 @@ class AdminProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     average_rating = serializers.FloatField(read_only=True, allow_null=True)
     review_count = serializers.IntegerField(read_only=True, default=0)
+    effective_return_policy = serializers.CharField(read_only=True)
 
     class Meta:
         model = Product
@@ -214,6 +227,8 @@ class AdminProductSerializer(serializers.ModelSerializer):
             "supplier_slug",
             "category_name",
             "category_slug",
+            "return_policy_override",
+            "effective_return_policy",
             "variants",
             "images",
             "average_rating",

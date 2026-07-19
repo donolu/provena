@@ -6,7 +6,7 @@ from decimal import Decimal
 from django.db import models
 from django.utils import timezone
 
-from apps.catalogue.models import VatRate
+from apps.catalogue.models import ReturnPolicy, VatRate
 from apps.suppliers.models import FulfilmentMode
 
 
@@ -104,12 +104,24 @@ class OrderItem(models.Model):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     vat_rate = models.CharField(max_length=10, choices=VatRate.choices, default=VatRate.STANDARD)
     vat_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    # Return policy snapshotted at checkout from the product's effective policy (ADR-014), so a
+    # later re-classification of the product/category never changes a placed order's rights.
+    # Existing rows backfill to RETURNABLE (they were placed under the flat 14-day regime).
+    return_policy = models.CharField(
+        max_length=16, choices=ReturnPolicy.choices, default=ReturnPolicy.RETURNABLE
+    )
 
     class Meta:
         ordering = ["id"]
 
     def __str__(self) -> str:
         return f"{self.sku} x {self.quantity}"
+
+    @property
+    def is_returnable(self) -> bool:
+        """Whether this item is eligible for a change-of-mind return (ADR-014).
+        A non-returnable item that arrives defective is handled via a dispute."""
+        return self.return_policy == ReturnPolicy.RETURNABLE
 
     @property
     def total_price(self) -> Decimal:

@@ -2717,6 +2717,8 @@ export interface components {
             readonly supplier_slug: string;
             readonly category_name: string | null;
             readonly category_slug: string | null;
+            return_policy_override?: components["schemas"]["ReturnPolicyOverrideEnum"] | components["schemas"]["BlankEnum"];
+            readonly effective_return_policy: string;
             readonly variants: components["schemas"]["ProductVariant"][];
             readonly images: components["schemas"]["ProductImage"][];
             /** Format: double */
@@ -2870,6 +2872,7 @@ export interface components {
             /** Format: int64 */
             position?: number;
             is_active?: boolean;
+            return_policy?: components["schemas"]["ReturnPolicyEnum"];
             readonly product_count: number;
         };
         CategoryWriteRequest: {
@@ -2880,6 +2883,7 @@ export interface components {
             /** Format: int64 */
             position?: number;
             is_active?: boolean;
+            return_policy?: components["schemas"]["ReturnPolicyEnum"];
         };
         ChangePasswordRequest: {
             current_password: string;
@@ -3199,6 +3203,8 @@ export interface components {
             vat_rate?: components["schemas"]["VatRateEnum"];
             /** Format: decimal */
             vat_amount?: string;
+            return_policy?: components["schemas"]["ReturnPolicyEnum"];
+            readonly is_returnable: boolean;
         };
         OrderItemInputRequest: {
             /** Format: uuid */
@@ -3628,6 +3634,7 @@ export interface components {
             /** Format: int64 */
             position?: number;
             is_active?: boolean;
+            return_policy?: components["schemas"]["ReturnPolicyEnum"];
         };
         PatchedNotificationPreferenceRequest: {
             email_order_placed?: boolean;
@@ -3789,6 +3796,7 @@ export interface components {
             readonly supplier_name: string;
             readonly category_slug: string | null;
             readonly category_name: string | null;
+            readonly effective_return_policy: string;
             /** Format: double */
             readonly average_rating: number | null;
             /** @default 0 */
@@ -3938,6 +3946,18 @@ export interface components {
             order_item_id: string;
             quantity: number;
         };
+        /**
+         * @description * `RETURNABLE` - Returnable (14-day change of mind)
+         *     * `DEFECTIVE_ONLY` - Defective only (via dispute)
+         * @enum {string}
+         */
+        ReturnPolicyEnum: "RETURNABLE" | "DEFECTIVE_ONLY";
+        /**
+         * @description * `RETURNABLE` - Returnable (14-day change of mind)
+         *     * `DEFECTIVE_ONLY` - Defective only (via dispute)
+         * @enum {string}
+         */
+        ReturnPolicyOverrideEnum: "RETURNABLE" | "DEFECTIVE_ONLY";
         ReturnRefundRequest: {
             /** Format: decimal */
             amount?: string | null;

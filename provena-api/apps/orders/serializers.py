@@ -15,6 +15,7 @@ from .models import (
 
 class OrderItemSerializer(serializers.ModelSerializer):
     total_price = serializers.DecimalField(read_only=True, max_digits=12, decimal_places=2)
+    is_returnable = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = OrderItem
@@ -28,6 +29,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "total_price",
             "vat_rate",
             "vat_amount",
+            "return_policy",
+            "is_returnable",
         ]
 
 

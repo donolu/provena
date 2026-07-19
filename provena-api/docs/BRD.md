@@ -132,6 +132,7 @@ Provena solves this by owning the full stack: supplier onboarding, product listi
 | ORD-07 | Buyer can raise a dispute within the category's dispute window (1-7 days, default 3) of delivery; Admin mediates |
 | ORD-08 | Returns: Buyer requests within 14 days of delivery selecting specific items/quantities; Supplier approves or rejects; refund and stock restock processed on approval |
 | ORD-09 | Admin can refund selected items of any order directly; the refund is attributed to the supplier that sold each item and their payout is reversed proportionally |
+| ORD-10 | Return eligibility is set by product type (ADR-014): perishable/exempt goods are `DEFECTIVE_ONLY` (no change-of-mind return; spoilage/defects go via a dispute), others are `RETURNABLE`. The policy is set per category (default defective-only for this produce marketplace), overridable per product, and snapshotted onto the order line at checkout. Change-of-mind returns of non-returnable items are blocked and the buyer is steered to raise a "damaged or spoiled" dispute |
 
 ### 4.7 Payments
 
