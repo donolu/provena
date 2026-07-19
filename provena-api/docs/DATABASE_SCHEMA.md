@@ -66,8 +66,8 @@
 
 ### catalogue
 
-**Category** - self-referential `parent` (SET_NULL) tree; `name`, `slug`, `image_url`, `position`, `is_active`, `dispute_window_days` (1-7, default 3).
-**Product** - FK `supplier`, FK `category` (SET_NULL); `name`, `slug`, `description`, `status` (`DRAFT`/`ACTIVE`/`ARCHIVED`), **`vat_rate`** (`STANDARD` 20% / `REDUCED` 5% / `ZERO`), `is_featured`.
+**Category** - self-referential `parent` (SET_NULL) tree; `name`, `slug`, `image_url`, `position`, `is_active`, `dispute_window_days` (1-7, default 3), **`return_policy`** (`RETURNABLE` / `DEFECTIVE_ONLY`, default `DEFECTIVE_ONLY`; ADR-014).
+**Product** - FK `supplier`, FK `category` (SET_NULL); `name`, `slug`, `description`, `status` (`DRAFT`/`ACTIVE`/`ARCHIVED`), **`vat_rate`** (`STANDARD` 20% / `REDUCED` 5% / `ZERO`), **`return_policy_override`** (blank = inherit category; `effective_return_policy` resolves override-else-category-else-`DEFECTIVE_ONLY`), `is_featured`.
 **ProductVariant** - FK `product`; `name`, `sku` (unique), `price`, `compare_at_price?`, `weight_grams`, `is_active`.
 **ProductImage / VariantImage** - `url`, `alt_text`, `position`, `is_primary`.
 **Banner** - homepage banner: `title`, `subtitle`, `image_url`, `link`, `is_active`, `position`.
@@ -100,7 +100,7 @@
 | discount_code, discount_funded_by | Char | snapshot of the applied code |
 
 **SubOrder** - FK `order`, FK `supplier` (PROTECT); own `status`, the same **breakdown** columns plus `subtotal`, `fulfilment_mode` snapshot, `tracking_number`, `delivered_at`. One per supplier in an order.
-**OrderItem** - FK `sub_order`, FK `variant` (PROTECT); snapshots `product_name`, `variant_name`, `sku`, `quantity`, `unit_price`, `vat_rate`, `vat_amount`. `returnable_quantity` derives from non-rejected returns.
+**OrderItem** - FK `sub_order`, FK `variant` (PROTECT); snapshots `product_name`, `variant_name`, `sku`, `quantity`, `unit_price`, `vat_rate`, `vat_amount`, **`return_policy`** (snapshot of the product's effective policy at checkout; `is_returnable` derives from it; ADR-014). `returnable_quantity` derives from non-rejected returns.
 **OrderReturn** - FK `sub_order`, `raised_by` (FK User, SET_NULL); `reason`, `status` (`REQUESTED`/`APPROVED`/`REFUNDING`/`REJECTED`/`REFUNDED`), `refund_amount`. A return with no items = full sub-order.
 **ReturnItem** - FK `order_return`, FK `order_item` (PROTECT), `quantity`.
 **DiscountCode** - `code` (unique), `discount_type` (`PERCENTAGE`/`FIXED`), `value`, `funded_by` (`PLATFORM`/`SUPPLIER`), `minimum_spend`, `valid_from/until?`, `max_uses?`, `max_uses_per_buyer?`, `is_active`.

@@ -311,6 +311,7 @@ def place_order(
                 unit_price=line.unit_price,
                 vat_rate=line.vat_rate,
                 vat_amount=line.vat_amount,
+                return_policy=v.product.effective_return_policy,
             )
 
     return order
@@ -450,12 +451,28 @@ def request_return(sub_order: SubOrder, raised_by, reason: str, items=None) -> O
     ):
         raise ValueError(f"Returns must be requested within {RETURN_WINDOW_DAYS} days of delivery.")
 
-    ret = OrderReturn.objects.create(sub_order=sub_order, raised_by=raised_by, reason=reason)
-    for line in items or []:
+    lines = items or []
+    # Validate everything before creating any row, so a rejected request leaves no orphan
+    # OrderReturn. Return eligibility is the snapshotted policy (ADR-014): a non-returnable
+    # item (e.g. perishable) has no change-of-mind return and must go via a dispute instead.
+    if not lines:
+        non_returnable = sorted({i.sku for i in sub_order.items.all() if not i.is_returnable})
+        if non_returnable:
+            raise ValueError(
+                f"This order contains non-returnable items ({', '.join(non_returnable)}), "
+                "such as perishable goods. Return the eligible items individually, or raise a "
+                "dispute if they arrived damaged or spoiled."
+            )
+    for line in lines:
         order_item = line["order_item"]
         quantity = int(line["quantity"])
         if order_item.sub_order_id != sub_order.id:
             raise ValueError("Return item does not belong to this sub-order.")
+        if not order_item.is_returnable:
+            raise ValueError(
+                f"{order_item.sku} is non-returnable (e.g. a perishable item) and can only be "
+                "refunded if it arrives damaged or spoiled; please raise a dispute for it."
+            )
         if quantity <= 0:
             raise ValueError("Return quantity must be positive.")
         if quantity > order_item.returnable_quantity:
@@ -463,7 +480,12 @@ def request_return(sub_order: SubOrder, raised_by, reason: str, items=None) -> O
                 f"Cannot return {quantity} of {order_item.sku}; "
                 f"only {order_item.returnable_quantity} remain returnable."
             )
-        ReturnItem.objects.create(order_return=ret, order_item=order_item, quantity=quantity)
+
+    ret = OrderReturn.objects.create(sub_order=sub_order, raised_by=raised_by, reason=reason)
+    for line in lines:
+        ReturnItem.objects.create(
+            order_return=ret, order_item=line["order_item"], quantity=int(line["quantity"])
+        )
     return ret
 
 

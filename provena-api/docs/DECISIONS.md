@@ -320,3 +320,26 @@ The direction, with the details deferred until the base pipeline (#140/#141/#142
 - Suppliers with no delivery capability become servable, widening supply.
 - The platform takes on a new operational and financial relationship (courier billing, SLAs, failed-delivery handling) and a delivery-leg VAT position it did not have before.
 - The money path gains a third recipient class (external couriers) distinct from suppliers on Connect.
+
+---
+
+## ADR-014: Return Eligibility by Product Type (Perishable Goods)
+
+**Status:** Accepted (implemented, issue #217)
+
+**Context:**
+Returns were gated only by delivery status and a flat 14-day window (`orders.services.request_return`), with no notion of return *eligibility* by product type. For a fresh-produce marketplace that is both commercially and legally wrong: under the UK Consumer Contracts Regulations 2013, perishable goods are exempt from the 14-day change-of-mind right to cancel/return. Defective or spoiled goods remain covered by the Consumer Rights Act 2015, which is exactly what the existing dispute flow (with per-category `dispute_window_days` and a `DAMAGED` "damaged or spoiled" dispute type) is for. So the real distinction is "eligible for a change-of-mind return" (a product attribute) versus "defective on arrival" (always redressable, via a dispute).
+
+**Decision:**
+1. **A `return_policy` enum**: `RETURNABLE` (standard 14-day change-of-mind return) and `DEFECTIVE_ONLY` (no change-of-mind return; defects go via a dispute).
+2. **Set at Category level, overridable per Product.** Return eligibility tracks the *kind* of good, so its natural home is the category, mirroring the existing category-level `dispute_window_days`. A product may override its category for exceptions (a shelf-stable item in a mostly-perishable category). Variant is too granular; supplier is too coarse. The category default is **`DEFECTIVE_ONLY`**: this is a produce marketplace, so perishable is the safe default and admins opt categories into `RETURNABLE`.
+3. **The override is admin-only.** `return_policy` (category) and `return_policy_override` (product) are set through the admin serializers; the supplier product-write path does not expose them, so a supplier cannot unilaterally weaken the perishable protection. The category default (admin-controlled) is the primary lever.
+4. **Snapshot the effective policy onto `OrderItem` at checkout**, resolved as product-override-else-category-default-else-`DEFECTIVE_ONLY`. Like price and VAT (ADR-012), the snapshot means a later re-classification of a product or category never rewrites a placed order's return rights. Existing `OrderItem` rows backfill to `RETURNABLE` (they were placed under the flat 14-day regime).
+5. **`request_return` enforces it per item.** A per-item request rejects any non-returnable line; a full (no-items) request is rejected if the sub-order contains any non-returnable item. In both cases the error steers the buyer to raise a "damaged or spoiled" dispute for those items. Validation now runs before any row is created, so a rejected request leaves no orphan `OrderReturn` (this also fixes a latent orphan bug on the existing quantity checks).
+6. **The admin item-refund path stays unrestricted.** `admin_refund_order_items` (ADR-012 refund tail) does not check the policy: admins act on genuine defects, disputes, and goodwill and must be able to refund any item.
+
+**Consequences:**
+- Perishable goods can no longer be returned for change of mind; buyers are routed to the dispute channel for spoilage/defects, matching UK consumer law and the produce context.
+- The policy is exposed on the Category, Product (`effective_return_policy`), and OrderItem (`return_policy`, `is_returnable`) serializers so the storefront can hide the Return button for non-returnable items and surface the dispute path.
+- Existing orders are unaffected (snapshot backfilled to `RETURNABLE`); newly-created categories default to `DEFECTIVE_ONLY`, so admins must mark genuinely returnable categories explicitly.
+- Deferred: a distinct "sealed/hygiene" exemption class, and a buyer-facing returns-policy explainer on the product page (the data is available via `effective_return_policy`).

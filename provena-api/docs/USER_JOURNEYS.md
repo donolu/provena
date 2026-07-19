@@ -42,7 +42,7 @@ The price shown at every step equals `order.total_amount`; the Pay button charge
 
 - Track each sub-order's status live over the order WebSocket (`ws-ticket/`). For platform-delivered sub-orders a courier tracking link is shown.
 - **Cancel** before dispatch releases the reserved stock and (if paid) refunds.
-- **Return** within 14 days of delivery: select specific items/quantities and a reason; the Supplier approves or rejects; on approval the refund is issued and the returned units restock.
+- **Return** within 14 days of delivery: select specific items/quantities and a reason; the Supplier approves or rejects; on approval the refund is issued and the returned units restock. Only **returnable** items qualify (ADR-014): perishable/exempt goods are marked defective-only, so a change-of-mind return of them is blocked and the buyer is steered to raise a dispute instead. The UI hides the Return action for non-returnable lines (each order line exposes `return_policy` / `is_returnable`).
 - **Dispute** within the category's dispute window (1-7 days, default 3): opens a mediated thread with the Supplier; Admin can escalate/resolve and issue a dispute refund. Payouts can be held while a dispute is open.
 
 ---
