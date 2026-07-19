@@ -1634,6 +1634,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orders/admin/{reference}/refund-items/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refund selected order items (admin)
+         * @description Refunds specific items from an order and reverses each supplier's payout for the items they sold. Items are grouped by supplier; the buyer is refunded the selected units' discounted, VAT-inclusive value. Not gated on delivery status or the return window; the refunded units are restocked. Returns one refund record per supplier.
+         */
+        post: operations["orders_admin_refund_items_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orders/admin/{reference}/": {
         parameters: {
             query?: never;
@@ -2680,6 +2700,11 @@ export interface components {
             max_uses_per_buyer?: number | null;
             is_active?: boolean;
         };
+        AdminItemRefundRequest: {
+            /** @default  */
+            reason: string;
+            items: components["schemas"]["ReturnLineInputRequest"][];
+        };
         AdminProduct: {
             /** Format: uuid */
             readonly id: string;
@@ -2896,6 +2921,8 @@ export interface components {
             code?: string;
             /** Format: decimal */
             discount_amount?: string;
+            /** Format: decimal */
+            new_total?: string;
             reason?: string;
         };
         DispatchRequest: {
@@ -7114,6 +7141,40 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PaginatedOrderList"];
                 };
+            };
+        };
+    };
+    orders_admin_refund_items_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminItemRefundRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["AdminItemRefundRequest"];
+                "multipart/form-data": components["schemas"]["AdminItemRefundRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderReturn"][];
+                };
+            };
+            /** @description Invalid selection or refund not possible */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

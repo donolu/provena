@@ -236,6 +236,11 @@ class ReturnRefundSerializer(serializers.Serializer):
     )
 
 
+class AdminItemRefundSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True, default="")
+    items = ReturnLineInputSerializer(many=True, allow_empty=False)
+
+
 # --- Discount codes ---
 
 
@@ -247,6 +252,7 @@ class DiscountValidateResultSerializer(serializers.Serializer):
     valid = serializers.BooleanField()
     code = serializers.CharField(required=False)
     discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    new_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     reason = serializers.CharField(required=False)
 
 

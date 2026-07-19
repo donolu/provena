@@ -467,6 +467,7 @@ export interface DiscountValidateResult {
   valid: boolean
   code?: string
   discount_amount?: string
+  new_total?: string
   reason?: string
 }
 
