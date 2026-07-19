@@ -43,6 +43,14 @@ class TestReturnPolicySnapshot:
         assert item.return_policy == ReturnPolicy.DEFECTIVE_ONLY
         assert item.is_returnable is False
 
+    def test_sealed_category_snapshots_sealed_and_stays_returnable(self, buyer, approved_supplier):
+        # Sealed hygiene goods remain returnable while unopened (supplier verifies the seal).
+        v = _perishable_variant(approved_supplier, policy=ReturnPolicy.SEALED, sku="SEALED-1")
+        order = services.place_order(buyer, [{"variant": v, "quantity": 1}], SHIPPING)
+        item = order.sub_orders.first().items.first()
+        assert item.return_policy == ReturnPolicy.SEALED
+        assert item.is_returnable is True
+
     def test_snapshot_frozen_after_category_reclassification(self, buyer, approved_supplier):
         v = _perishable_variant(approved_supplier, policy=ReturnPolicy.RETURNABLE, sku="FROZEN-1")
         order = services.place_order(buyer, [{"variant": v, "quantity": 1}], SHIPPING)
@@ -90,6 +98,16 @@ class TestReturnBlockedForPerishable:
         # The fixture chain uses the RETURNABLE orders category.
         sub = services.deliver_sub_order(dispatched_sub_order)
         ret = services.request_return(sub, buyer, "Faulty")
+        assert ret.sub_order_id == sub.id
+
+    def test_sealed_item_return_allowed(self, buyer, approved_supplier):
+        # Sealed hygiene goods may still be returned (if unopened); the request is not blocked.
+        v = _perishable_variant(approved_supplier, policy=ReturnPolicy.SEALED, sku="SEALED-2")
+        order = services.place_order(buyer, [{"variant": v, "quantity": 1}], SHIPPING)
+        sub = order.sub_orders.first()
+        services.dispatch_sub_order(sub)
+        services.deliver_sub_order(sub)
+        ret = services.request_return(sub, buyer, "Unopened, changed my mind")
         assert ret.sub_order_id == sub.id
 
 

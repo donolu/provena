@@ -183,7 +183,7 @@ export interface OrderDispute {
   updated_at: string
 }
 
-export type ReturnPolicy = 'RETURNABLE' | 'DEFECTIVE_ONLY'
+export type ReturnPolicy = 'RETURNABLE' | 'DEFECTIVE_ONLY' | 'SEALED'
 
 export interface OrderItem {
   id: string

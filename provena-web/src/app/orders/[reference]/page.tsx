@@ -282,6 +282,11 @@ function SubOrderCard({
           <p className="text-[10px] uppercase tracking-[0.12em] text-soil font-sans font-medium">
             Which items?
           </p>
+          {sub.items.some((i) => i.return_policy === 'SEALED') && (
+            <p className="text-[11px] font-sans text-soil">
+              Sealed items can only be returned if unopened; the supplier checks the seal on receipt.
+            </p>
+          )}
           <ul className="space-y-2">
             {sub.items.map((item) => {
               const max = returnableFor(item.id, item.quantity)

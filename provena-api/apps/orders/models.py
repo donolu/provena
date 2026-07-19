@@ -119,9 +119,13 @@ class OrderItem(models.Model):
 
     @property
     def is_returnable(self) -> bool:
-        """Whether this item is eligible for a change-of-mind return (ADR-014).
-        A non-returnable item that arrives defective is handled via a dispute."""
-        return self.return_policy == ReturnPolicy.RETURNABLE
+        """Whether a change-of-mind return request may be made for this item (ADR-014).
+
+        RETURNABLE and SEALED both qualify: a sealed hygiene item stays returnable while
+        unopened (the supplier verifies the seal on inspection), so the request is allowed.
+        DEFECTIVE_ONLY (perishable) does not qualify; a defect there is handled via a dispute.
+        """
+        return self.return_policy in (ReturnPolicy.RETURNABLE, ReturnPolicy.SEALED)
 
     @property
     def total_price(self) -> Decimal:
