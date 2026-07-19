@@ -4,7 +4,7 @@
 **Status:** Living document (reflects the models as of 2026-07)
 **Source of truth:** the Django models under `provena-api/apps/*/models.py`. This document is a human-readable reference; regenerate it when models change.
 
-> **Entity-relationship diagram:** the ER diagram is maintained in draw.io. Open the source with the drawio tooling (or `docs/diagrams/provena-erd.drawio`), export to `docs/diagrams/provena-erd.png`, and it renders below.
+> **Entity-relationship diagram:** maintained in `docs/diagrams/provena-diagrams.drawio` (the **Entity-relationship** tab). Export that tab to `docs/diagrams/provena-erd.png` (see `diagrams/README.md`) and it renders below.
 >
 > ![Provena entity-relationship diagram](./diagrams/provena-erd.png)
 

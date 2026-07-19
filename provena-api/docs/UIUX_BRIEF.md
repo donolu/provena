@@ -4,7 +4,7 @@
 **Status:** Living document (2026-07)
 **Scope:** the Next.js storefront and role dashboards (`provena-web`). Native apps are out of scope for v1.
 
-> Navigation map / sitemap is maintained in draw.io; export to `docs/diagrams/sitemap.png`.
+> Navigation map / sitemap is maintained in `docs/diagrams/provena-diagrams.drawio` (the **Sitemap** tab); export it to `docs/diagrams/sitemap.png` (see `diagrams/README.md`).
 >
 > ![Provena sitemap](./diagrams/sitemap.png)
 

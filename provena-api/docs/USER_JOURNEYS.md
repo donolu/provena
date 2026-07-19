@@ -4,12 +4,12 @@
 **Status:** Living document (2026-07)
 **Audience:** product, design, engineering, QA
 
-Provena has three actors: **Buyer**, **Supplier**, and **Admin** (plus **System**: Stripe, the courier provider, Celery jobs). This document narrates the primary journeys and the state each one moves through. Flow diagrams are maintained in draw.io; export each to `docs/diagrams/` and it renders inline where referenced.
+Provena has three actors: **Buyer**, **Supplier**, and **Admin** (plus **System**: Stripe, the courier provider, Celery jobs). This document narrates the primary journeys and the state each one moves through. Flow diagrams are maintained in `docs/diagrams/provena-diagrams.drawio` (one tab per diagram); export each tab to `docs/diagrams/` and it renders inline where referenced (see `diagrams/README.md`).
 
-> Diagram sources are opened in the drawio tooling. Export PNGs to:
-> - `docs/diagrams/journey-checkout.png`
-> - `docs/diagrams/journey-order-lifecycle.png`
-> - `docs/diagrams/journey-returns-refund.png`
+> Tabs → exported PNGs:
+> - **Checkout money path** → `docs/diagrams/journey-checkout.png`
+> - **Order lifecycle** → `docs/diagrams/journey-order-lifecycle.png`
+> - **Returns and refund attribution** → `docs/diagrams/journey-returns-refund.png`
 
 ---
 
