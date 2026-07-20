@@ -338,7 +338,7 @@ class TestProcessPayout:
     ):
         mock_stripe_transfer.StripeError = Exception
         mock_stripe_transfer.Transfer.create.side_effect = Exception("card declined")
-        with pytest.raises(ValueError, match="Stripe transfer failed"):
+        with pytest.raises(ValueError, match="could not be completed by the payment provider"):
             services.process_payout(pending_payout)
         pending_payout.refresh_from_db()
         assert pending_payout.status == PayoutStatus.FAILED
@@ -356,7 +356,7 @@ class TestProcessPayout:
         mock_stripe_transfer.StripeError = Exception
         mock_stripe_transfer.Transfer.create.side_effect = _mark_paid_then_raise
 
-        with pytest.raises(ValueError, match="Stripe transfer failed"):
+        with pytest.raises(ValueError, match="could not be completed by the payment provider"):
             services.process_payout(pending_payout)
         pending_payout.refresh_from_db()
         assert pending_payout.status == PayoutStatus.PAID
@@ -551,7 +551,7 @@ class TestInitiateRefund:
     def test_releases_reservation_on_stripe_error(self, succeeded_payment, mock_stripe_refund):
         mock_stripe_refund.StripeError = Exception
         mock_stripe_refund.Refund.create.side_effect = Exception("stripe down")
-        with pytest.raises(ValueError, match="Stripe refund failed"):
+        with pytest.raises(ValueError, match="could not be completed by the payment provider"):
             services.initiate_refund(succeeded_payment, amount=Decimal("1.00"))
         succeeded_payment.refresh_from_db()
         assert succeeded_payment.pending_refund_amount == Decimal("0.00")

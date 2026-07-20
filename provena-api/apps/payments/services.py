@@ -220,7 +220,10 @@ def initiate_refund(
                     Decimal("0"), pmt.pending_refund_amount - refund_amount
                 )
                 pmt.save(update_fields=["pending_refund_amount", "updated_at"])
-        raise ValueError(f"Stripe refund failed: {exc}") from exc
+        # Log the provider detail server-side; do not surface it to the client (it can flow
+        # to an API response and expose payment-processor internals).
+        logger.exception("Stripe refund failed for payment %s", payment.id)
+        raise ValueError("The refund could not be completed by the payment provider.") from exc
 
     with transaction.atomic():
         request.stripe_refund_id = refund.id
@@ -361,7 +364,8 @@ def process_payout(payout: Payout) -> Payout:
                 locked.status = PayoutStatus.FAILED
                 locked.save(update_fields=["status", "updated_at"])
         logger.exception("Stripe transfer failed for payout %s", payout.id)
-        raise ValueError(f"Stripe transfer failed: {exc}") from exc
+        # Generic client message; the provider detail stays in the log above.
+        raise ValueError("The transfer could not be completed by the payment provider.") from exc
 
     try:
         from apps.notifications.email_service import send_payout_received
@@ -411,7 +415,10 @@ def reverse_payout_for_sub_order(sub_order, ratio: Decimal) -> None:
             )
         except stripe.StripeError as exc:
             logger.exception("Transfer reversal failed for payout %s", payout.id)
-            raise ValueError(f"Stripe transfer reversal failed: {exc}") from exc
+            # Generic client message; the provider detail stays in the log above.
+            raise ValueError(
+                "The transfer reversal could not be completed by the payment provider."
+            ) from exc
         logger.info("Reversed £%s of transfer %s for payout %s", reversal, transfer_id, payout.id)
 
     with transaction.atomic():
