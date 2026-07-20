@@ -3949,15 +3949,17 @@ export interface components {
         /**
          * @description * `RETURNABLE` - Returnable (14-day change of mind)
          *     * `DEFECTIVE_ONLY` - Defective only (via dispute)
+         *     * `SEALED` - Sealed for hygiene (returnable only if unopened)
          * @enum {string}
          */
-        ReturnPolicyEnum: "RETURNABLE" | "DEFECTIVE_ONLY";
+        ReturnPolicyEnum: "RETURNABLE" | "DEFECTIVE_ONLY" | "SEALED";
         /**
          * @description * `RETURNABLE` - Returnable (14-day change of mind)
          *     * `DEFECTIVE_ONLY` - Defective only (via dispute)
+         *     * `SEALED` - Sealed for hygiene (returnable only if unopened)
          * @enum {string}
          */
-        ReturnPolicyOverrideEnum: "RETURNABLE" | "DEFECTIVE_ONLY";
+        ReturnPolicyOverrideEnum: "RETURNABLE" | "DEFECTIVE_ONLY" | "SEALED";
         ReturnRefundRequest: {
             /** Format: decimal */
             amount?: string | null;

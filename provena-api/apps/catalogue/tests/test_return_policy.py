@@ -43,3 +43,10 @@ class TestEffectiveReturnPolicy:
     def test_no_category_falls_back_to_defective_only(self, approved_supplier):
         p = self._product(approved_supplier, category=None)
         assert p.effective_return_policy == ReturnPolicy.DEFECTIVE_ONLY
+
+    def test_sealed_category_resolves(self, approved_supplier):
+        cat = Category.objects.create(
+            name="Hygiene", slug="hygiene", return_policy=ReturnPolicy.SEALED
+        )
+        p = self._product(approved_supplier, category=cat)
+        assert p.effective_return_policy == ReturnPolicy.SEALED

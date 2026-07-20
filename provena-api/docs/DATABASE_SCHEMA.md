@@ -66,7 +66,7 @@
 
 ### catalogue
 
-**Category** - self-referential `parent` (SET_NULL) tree; `name`, `slug`, `image_url`, `position`, `is_active`, `dispute_window_days` (1-7, default 3), **`return_policy`** (`RETURNABLE` / `DEFECTIVE_ONLY`, default `DEFECTIVE_ONLY`; ADR-014).
+**Category** - self-referential `parent` (SET_NULL) tree; `name`, `slug`, `image_url`, `position`, `is_active`, `dispute_window_days` (1-7, default 3), **`return_policy`** (`RETURNABLE` / `DEFECTIVE_ONLY` / `SEALED`, default `DEFECTIVE_ONLY`; ADR-014. `SEALED` = hygiene goods, returnable only while unopened).
 **Product** - FK `supplier`, FK `category` (SET_NULL); `name`, `slug`, `description`, `status` (`DRAFT`/`ACTIVE`/`ARCHIVED`), **`vat_rate`** (`STANDARD` 20% / `REDUCED` 5% / `ZERO`), **`return_policy_override`** (blank = inherit category; `effective_return_policy` resolves override-else-category-else-`DEFECTIVE_ONLY`), `is_featured`.
 **ProductVariant** - FK `product`; `name`, `sku` (unique), `price`, `compare_at_price?`, `weight_grams`, `is_active`.
 **ProductImage / VariantImage** - `url`, `alt_text`, `position`, `is_primary`.

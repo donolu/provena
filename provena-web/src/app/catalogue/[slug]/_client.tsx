@@ -415,7 +415,9 @@ export default function ProductDetailPage({
                   <p className="text-[11px] font-sans text-soil leading-relaxed">
                     {product.effective_return_policy === 'RETURNABLE'
                       ? 'Returnable within 14 days of delivery.'
-                      : 'Perishable: non-returnable, except if it arrives damaged or spoiled (raise a dispute).'}
+                      : product.effective_return_policy === 'SEALED'
+                        ? 'Sealed for hygiene: returnable within 14 days only if unopened. If it arrives damaged or faulty, raise a dispute.'
+                        : 'Perishable: non-returnable, except if it arrives damaged or spoiled (raise a dispute).'}
                   </p>
                 </div>
               </div>

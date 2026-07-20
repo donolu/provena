@@ -19,11 +19,18 @@ class VatRate(models.TextChoices):
 
 
 class ReturnPolicy(models.TextChoices):
-    # Standard 14-day change-of-mind return (UK Consumer Contracts Regulations).
+    # The two UK Consumer Contracts Regulations 2013 exemption classes relevant here,
+    # plus the default. Defects/spoilage are always redressable via a dispute (CRA 2015).
+    #
+    # Standard 14-day change-of-mind return.
     RETURNABLE = "RETURNABLE", "Returnable (14-day change of mind)"
-    # No change-of-mind return; perishable/exempt goods. A defect or spoilage on
-    # arrival is still covered, but goes via a dispute (Consumer Rights Act 2015).
+    # Perishable/exempt goods: no change-of-mind return at all (reg 28(3)(c)).
     DEFECTIVE_ONLY = "DEFECTIVE_ONLY", "Defective only (via dispute)"
+    # Sealed goods unsuitable for return for hygiene/health reasons *once unsealed*
+    # (reg 28(3)(b)). The right survives while the item is unopened, and the platform
+    # cannot observe the seal, so a return request is allowed (like RETURNABLE) with an
+    # "only if unopened" condition; the supplier verifies the seal on inspection.
+    SEALED = "SEALED", "Sealed for hygiene (returnable only if unopened)"
 
 
 # Fraction of the net price that VAT adds; prices are VAT-inclusive, so VAT is
