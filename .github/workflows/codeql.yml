@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Initialise CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           # security-and-quality adds maintainability/reliability queries on top of
@@ -41,9 +41,9 @@ jobs:
       # Python and JS/TS need no compilation - autobuild is a no-op but kept for
       # forward-compatibility if a compiled language is added later.
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
       - name: Analyse
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: '/language:${{ matrix.language }}'
