@@ -52,6 +52,7 @@
     "vitest": "^4.1.10"
   },
   "overrides": {
-    "postcss": "$postcss"
+    "postcss": "$postcss",
+    "js-yaml": "^4.3.0"
   }
 }
