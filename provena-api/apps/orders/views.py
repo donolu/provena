@@ -1,6 +1,9 @@
 import secrets
+from decimal import Decimal
 
 from django.core.cache import cache
+from django.db.models import Count, Sum
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import generics, status
@@ -583,7 +586,12 @@ class ValidateDiscountView(APIView):
 class AdminDiscountCodeListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAdminUser]
     serializer_class = AdminDiscountCodeSerializer
-    queryset = DiscountCode.objects.all()
+    # Annotate usage + total discount given so the serializer reads them off the row
+    # instead of one COUNT/SUM query per code (avoids an N+1 on the list).
+    queryset = DiscountCode.objects.annotate(
+        times_used_count=Count("redemptions", distinct=True),
+        total_discount_sum=Coalesce(Sum("redemptions__amount"), Decimal("0.00")),
+    ).order_by("-created_at")
 
 
 @extend_schema(tags=["Discounts (Admin)"])

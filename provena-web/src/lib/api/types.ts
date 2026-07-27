@@ -464,6 +464,7 @@ export interface DiscountCode {
   max_uses_per_buyer: number | null
   is_active: boolean
   times_used: number
+  total_discount: string
   created_at: string
   updated_at: string
 }

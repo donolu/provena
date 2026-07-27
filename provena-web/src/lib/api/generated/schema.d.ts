@@ -2677,6 +2677,8 @@ export interface components {
             max_uses_per_buyer?: number | null;
             is_active?: boolean;
             readonly times_used: number;
+            /** @description Total money this code has given away (sum of redemption amounts). */
+            readonly total_discount: string;
             /** Format: date-time */
             readonly created_at: string;
             /** Format: date-time */
