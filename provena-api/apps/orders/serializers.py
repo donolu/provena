@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.db.models import Sum
 from rest_framework import serializers
 
 from .models import (
@@ -261,6 +262,7 @@ class DiscountValidateResultSerializer(serializers.Serializer):
 
 class AdminDiscountCodeSerializer(serializers.ModelSerializer):
     times_used = serializers.SerializerMethodField()
+    total_discount = serializers.SerializerMethodField()
 
     class Meta:
         model = DiscountCode
@@ -277,13 +279,23 @@ class AdminDiscountCodeSerializer(serializers.ModelSerializer):
             "max_uses_per_buyer",
             "is_active",
             "times_used",
+            "total_discount",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "times_used", "created_at", "updated_at"]
+        read_only_fields = ["id", "times_used", "total_discount", "created_at", "updated_at"]
 
     def get_times_used(self, obj: DiscountCode) -> int:
-        return obj.redemptions.count()
+        # Prefer the annotation from the list view (avoids an N+1); fall back for the detail view.
+        annotated = getattr(obj, "times_used_count", None)
+        return int(annotated) if annotated is not None else obj.redemptions.count()
+
+    def get_total_discount(self, obj: DiscountCode) -> str:
+        """Total money this code has given away (sum of redemption amounts)."""
+        annotated = getattr(obj, "total_discount_sum", None)
+        if annotated is None:
+            annotated = obj.redemptions.aggregate(total=Sum("amount"))["total"]
+        return str(annotated or Decimal("0.00"))
 
     def validate_code(self, value: str) -> str:
         value = value.strip().upper()

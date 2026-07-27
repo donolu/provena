@@ -116,3 +116,49 @@ class TestAdminDiscountCodes:
 
     def test_non_admin_forbidden(self, buyer_client):
         assert buyer_client.get(self.URL).status_code == 403
+
+    def test_list_reports_total_discount_and_uses(self, admin_client, buyer, variant):
+        from apps.orders import services
+        from apps.orders.tests.conftest import SHIPPING
+
+        DiscountCode.objects.create(
+            code="TEN",
+            discount_type=DiscountType.PERCENTAGE,
+            value=Decimal("10"),
+            funded_by="PLATFORM",
+        )
+        services.place_order(
+            buyer, [{"variant": variant, "quantity": 2}], SHIPPING, discount_code="TEN"
+        )
+        services.place_order(
+            buyer, [{"variant": variant, "quantity": 1}], SHIPPING, discount_code="TEN"
+        )
+        code = DiscountCode.objects.get(code="TEN")
+        expected = sum((r.amount for r in code.redemptions.all()), Decimal("0.00"))
+
+        res = admin_client.get(self.URL)
+        row = next(r for r in res.data["results"] if r["code"] == "TEN")
+        assert row["times_used"] == 2
+        assert Decimal(row["total_discount"]) == expected
+        assert expected > 0
+
+    def test_total_discount_zero_when_unused(self, admin_client):
+        DiscountCode.objects.create(
+            code="UNUSED", discount_type=DiscountType.FIXED, value=Decimal("5")
+        )
+        res = admin_client.get(self.URL)
+        row = next(r for r in res.data["results"] if r["code"] == "UNUSED")
+        assert row["times_used"] == 0
+        assert row["total_discount"] == "0.00"
+
+    def test_list_query_count_does_not_scale_with_codes(
+        self, admin_client, django_assert_max_num_queries
+    ):
+        # Annotated counts/sums keep the list at a constant query count (no per-code N+1).
+        for i in range(5):
+            DiscountCode.objects.create(
+                code=f"C{i}", discount_type=DiscountType.FIXED, value=Decimal("1")
+            )
+        with django_assert_max_num_queries(8):
+            res = admin_client.get(self.URL)
+        assert res.status_code == 200

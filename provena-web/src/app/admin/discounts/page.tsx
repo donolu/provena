@@ -143,6 +143,7 @@ function Row({ code }: { code: DiscountCode }) {
       <td className="py-2.5 px-3 text-xs text-soil">{code.funded_by === 'PLATFORM' ? 'Platform' : 'Supplier'}</td>
       <td className="py-2.5 px-3 font-mono text-xs text-soil">£{code.minimum_spend}</td>
       <td className="py-2.5 px-3 font-mono text-xs text-soil">{uses}</td>
+      <td className="py-2.5 px-3 font-mono text-xs text-soil">£{code.total_discount}</td>
       <td className="py-2.5 px-3">
         <span
           className={`text-[11px] font-sans rounded px-2 py-0.5 ${
@@ -208,6 +209,7 @@ export default function AdminDiscountsPage() {
                 <th className="py-2.5 px-3 font-medium">Funded by</th>
                 <th className="py-2.5 px-3 font-medium">Min spend</th>
                 <th className="py-2.5 px-3 font-medium">Uses</th>
+                <th className="py-2.5 px-3 font-medium">Discounted</th>
                 <th className="py-2.5 px-3 font-medium">Status</th>
                 <th className="py-2.5 px-3" />
               </tr>
